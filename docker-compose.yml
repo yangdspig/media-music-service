@@ -1,0 +1,48 @@
+services:
+  # 核心 REST 服务（必选）
+  music-service:
+    build: .
+    image: media-music-service:latest
+    container_name: media-music-service
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    volumes:
+      # 下载目录：改成你 NAS 的音乐媒体库路径
+      - ./downloads:/app/downloads
+      # 任务/历史数据库
+      - ./data:/app/data
+      # 配置文件（改完重启生效；也可直接在镜像外编辑）
+      - ./config.yaml:/app/config.yaml
+    environment:
+      # 可选 API Key；不设或留空则不启用鉴权（纯内网推荐）
+      # MUSIC_SERVICE_API_KEY: "change-me"
+      TZ: Asia/Shanghai
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8765/api/v1/health',timeout=5).status==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # MCP 适配器（可选）：仅当你需要远程 Agent 通过 HTTP 连接时才启用
+  # 本地 Agent（如 Trae/Claude Desktop）建议直接用 stdio 方式拉起 mcp_adapter.py，不走此容器
+  mcp-adapter:
+    build: .
+    image: media-music-service:latest
+    container_name: media-music-mcp
+    restart: unless-stopped
+    profiles: ["mcp"]  # 默认不启动；docker compose --profile mcp up 才拉起
+    command: ["python", "mcp_adapter.py"]
+    environment:
+      MUSIC_MCP_TRANSPORT: http
+      MUSIC_MCP_HOST: 0.0.0.0
+      MUSIC_MCP_PORT: 8766
+      MUSIC_SERVICE_URL: http://music-service:8765
+      # MUSIC_SERVICE_API_KEY: "change-me"  # 若核心服务开了鉴权，这里要一致
+      TZ: Asia/Shanghai
+    ports:
+      - "8766:8766"
+    depends_on:
+      music-service:
+        condition: service_healthy

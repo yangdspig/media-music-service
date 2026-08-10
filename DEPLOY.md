@@ -1,0 +1,92 @@
+# Docker 部署指南
+
+本文档面向**在另一台 Linux 机器**上构建并运行 MediaMusicService 的场景。
+
+## 一、需要拷贝的文件清单
+
+把 `media-music-service` 目录下这些文件/目录打包拷到目标机器即可（其余如 `downloads/`、`data/`、`__pycache__/` 无需拷贝）：
+
+```
+media-music-service/
+├── app/                  # 核心服务代码（必拷，含 __init__.py 及全部 .py）
+│   ├── __init__.py
+│   ├── config.py
+│   ├── schemas.py
+│   ├── registry.py
+│   ├── search.py
+│   ├── playlist.py
+│   ├── download.py
+│   ├── storage.py
+│   └── main.py
+├── mcp_adapter.py        # MCP 适配器（必拷）
+├── config.yaml           # 配置文件（必拷，可在目标机器上再改）
+├── requirements.txt      # Python 依赖（必拷）
+├── Dockerfile            # 镜像定义（必拷）
+├── docker-compose.yml    # 编排（推荐拷）
+├── .dockerignore         # 构建瘦身（推荐拷）
+└── README.md             # 说明（可选）
+```
+
+## 二、目标机器前置条件
+
+- Linux（x86_64；ARM 需自行调整 Dockerfile 中 Node.js / N_m3u8DL-RE 的下载架构）
+- Docker 20.10+，docker compose 插件（`docker compose version` 可用）
+- 能访问外网拉取：PyPI、nodejs.org、GitHub Releases（构建期一次性）
+
+## 三、构建与启动
+
+```bash
+cd media-music-service
+
+# 1. 按需修改 config.yaml（下载目录、cookies、API Key 等）
+vi config.yaml
+
+# 2. 构建镜像
+docker compose build
+
+# 3. 启动核心 REST 服务
+docker compose up -d music-service
+
+# 4.（可选）同时启动 MCP HTTP 适配器，供远程 Agent 连接
+docker compose --profile mcp up -d
+```
+
+## 四、验证
+
+```bash
+# 健康检查
+curl http://127.0.0.1:8765/api/v1/health
+# 期望：{"ok":true,"musicdl":"2.13.4"}
+
+# 查看源可用性（哪些源因缺 cookies/网络被标记不可用）
+curl http://127.0.0.1:8765/api/v1/sources | jq '.[] | {name,available,note}'
+
+# 搜索冒烟
+curl 'http://127.0.0.1:8765/api/v1/search?keyword=周杰伦&limit=3' | jq '.total'
+```
+
+## 五、目录与持久化
+
+- 下载文件：宿主机 `./downloads`（compose 里映射到 `/app/downloads`），建议改成你的媒体库路径
+- 任务/历史库：宿主机 `./data/music_service.db`
+- 配置：宿主机 `./config.yaml` 挂载进容器，改完 `docker compose restart music-service` 生效
+
+## 六、常见问题
+
+1. **构建时拉 Node.js / N_m3u8DL-RE 失败**：目标机器需能访问 nodejs.org 和 github.com；离线环境可改为构建前手动下载对应发行包放进镜像（调整 Dockerfile 用 `COPY` 替代 `curl`）。
+2. **ARM 机器（如树莓派/部分 NAS）**：把 Dockerfile 中 `linux-x64` 改为 `linux-arm64`，Node.js 同理换 `node-v20.19.0-linux-arm64.tar.xz`。
+3. **海外源（Spotify/YouTube Music 等）超时**：属网络环境限制，与镜像无关；可通过 musicdl 的代理配置或在宿主机/网关层解决。
+4. **HLS/Apple Music 下载报错**：确认容器内 `N_m3u8DL-RE` 可用：`docker exec media-music-service N_m3u8DL-RE --version`。
+5. **防火墙**：只需开放 `8765`（REST）；只有启用 MCP HTTP 适配器时才需 `8766`。
+
+## 七、升级 musicdl
+
+进入容器或重建镜像即可（平台接口适配由 musicdl 作者维护）：
+
+```bash
+# 方式一：改 requirements.txt 后重建
+docker compose build --no-cache && docker compose up -d
+
+# 方式二：容器内临时升级（重启失效，仅调试用）
+docker exec media-music-service pip install -U "musicdl>=2.13.4,<3.0"
+```

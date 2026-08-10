@@ -1,0 +1,17 @@
+# 构建上下文瘦身
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+downloads/
+data/
+*.db
+*.pkl
+.git/
+.gitignore
+specs/
+*.md
+!README.md
