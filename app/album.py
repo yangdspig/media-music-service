@@ -155,6 +155,44 @@ def match_track(expected: AlbumTrack, album: AlbumInfo, sources: list[str] | Non
     return {"status": "matched", "match": _match_info(best_score, best), "track": best}
 
 
+_CJK_RE = re.compile(r"[一-鿿]")
+
+
+def _majority_vote(values: list[str]) -> Optional[str]:
+    """归一化多数表决：返回占比过半的值，否则 None。"""
+    from collections import Counter
+    votes = Counter(v for v in (t2s(x).strip() for x in values) if v)
+    if not votes:
+        return None
+    top, count = votes.most_common(1)[0]
+    return top if count > len(values) / 2 else None
+
+
+def infer_display_names(album: dict, ok_entries: list[dict]) -> dict:
+    """从匹配成功曲目的候选信息推断中文显示名（专辑名/艺人）。
+
+    背景：iTunes 对部分老中文专辑只存罗马音专辑名（如 "Kou Shi Xin Fei"），
+    但国内源候选里带着正确中文名。两道保护：
+    - 多数表决占比须过半（防"范特西PLUS"式再版名噪音）；
+    - 仅当 iTunes 原名不含 CJK 而表决结果含 CJK 时才替换（原名已对就不动）。
+    返回可能含 display_title / display_artist 的 dict（可为空）。
+    """
+    if not ok_entries:
+        return {}
+    out: dict[str, str] = {}
+    orig_title = album.get("title") or ""
+    if not _CJK_RE.search(orig_title):
+        voted = _majority_vote([(e.get("match") or {}).get("album") or "" for e in ok_entries])
+        if voted and _CJK_RE.search(voted):
+            out["display_title"] = voted
+    orig_artist = t2s((album.get("artists") or [""])[0])
+    if not _CJK_RE.search(orig_artist):
+        voted = _majority_vote([((e.get("match") or {}).get("artists") or [""])[0] for e in ok_entries])
+        if voted and _CJK_RE.search(voted):
+            out["display_artist"] = voted
+    return out
+
+
 def _safe_name(s: str) -> str:
     return "".join(c for c in s if c not in r'\/:*?"<>|').strip() or "未知"
 
@@ -189,22 +227,30 @@ def _download_cover(album: AlbumInfo, save_dir: str) -> Optional[str]:
         return None
 
 
-def submit_album_download(album: AlbumInfo, sources: list[str] | None = None, subdir: str | None = None) -> DownloadTask:
-    """提交专辑下载任务（异步）：先逐曲匹配消歧，再按源分组下载，最后产出 manifest.json。"""
+def submit_album_download(album: AlbumInfo, sources: list[str] | None = None, subdir: str | None = None,
+                          album_title: str | None = None, artist: str | None = None) -> DownloadTask:
+    """提交专辑下载任务（异步）：先逐曲匹配消歧，再按源分组下载，最后产出 manifest.json。
+
+    album_title/artist 为显式显示名覆盖（应对 iTunes 罗马音专辑名），
+    会写入 manifest 供归档使用；subdir 命名也优先采用。
+    """
     task_id = uuid.uuid4().hex[:12]
     if not subdir:
-        artist = _safe_name(t2s(album.artists[0])) if album.artists else "未知艺人"
-        subdir = f"{artist} - {_safe_name(t2s(album.title))}"
+        artist_name = _safe_name(t2s(artist or (album.artists[0] if album.artists else "未知艺人")))
+        title_name = _safe_name(t2s(album_title or album.title))
+        subdir = f"{artist_name} - {title_name}"
     save_dir = str(Path(settings.download_root) / subdir)
     Path(save_dir).mkdir(parents=True, exist_ok=True)
 
     task = DownloadTask(task_id=task_id, total=len(album.tracks), save_dir=save_dir)
     dl.register_task(task)
-    threading.Thread(target=_run_album, args=(task, album, sources), daemon=True).start()
+    display = {k: v for k, v in {"display_title": album_title, "display_artist": artist}.items() if v}
+    threading.Thread(target=_run_album, args=(task, album, sources, display), daemon=True).start()
     return task
 
 
-def _run_album(task: DownloadTask, album: AlbumInfo, sources: list[str] | None) -> None:
+def _run_album(task: DownloadTask, album: AlbumInfo, sources: list[str] | None,
+               display: dict[str, str] | None = None) -> None:
     task.status = TaskStatus.RUNNING
     dl.save_task(task)
     save_dir = task.save_dir or settings.download_root
@@ -282,10 +328,13 @@ def _run_album(task: DownloadTask, album: AlbumInfo, sources: list[str] | None) 
     failed = sum(1 for e in entries if e["status"] == "failed")
     ok = sum(1 for e in entries if e["status"] == "ok")
     task.failed = unmatched + failed
+    album_dict = {**album.model_dump(exclude={"tracks"}), "meta_source": "itunes"}
+    # 显示名：显式覆盖优先，否则从匹配候选自动推断（应对 iTunes 罗马音专辑名）
+    display = display or infer_display_names(album_dict, [e for e in entries if e["status"] == "ok"])
     manifest = {
         "task_id": task.task_id,
         "created_at": time.time(),
-        "album": {**album.model_dump(exclude={"tracks"}), "meta_source": "itunes"},
+        "album": {**album_dict, **display},
         "cover": cover,
         "tracks": entries,
         "summary": {"total": len(entries), "ok": ok, "unmatched": unmatched, "failed": failed},

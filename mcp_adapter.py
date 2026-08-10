@@ -152,13 +152,17 @@ def get_album_info(collection_id: str) -> dict:
 
 
 @mcp.tool()
-def download_album(collection_id: str, sources: str | None = None, subdir: str | None = None) -> dict:
+def download_album(collection_id: str, sources: str | None = None, subdir: str | None = None,
+                   album_title: str | None = None, artist: str | None = None) -> dict:
     """专辑整单下载（异步）：服务端逐曲搜索匹配、按曲目序号命名落盘，并产出 manifest.json。
 
     Args:
         collection_id: search_albums 返回的 collection_id
         sources: 逗号分隔的源名（可选，留空用默认五源）
         subdir: 下载根目录下的子目录名（可选，默认"{艺人} - {专辑}"）
+        album_title: 显示用专辑名覆盖（可选；iTunes 专辑名为罗马音/拼音时建议传入中文名，
+            会写入 manifest 供归档作为目录名与 ALBUM tag）
+        artist: 显示用艺人名覆盖（可选，同上）
     Returns:
         task_id / save_dir，用 get_download_status 轮询进度；完成后
         manifest_path 指向的 manifest.json 含逐曲匹配分数、落盘文件与失败原因，供复核。
@@ -168,6 +172,10 @@ def download_album(collection_id: str, sources: str | None = None, subdir: str |
         payload["sources"] = [s.strip() for s in sources.split(",") if s.strip()]
     if subdir:
         payload["subdir"] = subdir
+    if album_title:
+        payload["album_title"] = album_title
+    if artist:
+        payload["artist"] = artist
     with _client() as c:
         r = c.post(f"/api/v1/albums/{collection_id}/download", json=payload)
         r.raise_for_status()
@@ -176,13 +184,19 @@ def download_album(collection_id: str, sources: str | None = None, subdir: str |
 
 
 @mcp.tool()
-def archive_album(task_id: str | None = None, manifest_path: str | None = None, overwrite: bool = False) -> dict:
+def archive_album(task_id: str | None = None, manifest_path: str | None = None, overwrite: bool = False,
+                  album_title: str | None = None, artist: str | None = None) -> dict:
     """把专辑下载产物归档进媒体库（同步）：硬链接/复制入库、写 tag、嵌封面歌词、生成 album_info.txt。
+
+    目录名与 tag 的专辑名/艺人名按解析链确定：显式参数 > manifest display_*
+    > 自动推断（国内源候选多数表决，仅在 iTunes 原名为罗马音时生效）> iTunes 原名。
 
     Args:
         task_id: download_album 返回的任务 ID（服务未重启时可用，推荐）
         manifest_path: manifest.json 的绝对路径（服务重启后用这个）
         overwrite: 目标已存在时是否覆盖重建；默认 False（幂等跳过）
+        album_title: 显示用专辑名覆盖（可选，最高优先级；自动推断仍不对时用它兜底）
+        artist: 显示用艺人名覆盖（可选，最高优先级）
     Returns:
         归档结果：library_dir（库内专辑目录）、逐曲 action（linked/copied/skipped/failed）、
         summary 计数、errors。目录结构为 {library_root}/{艺人}/{专辑}/，多 Disc 用 CD1/CD2 子目录。
@@ -192,6 +206,10 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None, 
         payload["task_id"] = task_id
     if manifest_path:
         payload["manifest_path"] = manifest_path
+    if album_title:
+        payload["album_title"] = album_title
+    if artist:
+        payload["artist"] = artist
     with _client() as c:
         r = c.post("/api/v1/albums/archive", json=payload)
         r.raise_for_status()

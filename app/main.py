@@ -84,7 +84,8 @@ def api_album_search(keyword: str, artist: str | None = None, limit: int = 10) -
 def api_album_archive(req: ArchiveRequest) -> ArchiveResult:
     try:
         return archive_svc.archive_album(task_id=req.task_id, manifest_path=req.manifest_path,
-                                         overwrite=req.overwrite)
+                                         overwrite=req.overwrite, album_title=req.album_title,
+                                         artist=req.artist)
     except (ValueError, LookupError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
@@ -101,7 +102,8 @@ def api_album_download(collection_id: str, req: AlbumDownloadRequest) -> Downloa
     album = _get_album_or_404(collection_id)
     if not album.tracks:
         raise HTTPException(status_code=400, detail="专辑曲目表为空，无法下载")
-    return album_svc.submit_album_download(album, sources=req.sources, subdir=req.subdir)
+    return album_svc.submit_album_download(album, sources=req.sources, subdir=req.subdir,
+                                           album_title=req.album_title, artist=req.artist)
 
 
 @app.post("/api/v1/downloads", response_model=DownloadTask, dependencies=[Depends(auth)])

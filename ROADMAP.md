@@ -19,6 +19,7 @@
    - **第二期已完成**（2026-08-10）：`archive_album` 服务端归档（REST + MCP）：以 manifest.json 为契约，硬链接（CIFS/跨设备回退复制）入库 `{library_root}/{艺人}/{专辑}/`，断链后写 tag（TRACKNUMBER n/N、多 Disc CD1/CD2 + DISCNUMBER d/D）、嵌封面/歌词、`lyrics/`、`cover.jpg`、`album_info.txt`，幂等跳过；新增 `library_root`/`archive_comment` 配置与 compose 媒体库卷挂载示例
    - **后续待做**：网易云/QQ 网页接口补充中文专辑与简介（iTunes 覆盖不足时）；`get_artist_info` + 艺人 `artist.jpg` 头像；WAV→FLAC 转换
    - **已完成补充**（2026-08-10）：匹配音质偏好——同分段（与最高分差 ≤0.1）候选优先无损（`quality_tier`：无损 3 / 320k 2 / 其他 1），没有合格无损才选 MP3；manifest 的 match 增加 `ext`/`quality`/`quality_tier` 字段
+   - **已完成补充**（2026-08-10）：罗马音专辑名修复——iTunes 对部分老中文专辑只存罗马音专辑名（如 "Kou Shi Xin Fei"），归档按"显式参数 > manifest display_* > 自动推断（国内源候选多数表决 + CJK 保护）> iTunes 原名"解析显示名；`download_album`/`archive_album` 新增 `album_title`/`artist` 覆盖参数；旧 manifest 重跑归档即可自动纠正
    - 风险：网易云/QQ 网页接口可能变动或限流，需多源交叉验证；消歧可能误中 Live/翻唱版本，manifest 必须带置信信息供复核
 
 2. **MoviePilot 薄客户端插件**

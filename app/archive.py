@@ -19,11 +19,26 @@ from pathlib import Path
 from typing import Any, Optional
 
 from . import download as dl
-from .album import _safe_name, t2s
+from .album import _safe_name, infer_display_names, t2s
 from .config import settings
 from .schemas import ArchiveResult, ArchiveTrackResult
 
 _TAGGABLE_EXTS = {"flac", "mp3"}
+
+
+def _resolve_names(album: dict, ok_entries: list[dict],
+                   album_title: str | None = None, artist: str | None = None) -> tuple[str, str]:
+    """显示名解析链：显式参数 > manifest display_* 字段 > 归档时自动推断 > iTunes 原名（转简体）。
+
+    自动推断见 album.infer_display_names：iTunes 罗马音专辑名（如 "Kou Shi Xin Fei"）
+    会被国内源候选的多数表决中文名替换；原名已含中文则保持不变。
+    """
+    inferred = infer_display_names(album, ok_entries)
+    title = (album_title or album.get("display_title") or inferred.get("display_title")
+             or t2s(album.get("title") or "未知专辑"))
+    art = (artist or album.get("display_artist") or inferred.get("display_artist")
+           or t2s((album.get("artists") or ["未知艺人"])[0]))
+    return title, art
 
 
 def _load_manifest(task_id: str | None, manifest_path: str | None) -> tuple[dict, Path]:
@@ -50,14 +65,12 @@ def _break_link_if_needed(path: Path) -> None:
         os.replace(tmp, path)
 
 
-def _write_tags(path: Path, entry: dict, album: dict, disc_total: int, disc_track_total: int,
+def _write_tags(path: Path, entry: dict, artist: str, album_title: str, date: str,
+                disc_total: int, disc_track_total: int,
                 cover_bytes: bytes | None, lyric_text: str | None) -> None:
-    """按库约定重写 tag 并嵌封面/歌词（仅 flac/mp3）。"""
+    """按库约定重写 tag 并嵌封面/歌词（仅 flac/mp3）。artist/album_title 为解析后的显示名。"""
     ext = path.suffix.lstrip(".").lower()
-    artist = t2s((album.get("artists") or [""])[0])
-    album_title = t2s(album.get("title") or "")
     title = t2s(entry.get("title") or "")
-    date = (album.get("release_date") or "")[:10]
     track_no = f"{entry['track']}/{disc_track_total}"
     disc_no = f"{entry['disc']}/{disc_total}" if disc_total > 1 else None
     comment = settings.archive_comment
@@ -127,11 +140,14 @@ def _target_relpath(entry: dict, multi_disc: bool) -> str:
     return f"CD{entry['disc']}/{name}" if multi_disc else name
 
 
-def _write_album_info(album_dir: Path, album: dict, entries: list[dict]) -> None:
+def _write_album_info(album_dir: Path, album: dict, entries: list[dict],
+                      display_title: str, display_artist: str) -> None:
     """生成 album_info.txt（简介暂缺：iTunes 无此字段，待网易云/QQ 源补充）。"""
+    orig_title = album.get("title") or ""
+    orig_artists = " / ".join(album.get("artists") or [])
     lines = [
-        f"专辑：{t2s(album.get('title') or '')}",
-        f"艺人：{t2s(' / '.join(album.get('artists') or []))}",
+        f"专辑：{display_title}" + (f"（iTunes 原名：{orig_title}）" if orig_title != display_title else ""),
+        f"艺人：{display_artist}" + (f"（iTunes 原名：{orig_artists}）" if orig_artists and orig_artists != display_artist else ""),
         f"发行日期：{(album.get('release_date') or '')[:10]}",
         f"流派：{album.get('genre') or ''}",
         f"元数据来源：iTunes (collection {album.get('collection_id')}, storefront {album.get('storefront')})",
@@ -148,18 +164,21 @@ def _write_album_info(album_dir: Path, album: dict, entries: list[dict]) -> None
 
 
 def archive_album(task_id: str | None = None, manifest_path: str | None = None,
-                  overwrite: bool = False) -> ArchiveResult:
-    """按 manifest 把专辑下载产物归档进媒体库（同步，幂等）。"""
+                  overwrite: bool = False, album_title: str | None = None,
+                  artist: str | None = None) -> ArchiveResult:
+    """按 manifest 把专辑下载产物归档进媒体库（同步，幂等）。
+
+    目录名与 tag 用的专辑名/艺人名按解析链确定：
+    显式 album_title/artist 参数 > manifest display_* > 自动推断 > iTunes 原名。
+    """
     if not settings.library_root:
         raise RuntimeError("未配置 library_root（媒体库根目录），归档不可用；请在 config.yaml 配置并挂载媒体库卷")
     manifest, src_dir = _load_manifest(task_id, manifest_path)
     album = manifest.get("album") or {}
     entries = manifest.get("tracks") or []
-    artist = _safe_name(t2s((album.get("artists") or ["未知艺人"])[0]))
-    album_title = _safe_name(t2s(album.get("title") or "未知专辑"))
-    album_dir = Path(settings.library_root) / artist / album_title
-
     ok_entries = [e for e in entries if e.get("status") == "ok" and e.get("file")]
+    disp_title, disp_artist = _resolve_names(album, ok_entries, album_title, artist)
+    album_dir = Path(settings.library_root) / _safe_name(disp_artist) / _safe_name(disp_title)
     multi_disc = len({e["disc"] for e in entries}) > 1
     disc_total = max((e["disc"] for e in entries), default=1)
     cover_bytes: bytes | None = None
@@ -198,8 +217,9 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None,
                         lrc_dir.mkdir(exist_ok=True)
                         shutil.copy2(lrc_src, lrc_dir / f"{target.stem}.lrc")
                     disc_track_total = sum(1 for e in ok_entries if e["disc"] == entry["disc"])
-                    _write_tags(target, entry, album, disc_total, disc_track_total,
-                                cover_bytes, lyric_text)
+                    _write_tags(target, entry, disp_artist, disp_title,
+                                (album.get("release_date") or "")[:10],
+                                disc_total, disc_track_total, cover_bytes, lyric_text)
                 else:
                     res.action = "tag_unsupported"
         except Exception as e:  # 单曲失败不中断整体
@@ -217,7 +237,7 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None,
                 cd_dir = album_dir / f"CD{d}"
                 if cd_dir.exists():
                     (cd_dir / f"cover{suffix}").write_bytes(cover_bytes)
-    _write_album_info(album_dir, album, entries)
+    _write_album_info(album_dir, album, entries, disp_title, disp_artist)
 
     summary: dict[str, int] = {}
     for r in results:

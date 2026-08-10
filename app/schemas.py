@@ -77,6 +77,8 @@ class AlbumInfo(AlbumSummary):
 class AlbumDownloadRequest(BaseModel):
     sources: Optional[list[str]] = Field(default=None, description="参与匹配下载的源，留空用默认五源")
     subdir: Optional[str] = Field(default=None, description="下载根目录下的子目录，默认'{艺人} - {专辑}'")
+    album_title: Optional[str] = Field(default=None, description="显示用专辑名覆盖（应对 iTunes 罗马音专辑名，写入 manifest 供归档使用）")
+    artist: Optional[str] = Field(default=None, description="显示用艺人名覆盖")
 
 
 class ArchiveRequest(BaseModel):
@@ -84,6 +86,8 @@ class ArchiveRequest(BaseModel):
     task_id: Optional[str] = Field(default=None, description="专辑下载任务 ID（取其 manifest_path）")
     manifest_path: Optional[str] = Field(default=None, description="manifest.json 路径（直接指定）")
     overwrite: bool = Field(default=False, description="目标已存在时是否覆盖重建；默认跳过（幂等）")
+    album_title: Optional[str] = Field(default=None, description="显示用专辑名覆盖（最高优先级，影响目录名与 ALBUM tag）")
+    artist: Optional[str] = Field(default=None, description="显示用艺人名覆盖（最高优先级，影响目录名与 ARTIST tag）")
 
 
 class ArchiveTrackResult(BaseModel):

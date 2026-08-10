@@ -227,7 +227,9 @@
 
 专辑整单下载（**异步**，立即返回 `task_id`）。服务端编排：逐曲在音乐源中搜索 → 打分消歧（标题/歌手/专辑/时长，阈值 0.6，低于阈值记 `unmatched` 不强行下载）→ **音质择优**（与最高分相差 ≤0.1 的同分段候选中优先无损 flac 等，没有合格无损才选 MP3；分数明显更高的候选不受音质影响）→ 按曲目序号命名落盘 → 下载封面 → 产出 `manifest.json`。
 
-**请求体**：`{"sources": ["可选，源名列表"], "subdir": "可选，默认'{艺人} - {专辑}'"}`
+**请求体**：`{"sources": ["可选，源名列表"], "subdir": "可选，默认'{艺人} - {专辑}'", "album_title": "可选，显示用专辑名覆盖", "artist": "可选，显示用艺人名覆盖"}`
+
+> `album_title`/`artist` 用于应对 iTunes 罗马音专辑名（如 "Kou Shi Xin Fei"）：传入中文名后写入 manifest 的 `album.display_title`/`display_artist`，归档时作为目录名与 ALBUM/ARTIST tag 使用。
 
 **响应 200**：`DownloadTask`（进度用 `GET /api/v1/downloads/{task_id}` 查询）；**400**：曲目表为空；**404/502**：同专辑详情接口
 
@@ -266,6 +268,8 @@
 
 把专辑下载产物归档进媒体库（**同步**，秒级返回）。以 `manifest.json` 为输入契约：硬链接（CIFS/跨设备自动回退复制）入库 → 断链后写 tag → 嵌封面/歌词 → 生成 `cover.jpg` 与 `album_info.txt`。
 
+**专辑名/艺人名解析链**（应对 iTunes 罗马音专辑名，如 "Kou Shi Xin Fei"）：显式参数 > manifest 的 `display_title`/`display_artist` > **自动推断** > iTunes 原名（转简体）。自动推断对所有 ok 曲目候选的专辑名/艺人名做多数表决，仅在占比过半、原名不含中文且表决结果含中文时生效（原名已对就不动，防"范特西PLUS"式再版名噪音）。因此**旧 manifest 重跑一次归档即可自动纠正拼音目录名，无需重新下载**。
+
 **前置**：`config.yaml` 配置 `library_root` 且容器已挂载媒体库卷，否则返回 400。
 
 **请求体**
@@ -275,6 +279,8 @@
 | `task_id` | 二选一 | — | 专辑下载任务 ID（任务在内存中时可用） |
 | `manifest_path` | 二选一 | — | manifest.json 绝对路径（服务重启后用这个） |
 | `overwrite` | 否 | false | 目标已存在时是否覆盖重建；默认跳过（幂等） |
+| `album_title` | 否 | — | 显示用专辑名覆盖（最高优先级，影响目录名与 ALBUM tag） |
+| `artist` | 否 | — | 显示用艺人名覆盖（最高优先级，影响目录名与 ARTIST tag） |
 
 **响应 200**：`ArchiveResult`
 

@@ -86,11 +86,11 @@
 ### get_album_info(collection_id)
 获取专辑详情：官方曲目表（含 disc/序号/时长）、发行日期、封面等。**下载前建议先调用此工具向用户确认专辑版本**（同名专辑可能有 Single/EP/ deluxe 等多个版本）。
 
-### download_album(collection_id, sources?, subdir?)
-专辑整单下载（异步）。服务端逐曲搜索匹配消歧（打分含标题/歌手/专辑/时长，低于阈值记 `unmatched` 不强行下载；同分段候选优先无损音质，没有合格无损才选 MP3），按曲目序号命名落盘（`01 曲名.flac`，多 Disc 为 `1-01 曲名.flac`），附 `cover.jpg` 与 `manifest.json`。返回 `task_id`，用 `get_download_status` 轮询。
+### download_album(collection_id, sources?, subdir?, album_title?, artist?)
+专辑整单下载（异步）。服务端逐曲搜索匹配消歧（打分含标题/歌手/专辑/时长，低于阈值记 `unmatched` 不强行下载；同分段候选优先无损音质，没有合格无损才选 MP3），按曲目序号命名落盘（`01 曲名.flac`，多 Disc 为 `1-01 曲名.flac`），附 `cover.jpg` 与 `manifest.json`。返回 `task_id`，用 `get_download_status` 轮询。`album_title`/`artist` 用于 iTunes 专辑名是罗马音/拼音时显式指定中文显示名（写入 manifest 供归档使用）。
 
-### archive_album(task_id?, manifest_path?, overwrite?)
-把专辑下载产物归档进媒体库（同步，秒级）：硬链接（失败回退复制）入库 → 断链后写 tag → 嵌封面歌词 → `cover.jpg` + `album_info.txt`。库内结构 `{library_root}/{艺人}/{专辑}/`，多 Disc 用 `CD1/CD2` 子目录。`task_id`（服务未重启时）与 `manifest_path` 二选一；默认幂等跳过已存在文件。前置：服务端已配置 `library_root` 并挂载媒体库卷。
+### archive_album(task_id?, manifest_path?, overwrite?, album_title?, artist?)
+把专辑下载产物归档进媒体库（同步，秒级）：硬链接（失败回退复制）入库 → 断链后写 tag → 嵌封面歌词 → `cover.jpg` + `album_info.txt`。库内结构 `{library_root}/{艺人}/{专辑}/`，多 Disc 用 `CD1/CD2` 子目录。`task_id`（服务未重启时）与 `manifest_path` 二选一；默认幂等跳过已存在文件。前置：服务端已配置 `library_root` 并挂载媒体库卷。专辑名/艺人名按解析链确定：显式参数 > manifest display_* > 自动推断（国内源多数表决，仅在原名为罗马音时生效）> iTunes 原名——**罗马音专辑名一般无需手动传参，归档会自动纠正为中文**。
 
 ## 五、典型调用流程
 
