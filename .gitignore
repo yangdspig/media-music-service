@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 运行时数据（不纳入版本管理）
+data/
+downloads/
+
+# 环境/密钥
+.env
+*.local
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 打包产物
+dist/
+*.zip
