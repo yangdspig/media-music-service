@@ -225,7 +225,7 @@
 
 ### POST /api/v1/albums/{collection_id}/download
 
-专辑整单下载（**异步**，立即返回 `task_id`）。服务端编排：逐曲在音乐源中搜索 → 打分消歧（标题/歌手/专辑/时长，阈值 0.6，低于阈值记 `unmatched` 不强行下载）→ 按曲目序号命名落盘 → 下载封面 → 产出 `manifest.json`。
+专辑整单下载（**异步**，立即返回 `task_id`）。服务端编排：逐曲在音乐源中搜索 → 打分消歧（标题/歌手/专辑/时长，阈值 0.6，低于阈值记 `unmatched` 不强行下载）→ **音质择优**（与最高分相差 ≤0.1 的同分段候选中优先无损 flac 等，没有合格无损才选 MP3；分数明显更高的候选不受音质影响）→ 按曲目序号命名落盘 → 下载封面 → 产出 `manifest.json`。
 
 **请求体**：`{"sources": ["可选，源名列表"], "subdir": "可选，默认'{艺人} - {专辑}'"}`
 
@@ -250,7 +250,8 @@
     { "disc": 1, "track": 1, "title": "…", "artists": ["…"], "duration_s": 234.3,
       "status": "ok | unmatched | failed",
       "match": { "source": "…", "track_id": "…", "title": "…", "artists": ["…"],
-                 "album": "…", "score": 0.92, "candidates": 5 },
+                 "album": "…", "ext": "flac", "quality": "lossless", "quality_tier": 3,
+                 "score": 0.92, "candidates": 5 },
       "file": "01 曲名.flac", "ext": "flac", "size_bytes": 30000000, "error": null }
   ],
   "summary": { "total": 10, "ok": 9, "unmatched": 1, "failed": 0 }

@@ -5,6 +5,8 @@
 - 消歧打分：标题相似度为主，歌手/专辑/时长为辅；iTunes 各 storefront 可能返回
   繁体或罗马音，统一先做繁转简再比对；低于阈值宁可 unmatched 也不错配，
   分数与候选数写入 manifest 供人工/Agent 复核；
+- 音质偏好：同分段（与最高分差 ≤0.1）候选中优先无损（flac 等），
+  实在没有合格无损才选 MP3；分数明显更高的候选不受音质影响（见 pick_best）；
 - 落盘文件名按官方曲目表序号生成（{disc}-{track:02d} 或 {track:02d} 前缀），
   通过 SongInfo._save_path 让 musicdl 使用指定文件名（spike 已验证生效）；
 - 产物 manifest.json 替代解析私有 download_results.pkl，作为后续归档环节的输入契约。
@@ -32,8 +34,22 @@ from .search import search
 _T2S = OpenCC("t2s")
 
 ACCEPT_THRESHOLD = 0.6  # 低于此分数记为 unmatched，不强行下载
+_SCORE_TIE_MARGIN = 0.1  # 与最高分相差在此范围内视为"同分段"，此时音质优先于分数
 _MATCH_LIMIT = 10  # 每首曲目聚合搜索的候选上限
 _DOWNLOAD_TIMEOUT = 30.0  # 封面下载超时
+
+_LOSSLESS_EXTS = {"flac", "ape", "wav", "alac", "tak", "tta", "dsd", "dff", "dsf"}
+
+
+def quality_tier(cand: Track) -> int:
+    """音质分档：3=无损，2=高码率有损（320k），1=其他。用于同分段候选的择优。"""
+    ext = (cand.ext or "").lstrip(".").lower()
+    quality = (cand.quality or "").lower()
+    if ext in _LOSSLESS_EXTS or "lossless" in quality or "无损" in quality or "hires" in quality:
+        return 3
+    if "320" in quality:
+        return 2
+    return 1
 
 
 def t2s(s: str | None) -> str:
@@ -96,6 +112,16 @@ def score_candidate(expected: AlbumTrack, album_title: str, cand: Track) -> floa
     return round(0.45 * title + 0.15 * artist + 0.15 * album_s + 0.25 * dur, 3)
 
 
+def pick_best(scored: list[tuple[float, Track]]) -> tuple[float, Track]:
+    """从已按分数降序排序的候选中选最优：分数最高的候选优先；
+    与最高分相差不超过 _SCORE_TIE_MARGIN 的视为同分段，同分段内优先无损（tier 高者）。
+    即"有合格的无损就下无损，实在没有才考虑 MP3"，但分数明显更高的候选不受音质影响。
+    """
+    top_score = scored[0][0]
+    competitive = [(s, c) for s, c in scored if s >= top_score - _SCORE_TIE_MARGIN]
+    return max(competitive, key=lambda x: (quality_tier(x[1]), x[0]))
+
+
 def match_track(expected: AlbumTrack, album: AlbumInfo, sources: list[str] | None) -> dict[str, Any]:
     """对一首期望曲目做聚合搜索 + 打分消歧，返回匹配结论（含最高分候选，供 manifest）。"""
     keyword = t2s(expected.title)
@@ -111,17 +137,22 @@ def match_track(expected: AlbumTrack, album: AlbumInfo, sources: list[str] | Non
         ((score_candidate(expected, album.title, c), c) for c in candidates),
         key=lambda x: x[0], reverse=True,
     )
-    best_score, best = scored[0]
-    match_info = {
-        "source": best.source, "track_id": best.id, "title": best.title,
-        "artists": best.artists, "album": best.album,
-        "score": best_score, "candidates": len(candidates),
-    }
-    if best_score < ACCEPT_THRESHOLD:
+    top_score = scored[0][0]
+
+    def _match_info(score: float, c: Track) -> dict:
+        return {
+            "source": c.source, "track_id": c.id, "title": c.title,
+            "artists": c.artists, "album": c.album, "ext": c.ext, "quality": c.quality,
+            "quality_tier": quality_tier(c),
+            "score": score, "candidates": len(candidates),
+        }
+
+    if top_score < ACCEPT_THRESHOLD:
         return {"status": "unmatched",
-                "error": f"最高匹配分 {best_score} 低于阈值 {ACCEPT_THRESHOLD}",
-                "match": match_info}
-    return {"status": "matched", "match": match_info, "track": best}
+                "error": f"最高匹配分 {top_score} 低于阈值 {ACCEPT_THRESHOLD}",
+                "match": _match_info(top_score, scored[0][1])}
+    best_score, best = pick_best(scored)
+    return {"status": "matched", "match": _match_info(best_score, best), "track": best}
 
 
 def _safe_name(s: str) -> str:
