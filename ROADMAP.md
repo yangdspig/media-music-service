@@ -15,11 +15,8 @@
 
 1. **专辑级闭环：MCP 专辑维度能力**（源自 music-album-archiver 实践复盘）
    - 背景：实测"给一个专辑名 → 自动搜索资料/下载/整理入库"场景，现有 MCP 只有单曲级工具，专辑元数据确认、逐曲消歧、批量编排全靠 Agent 手工绕路，出错率最高的恰是专辑元数据环节
-   - `search_albums` / `get_album_info`：专辑名+歌手 → 聚合多平台的规范化结果（官方曲目表含 disc/序号、发行日期、厂牌、高清封面 URL、专辑简介）。musicdl 无专辑级 API，需直连平台接口聚合；建议以 iTunes Search API（官方免 key）为稳定主干，网易云/QQ 网页接口补充中文专辑与简介
-   - `download_album`：服务端编排"逐曲搜索 → 专辑/歌手匹配消歧 → 缺歌换源兜底 → 按序号命名落盘 → 结构化清单"
-   - `get_artist_info`：艺人头像候选 URL + 简介（网易云/iTunes 艺人接口）
-   - 下载产物同步输出 `manifest.json`（曲目映射、封面/歌词路径、失败原因、匹配置信信息），替代解析私有 `download_results.pkl`
-   - 边界：硬链接/tag 规范化/嵌封面/校验等归档动作留在客户端 skill 脚本；若容器直挂媒体库可再评估服务端 `archive_album`（需 compose 增加媒体库卷挂载）
+   - **第一期已完成**（2026-08-10）：`search_albums` / `get_album_info`（iTunes Search/Lookup API 主干，storefront 链 CN→HK→TW→US→JP 兜底，繁体曲目表自动转简体匹配）；`download_album`（服务端编排逐曲搜索 → 打分消歧（阈值 0.6，低于阈值记 unmatched）→ 按序号命名落盘 → `cover.jpg` + `manifest.json`（含逐曲 score/candidates/失败原因），替代解析私有 `download_results.pkl`）；REST 三端点 + MCP 三工具，E2E 验证通过
+   - **第二期待做**：`archive_album` 服务端归档（校验 → 硬链接/移动入库 → tag 规范化/嵌封面，输入契约为 manifest.json，需 compose 增加媒体库卷挂载与 `library_root` 配置）；网易云/QQ 网页接口补充中文专辑与简介（iTunes 覆盖不足时）；`get_artist_info`（艺人头像候选 URL + 简介）
    - 风险：网易云/QQ 网页接口可能变动或限流，需多源交叉验证；消歧可能误中 Live/翻唱版本，manifest 必须带置信信息供复核
 
 2. **MoviePilot 薄客户端插件**

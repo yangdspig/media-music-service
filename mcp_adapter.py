@@ -104,7 +104,7 @@ def submit_download(tracks: list[dict], subdir: str | None = None) -> dict:
 
 @mcp.tool()
 def get_download_status(task_id: str) -> dict:
-    """查询下载任务状态与进度。"""
+    """查询下载任务状态与进度（单曲与专辑任务通用；专辑任务结果里带 manifest_path）。"""
     with _client() as c:
         r = c.get(f"/api/v1/downloads/{task_id}")
         r.raise_for_status()
@@ -112,7 +112,67 @@ def get_download_status(task_id: str) -> dict:
     return {"task_id": t["task_id"], "status": t["status"], "completed": t["completed"],
             "total": t["total"], "failed": t["failed"], "current": t["current"],
             "message": t["message"], "save_dir": t["save_dir"],
+            "manifest_path": t.get("manifest_path"),
             "results": t["results"], "errors": t["errors"]}
+
+
+@mcp.tool()
+def search_albums(keyword: str, artist: str | None = None, limit: int = 10) -> dict:
+    """按专辑名搜索专辑（iTunes 官方元数据）。
+
+    Args:
+        keyword: 专辑名
+        artist: 艺人名（可选，叠加可提高准确度）
+        limit: 返回条数上限
+    Returns:
+        专辑列表，含 collection_id（供 get_album_info / download_album 使用）、
+        曲目数、发行日期、高清封面 URL。
+    """
+    params: dict[str, Any] = {"keyword": keyword, "limit": limit}
+    if artist:
+        params["artist"] = artist
+    with _client() as c:
+        r = c.get("/api/v1/albums/search", params=params)
+        r.raise_for_status()
+        albums = r.json()
+    return {"total": len(albums), "albums": albums}
+
+
+@mcp.tool()
+def get_album_info(collection_id: str) -> dict:
+    """获取专辑详情：官方曲目表（含 disc/序号/时长）、发行日期、封面等。
+
+    Args:
+        collection_id: search_albums 返回的 collection_id
+    """
+    with _client() as c:
+        r = c.get(f"/api/v1/albums/{collection_id}")
+        r.raise_for_status()
+        return r.json()
+
+
+@mcp.tool()
+def download_album(collection_id: str, sources: str | None = None, subdir: str | None = None) -> dict:
+    """专辑整单下载（异步）：服务端逐曲搜索匹配、按曲目序号命名落盘，并产出 manifest.json。
+
+    Args:
+        collection_id: search_albums 返回的 collection_id
+        sources: 逗号分隔的源名（可选，留空用默认五源）
+        subdir: 下载根目录下的子目录名（可选，默认"{艺人} - {专辑}"）
+    Returns:
+        task_id / save_dir，用 get_download_status 轮询进度；完成后
+        manifest_path 指向的 manifest.json 含逐曲匹配分数、落盘文件与失败原因，供复核。
+    """
+    payload: dict[str, Any] = {}
+    if sources:
+        payload["sources"] = [s.strip() for s in sources.split(",") if s.strip()]
+    if subdir:
+        payload["subdir"] = subdir
+    with _client() as c:
+        r = c.post(f"/api/v1/albums/{collection_id}/download", json=payload)
+        r.raise_for_status()
+        t = r.json()
+    return {"task_id": t["task_id"], "status": t["status"], "total": t["total"], "save_dir": t["save_dir"]}
 
 
 if __name__ == "__main__":

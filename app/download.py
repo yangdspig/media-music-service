@@ -27,6 +27,33 @@ def _task_to_dict(t: DownloadTask) -> dict[str, Any]:
     return t.model_dump()
 
 
+def register_task(task: DownloadTask) -> None:
+    """注册任务到内存表并落库（供单曲/专辑下载共用）。"""
+    with _LOCK:
+        _TASKS[task.task_id] = task
+    storage.upsert_task(_task_to_dict(task))
+
+
+def save_task(task: DownloadTask) -> None:
+    """任务状态变更后落库。"""
+    storage.upsert_task(_task_to_dict(task))
+
+
+def download_songs(source: str, song_dicts: list[dict], save_dir: str) -> int:
+    """用对应源的 client 下载一组歌曲（musicdl 同步阻塞调用）。
+
+    song_dicts 为 musicdl 原始 SongInfo dict；带 `_save_path` 键时可覆盖落盘文件名。
+    返回成功构建 SongInfo 的数量；构建失败或下载异常时抛错。
+    注意：不要再用额外线程包裹，musicdl 的 rich.Progress 在嵌套线程里会死锁。
+    """
+    song_infos = _dicts_to_songinfos(song_dicts, save_dir)
+    if not song_infos:
+        raise RuntimeError("SongInfo 重建失败")
+    client = build_client([source])
+    client.download(song_infos=song_infos)
+    return len(song_infos)
+
+
 def submit(tracks: list[Track], subdir: str | None = None) -> DownloadTask:
     task_id = uuid.uuid4().hex[:12]
     # 落盘目录：根目录 / 子目录（默认 时间戳_首曲名）
@@ -38,9 +65,7 @@ def submit(tracks: list[Track], subdir: str | None = None) -> DownloadTask:
     Path(save_dir).mkdir(parents=True, exist_ok=True)
 
     task = DownloadTask(task_id=task_id, total=len(tracks), save_dir=save_dir)
-    with _LOCK:
-        _TASKS[task_id] = task
-    storage.upsert_task(_task_to_dict(task))
+    register_task(task)
 
     th = threading.Thread(target=_run, args=(task, tracks), daemon=True)
     th.start()
@@ -77,7 +102,7 @@ def _dicts_to_songinfos(song_dicts: list[dict], save_dir: str) -> list[Any]:
 
 def _run(task: DownloadTask, tracks: list[Track]) -> None:
     task.status = TaskStatus.RUNNING
-    storage.upsert_task(_task_to_dict(task))
+    save_task(task)
     # 按来源分组，逐组用对应 client 下载（musicdl 按 source 分发）
     groups: dict[str, list[dict]] = {}
     for t in tracks:
@@ -85,25 +110,19 @@ def _run(task: DownloadTask, tracks: list[Track]) -> None:
     for source, song_dicts in groups.items():
         try:
             task.current = source
-            song_infos = _dicts_to_songinfos(song_dicts, task.save_dir or settings.download_root)
-            if not song_infos:
-                raise RuntimeError("SongInfo 重建失败")
-            client = build_client([source])
-            # 直接调用。注意：不要再用额外线程包裹，musicdl 的 rich.Progress
-            # 在嵌套线程里会死锁；下载链路本身的 requests 超时即兜底。
-            client.download(song_infos=song_infos)
-            task.completed += len(song_infos)
+            download_songs(source, song_dicts, task.save_dir or settings.download_root)
+            task.completed += len(song_dicts)
             for t in [x for x in tracks if x.source == source]:
                 task.results.append({"source": source, "title": t.title, "artists": t.artists, "save_dir": task.save_dir})
                 storage.record_file(task.task_id, t.model_dump(), save_path=task.save_dir or "")
         except Exception as e:  # 单源失败不拖垮整体
             task.failed += len(song_dicts)
             task.errors.append(f"{source}: {e}")
-        storage.upsert_task(_task_to_dict(task))
+        save_task(task)
     task.current = None
     task.status = TaskStatus.SUCCESS if task.failed == 0 else (TaskStatus.FAILED if task.completed == 0 else TaskStatus.SUCCESS)
     task.message = f"完成 {task.completed}/{task.total}，失败 {task.failed}"
-    storage.upsert_task(_task_to_dict(task))
+    save_task(task)
 
 
 def get(task_id: str) -> DownloadTask | None:

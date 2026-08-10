@@ -48,6 +48,37 @@ class DownloadRequest(BaseModel):
     subdir: Optional[str] = Field(default=None, description="下载根目录下的子目录，默认按规则自动组织")
 
 
+class AlbumSummary(BaseModel):
+    """专辑摘要（iTunes 搜索结果项）。"""
+    collection_id: str = Field(description="iTunes collectionId")
+    title: str = Field(description="专辑名")
+    artists: list[str] = Field(default_factory=list, description="艺人列表")
+    release_date: Optional[str] = Field(default=None, description="发行日期（ISO）")
+    track_count: int = Field(default=0, description="曲目数")
+    cover_url: Optional[str] = Field(default=None, description="高清封面 URL（600x600）")
+    genre: Optional[str] = Field(default=None, description="流派")
+
+
+class AlbumTrack(BaseModel):
+    """专辑内一首曲目（官方曲目表）。"""
+    disc: int = Field(default=1, description="Disc 序号")
+    track: int = Field(description="Disc 内序号")
+    title: str
+    artists: list[str] = Field(default_factory=list)
+    duration_s: Optional[float] = Field(default=None, description="时长（秒）")
+
+
+class AlbumInfo(AlbumSummary):
+    """专辑详情：摘要 + 完整曲目表。"""
+    tracks: list[AlbumTrack] = Field(default_factory=list, description="按 disc/track 排序的官方曲目表")
+    storefront: Optional[str] = Field(default=None, description="实际命中曲目的 iTunes storefront（如 CN/HK/US）")
+
+
+class AlbumDownloadRequest(BaseModel):
+    sources: Optional[list[str]] = Field(default=None, description="参与匹配下载的源，留空用默认五源")
+    subdir: Optional[str] = Field(default=None, description="下载根目录下的子目录，默认'{艺人} - {专辑}'")
+
+
 class TaskStatus:
     PENDING = "pending"
     RUNNING = "running"
@@ -67,3 +98,4 @@ class DownloadTask(BaseModel):
     save_dir: Optional[str] = None
     results: list[dict[str, Any]] = Field(default_factory=list, description="成功项的落盘信息")
     errors: list[str] = Field(default_factory=list)
+    manifest_path: Optional[str] = Field(default=None, description="专辑下载产出的 manifest.json 路径（仅专辑任务）")
