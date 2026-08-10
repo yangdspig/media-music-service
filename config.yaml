@@ -1,0 +1,38 @@
+# MediaMusicService 配置文件
+# 所有项均可选，缺省走默认值。纯内网自用建议保持最小配置。
+
+server:
+  host: "0.0.0.0"
+  port: 8765
+
+# 下载文件根目录（建议挂载到 NAS 媒体库目录）
+download_root: "./downloads"
+
+# 任务/历史数据库
+db_path: "./data/music_service.db"
+
+# 每个源的下载线程数
+num_threads: 5
+
+# 可选 API Key；留空或删除本行则不启用鉴权（纯内网自用推荐）
+# api_key: "change-me"
+
+# 默认搜索源（musicdl 官方默认五源）
+default_sources:
+  - MiguMusicClient
+  - NeteaseMusicClient
+  - QQMusicClient
+  - KuwoMusicClient
+  - QianqianMusicClient
+
+# 按需配置各源 cookies；不配置的源如果必须登录态会被标记为不可用
+# 示例：
+# sources:
+#   QQMusicClient:
+#     search_cookies: "你的QQ音乐cookies"
+#     download_cookies: "你的QQ音乐cookies"
+#   TIDALMusicClient:
+#     parse_cookies: "你的TIDAL cookies"
+#   MituMusicClient:
+#     quark_cookies: "你的夸克网盘cookies"
+sources: {}

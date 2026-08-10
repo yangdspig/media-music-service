@@ -1,0 +1,74 @@
+"""配置加载：单一 config.yaml + 环境变量覆盖。
+
+纯内网自用定位下，配置项保持最小集合：
+- 服务监听、下载根目录、线程数
+- 可选 API Key（为空即关闭鉴权）
+- 各源 cookies（按需配置，不配的源自动标记不可用）
+"""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+from typing import Any
+
+import yaml
+from pydantic import BaseModel
+
+
+_DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.yaml"
+
+
+class SourceConfig(BaseModel):
+    """单个源的覆盖配置。"""
+    enabled: bool = True
+    search_cookies: str | dict | None = None
+    download_cookies: str | dict | None = None
+    parse_cookies: str | dict | None = None
+    quark_cookies: str | dict | None = None
+    extra: dict[str, Any] = {}
+
+
+class Settings(BaseModel):
+    host: str = "0.0.0.0"
+    port: int = 8765
+    download_root: str = "./downloads"
+    db_path: str = "./data/music_service.db"
+    num_threads: int = 5
+    download_timeout_s: int = 300  # 单源下载超时保护，防止 musicdl 内部无限等待
+    api_key: str | None = None  # 为空则不启用鉴权
+    default_sources: list[str] = [
+        "MiguMusicClient", "NeteaseMusicClient", "QQMusicClient",
+        "KuwoMusicClient", "QianqianMusicClient",
+    ]
+    sources: dict[str, SourceConfig] = {}
+
+
+def _load_yaml(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
+
+
+def load_settings() -> Settings:
+    path = Path(os.environ.get("MUSIC_SERVICE_CONFIG", str(_DEFAULT_CONFIG_PATH)))
+    data = _load_yaml(path)
+    s = Settings(**data)
+    # 环境变量覆盖
+    if os.environ.get("MUSIC_SERVICE_API_KEY"):
+        s.api_key = os.environ["MUSIC_SERVICE_API_KEY"]
+    if os.environ.get("MUSIC_SERVICE_DOWNLOAD_ROOT"):
+        s.download_root = os.environ["MUSIC_SERVICE_DOWNLOAD_ROOT"]
+    # 相对路径统一锚定到项目根（config.yaml 所在目录），避免随进程 CWD 漂移
+    project_root = path.resolve().parent
+    for attr in ("download_root", "db_path"):
+        v = getattr(s, attr)
+        if v and not os.path.isabs(v):
+            setattr(s, attr, str(project_root / v))
+    # 确保目录存在
+    Path(s.download_root).mkdir(parents=True, exist_ok=True)
+    Path(s.db_path).parent.mkdir(parents=True, exist_ok=True)
+    return s
+
+
+settings = load_settings()
