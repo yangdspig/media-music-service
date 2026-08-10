@@ -8,3 +8,5 @@ mcp>=1.0
 fastmcp>=2.0
 # 繁转简：iTunes HK/TW storefront 返回繁体曲目表，专辑匹配消歧前统一转简体
 opencc-python-reimplemented>=0.1.7
+# 归档时写音频 tag / 嵌封面歌词（flac/mp3）
+mutagen>=1.46

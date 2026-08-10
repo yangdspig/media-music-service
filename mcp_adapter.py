@@ -175,6 +175,29 @@ def download_album(collection_id: str, sources: str | None = None, subdir: str |
     return {"task_id": t["task_id"], "status": t["status"], "total": t["total"], "save_dir": t["save_dir"]}
 
 
+@mcp.tool()
+def archive_album(task_id: str | None = None, manifest_path: str | None = None, overwrite: bool = False) -> dict:
+    """把专辑下载产物归档进媒体库（同步）：硬链接/复制入库、写 tag、嵌封面歌词、生成 album_info.txt。
+
+    Args:
+        task_id: download_album 返回的任务 ID（服务未重启时可用，推荐）
+        manifest_path: manifest.json 的绝对路径（服务重启后用这个）
+        overwrite: 目标已存在时是否覆盖重建；默认 False（幂等跳过）
+    Returns:
+        归档结果：library_dir（库内专辑目录）、逐曲 action（linked/copied/skipped/failed）、
+        summary 计数、errors。目录结构为 {library_root}/{艺人}/{专辑}/，多 Disc 用 CD1/CD2 子目录。
+    """
+    payload: dict[str, Any] = {"overwrite": overwrite}
+    if task_id:
+        payload["task_id"] = task_id
+    if manifest_path:
+        payload["manifest_path"] = manifest_path
+    with _client() as c:
+        r = c.post("/api/v1/albums/archive", json=payload)
+        r.raise_for_status()
+        return r.json()
+
+
 if __name__ == "__main__":
     transport = os.environ.get("MUSIC_MCP_TRANSPORT", "stdio")
     if transport == "stdio":

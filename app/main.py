@@ -7,8 +7,9 @@ from __future__ import annotations
 from fastapi import Depends, FastAPI, Header, HTTPException
 
 from .config import settings
-from .schemas import AlbumDownloadRequest, AlbumInfo, AlbumSummary, DownloadRequest, DownloadTask, SearchResponse, SourceInfo, Track
+from .schemas import AlbumDownloadRequest, AlbumInfo, AlbumSummary, ArchiveRequest, ArchiveResult, DownloadRequest, DownloadTask, SearchResponse, SourceInfo, Track
 from . import album as album_svc
+from . import archive as archive_svc
 from . import download as dl
 from . import itunes, registry, storage
 from .playlist import parse_playlist
@@ -76,6 +77,18 @@ def api_album_search(keyword: str, artist: str | None = None, limit: int = 10) -
         return itunes.search_albums(keyword=keyword, artist=artist, limit=limit)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"iTunes 搜索失败: {e}")
+
+
+# 注意：/albums/archive 必须声明在 /albums/{collection_id} 之前，否则会被路径参数吃掉
+@app.post("/api/v1/albums/archive", response_model=ArchiveResult, dependencies=[Depends(auth)])
+def api_album_archive(req: ArchiveRequest) -> ArchiveResult:
+    try:
+        return archive_svc.archive_album(task_id=req.task_id, manifest_path=req.manifest_path,
+                                         overwrite=req.overwrite)
+    except (ValueError, LookupError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/api/v1/albums/{collection_id}", response_model=AlbumInfo, dependencies=[Depends(auth)])

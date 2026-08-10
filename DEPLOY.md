@@ -17,6 +17,9 @@ media-music-service/
 │   ├── playlist.py
 │   ├── download.py
 │   ├── storage.py
+│   ├── itunes.py
+│   ├── album.py
+│   ├── archive.py
 │   └── main.py
 ├── mcp_adapter.py        # MCP 适配器（必拷）
 ├── config.yaml           # 配置文件（必拷，可在目标机器上再改）
@@ -70,6 +73,7 @@ curl 'http://127.0.0.1:8765/api/v1/search?keyword=周杰伦&limit=3' | jq '.tota
 - 下载文件：宿主机 `./downloads`（compose 里映射到 `/app/downloads`），建议改成你的媒体库路径
 - 任务/历史库：宿主机 `./data/music_service.db`
 - 配置：宿主机 `./config.yaml` 挂载进容器，改完 `docker compose restart music-service` 生效
+- **媒体库（可选，archive_album 归档目标）**：在 `docker-compose.yml` 的 volumes 里取消注释媒体库挂载行（如 `/vol02/1000-0-ba5fad3f/Music:/library:rw`），并把 `config.yaml` 的 `library_root` 设为 `/library`，重启生效。归档目录结构为 `{library_root}/{艺人}/{专辑}/`，多 Disc 专辑用 `CD1/CD2` 子目录
 
 ## 六、常见问题
 

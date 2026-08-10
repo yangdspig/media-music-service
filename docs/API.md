@@ -261,6 +261,50 @@
 
 ---
 
+### POST /api/v1/albums/archive
+
+把专辑下载产物归档进媒体库（**同步**，秒级返回）。以 `manifest.json` 为输入契约：硬链接（CIFS/跨设备自动回退复制）入库 → 断链后写 tag → 嵌封面/歌词 → 生成 `cover.jpg` 与 `album_info.txt`。
+
+**前置**：`config.yaml` 配置 `library_root` 且容器已挂载媒体库卷，否则返回 400。
+
+**请求体**
+
+| 字段 | 必填 | 默认 | 说明 |
+|---|---|---|---|
+| `task_id` | 二选一 | — | 专辑下载任务 ID（任务在内存中时可用） |
+| `manifest_path` | 二选一 | — | manifest.json 绝对路径（服务重启后用这个） |
+| `overwrite` | 否 | false | 目标已存在时是否覆盖重建；默认跳过（幂等） |
+
+**响应 200**：`ArchiveResult`
+
+```json
+{
+  "status": "success | partial | failed",
+  "library_dir": "/library/周杰伦/范特西 - Single",
+  "summary": {"linked": 3},
+  "tracks": [
+    {"disc": 1, "track": 1, "title": "蜗牛", "target": "01 - 蜗牛.flac",
+     "action": "linked | copied | skipped | failed | tag_unsupported", "error": null}
+  ],
+  "errors": []
+}
+```
+
+**库内目录结构**（对齐 Navidrome 约定）：
+
+```
+{library_root}/{艺人}/{专辑}/
+├── 01 - 曲名.flac          # tag：ARTIST/ALBUMARTIST/ALBUM/TITLE/DATE/TRACKNUMBER n/N/COMMENT，嵌封面歌词
+├── cover.jpg               # 多 Disc 时每个 CDx 子目录也有一份
+├── album_info.txt
+├── lyrics/                 # sidecar .lrc 平铺
+└── CD1/, CD2/ ...          # 仅多 Disc 专辑，内含 NN - 曲名.ext 与 cover.jpg
+```
+
+> 设计约束：归档**不会修改下载目录的源文件**（硬链接文件改 tag 前先断链）；`COMMENT` 统一写为 `archive_comment` 配置值（默认 `yangds整理`），覆盖平台水印；仅 flac/mp3 写 tag，其他格式文件照入库但记 `tag_unsupported`。
+
+---
+
 ## 错误码
 
 | 状态码 | 场景 |

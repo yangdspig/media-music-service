@@ -14,6 +14,9 @@ services:
       - ./data:/app/data
       # 配置文件（改完重启生效；也可直接在镜像外编辑）
       - ./config.yaml:/app/config.yaml
+      # 媒体库（archive_album 归档目标）：取消注释并改成你的媒体库路径，
+      # 同时把 config.yaml 的 library_root 设为 /library
+      # - /vol02/1000-0-ba5fad3f/Music:/library:rw
     environment:
       # 可选 API Key；不设或留空则不启用鉴权（纯内网推荐）
       # MUSIC_SERVICE_API_KEY: "change-me"

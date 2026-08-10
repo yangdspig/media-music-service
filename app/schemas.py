@@ -79,6 +79,30 @@ class AlbumDownloadRequest(BaseModel):
     subdir: Optional[str] = Field(default=None, description="下载根目录下的子目录，默认'{艺人} - {专辑}'")
 
 
+class ArchiveRequest(BaseModel):
+    """归档请求：task_id 与 manifest_path 必填其一（task_id 优先）。"""
+    task_id: Optional[str] = Field(default=None, description="专辑下载任务 ID（取其 manifest_path）")
+    manifest_path: Optional[str] = Field(default=None, description="manifest.json 路径（直接指定）")
+    overwrite: bool = Field(default=False, description="目标已存在时是否覆盖重建；默认跳过（幂等）")
+
+
+class ArchiveTrackResult(BaseModel):
+    disc: int = 1
+    track: int = 0
+    title: str = ""
+    target: Optional[str] = Field(default=None, description="库内相对路径（相对 library_root）")
+    action: str = Field(description="linked / copied / skipped / failed / tag_unsupported")
+    error: Optional[str] = None
+
+
+class ArchiveResult(BaseModel):
+    status: str = Field(description="success / partial / failed")
+    library_dir: Optional[str] = Field(default=None, description="专辑入库目录（绝对路径）")
+    summary: dict[str, int] = Field(default_factory=dict, description="按 action 计数")
+    tracks: list[ArchiveTrackResult] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+
+
 class TaskStatus:
     PENDING = "pending"
     RUNNING = "running"

@@ -36,6 +36,8 @@ class Settings(BaseModel):
     num_threads: int = 5
     download_timeout_s: int = 300  # 单源下载超时保护，防止 musicdl 内部无限等待
     api_key: str | None = None  # 为空则不启用鉴权
+    library_root: str | None = None  # 媒体库根目录（archive_album 归档目标）；为空则归档不可用
+    archive_comment: str = "yangds整理"  # 归档时统一写入的 COMMENT tag
     default_sources: list[str] = [
         "MiguMusicClient", "NeteaseMusicClient", "QQMusicClient",
         "KuwoMusicClient", "QianqianMusicClient",
@@ -59,9 +61,11 @@ def load_settings() -> Settings:
         s.api_key = os.environ["MUSIC_SERVICE_API_KEY"]
     if os.environ.get("MUSIC_SERVICE_DOWNLOAD_ROOT"):
         s.download_root = os.environ["MUSIC_SERVICE_DOWNLOAD_ROOT"]
+    if os.environ.get("MUSIC_SERVICE_LIBRARY_ROOT"):
+        s.library_root = os.environ["MUSIC_SERVICE_LIBRARY_ROOT"]
     # 相对路径统一锚定到项目根（config.yaml 所在目录），避免随进程 CWD 漂移
     project_root = path.resolve().parent
-    for attr in ("download_root", "db_path"):
+    for attr in ("download_root", "db_path", "library_root"):
         v = getattr(s, attr)
         if v and not os.path.isabs(v):
             setattr(s, attr, str(project_root / v))

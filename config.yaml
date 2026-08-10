@@ -11,6 +11,13 @@ download_root: "./downloads"
 # 任务/历史数据库
 db_path: "./data/music_service.db"
 
+# 媒体库根目录（archive_album 归档目标，结构：{library_root}/{艺人}/{专辑}/）
+# 不配则归档端点不可用；Docker 部署时需同时挂载媒体库卷（见 docker-compose.yml 注释）
+# library_root: "/library"
+
+# 归档时统一写入音频文件的 COMMENT tag（用于标记整理来源、覆盖平台水印）
+archive_comment: "yangds整理"
+
 # 每个源的下载线程数
 num_threads: 5
 

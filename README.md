@@ -85,6 +85,7 @@ venv\Scripts\python.exe mcp_adapter.py
 | GET | `/api/v1/albums/search?keyword=…&artist=…&limit=…` | 专辑搜索（iTunes 元数据） |
 | GET | `/api/v1/albums/{collection_id}` | 专辑详情与官方曲目表 |
 | POST | `/api/v1/albums/{collection_id}/download` | 专辑整单下载（逐曲消歧 + 序号命名 + manifest.json） |
+| POST | `/api/v1/albums/archive` | 专辑归档入库（硬链接/tag/嵌封面，需配置 library_root） |
 | POST | `/api/v1/downloads/{task_id}/cancel` | 取消（仅 pending 态有效） |
 
 > 字段定义与完整示例见 [docs/API.md](docs/API.md)。
@@ -101,6 +102,7 @@ venv\Scripts\python.exe mcp_adapter.py
 | `search_albums(keyword, artist?, limit?)` | 专辑搜索（iTunes 元数据） |
 | `get_album_info(collection_id)` | 专辑详情与官方曲目表 |
 | `download_album(collection_id, sources?, subdir?)` | 专辑整单下载（产出 manifest.json） |
+| `archive_album(task_id?, manifest_path?, overwrite?)` | 专辑归档入库（需配置 library_root） |
 
 > 接入配置与调用示例见 [docs/MCP.md](docs/MCP.md)。
 
