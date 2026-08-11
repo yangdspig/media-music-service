@@ -55,9 +55,8 @@ venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8765 --app-dir .
 # stdio（本地 Agent 直接拉起，推荐）
 venv\Scripts\python.exe mcp_adapter.py
 
-# 或 HTTP（远程 Agent 连接内网服务）
-set MUSIC_MCP_TRANSPORT=http
-set MUSIC_SERVICE_URL=http://127.0.0.1:8765
+# 或 HTTP（远程 Agent 连接内网服务）：把 config.yaml 的 mcp.transport 改为 http
+# （也可用环境变量覆盖：MUSIC_MCP_TRANSPORT=http MUSIC_SERVICE_URL=http://127.0.0.1:8765）
 venv\Scripts\python.exe mcp_adapter.py
 ```
 

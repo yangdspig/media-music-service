@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import time
@@ -16,8 +17,10 @@ from typing import Any
 
 from .config import effective_max_size_mb, settings
 from .registry import build_client
-from .schemas import DownloadTask, TaskStatus, Track
+from .schemas import DownloadTask, DownloadTrackInput, TaskStatus, Track
 from . import storage
+
+logger = logging.getLogger(__name__)
 
 _TASKS: dict[str, DownloadTask] = {}
 _LOCK = threading.Lock()
@@ -73,12 +76,31 @@ def _find_downloaded_file(save_dir: str, filename: str, identifier: str, before:
     return None
 
 
-def submit(tracks: list[Track], subdir: str | None = None, library: str | None = None,
+def _resolve_tracks(inputs: list[DownloadTrackInput]) -> list[Track]:
+    """把下载提交项解析为完整 Track：raw 非空直接用；否则按 id 查搜索缓存补全。"""
+    from .search import get_cached
+    resolved: list[Track] = []
+    missing: list[str] = []
+    for t in inputs:
+        if t.raw:
+            resolved.append(Track(**t.model_dump()))
+            continue
+        cached = get_cached(t.id)
+        (resolved.append(cached) if cached else missing.append(t.id))
+    if missing:
+        raise ValueError("以下曲目缺少 raw 且未命中搜索缓存（请重新搜索后再提交下载）: " + ", ".join(missing))
+    return resolved
+
+
+def submit(tracks: list[DownloadTrackInput], subdir: str | None = None, library: str | None = None,
            max_size_mb: float | None = None) -> DownloadTask:
     if library:
         # 提前校验库名（白名单），避免下载完成后才发现归档目标不存在
         from .libraries import resolve_library_root
         resolve_library_root(library)
+    tracks = _resolve_tracks(tracks)
+    if not tracks:
+        raise ValueError("tracks 不能为空")
     # 体积上限过滤：超限曲目直接拒绝下载（接口传参 >0 优先，否则用配置，0/空不限）
     limit_mb = effective_max_size_mb(max_size_mb)
     rejected: list[Track] = []
@@ -156,13 +178,16 @@ def _run(task: DownloadTask, tracks: list[Track]) -> None:
                 task.results.append({
                     "source": source, "title": t.title, "artists": t.artists,
                     "album": t.album, "ext": t.ext, "cover_url": t.cover_url,
+                    "artist_img_url": t.artist_img_url,
                     "file": fname, "save_dir": save_dir,
                 })
                 storage.record_file(task.task_id, t.model_dump(),
                                     save_path=str(Path(save_dir) / fname) if fname else save_dir)
         except Exception as e:  # 单源失败不拖垮整体
+            # 完整堆栈进日志；errors 里带异常类型，避免 musicdl 抛出空消息异常时只剩 "None"
+            logger.exception("下载失败 task=%s source=%s", task.task_id, source)
             task.failed += len(song_dicts)
-            task.errors.append(f"{source}: {e}")
+            task.errors.append(f"{source}: {type(e).__name__}: {e}")
         save_task(task)
     task.current = None
     task.status = TaskStatus.SUCCESS if task.failed == 0 else (TaskStatus.FAILED if task.completed == 0 else TaskStatus.SUCCESS)

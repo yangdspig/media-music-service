@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 from typing import Any, Optional
@@ -247,8 +248,20 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None,
                 if cd_dir.exists():
                     (cd_dir / f"cover{suffix}").write_bytes(cover_bytes)
     _write_album_info(album_dir, album, entries, disp_title, disp_artist)
+    # 艺人头像（幂等）：取首个带头像的成功条目写入艺人目录，已有 artist.* 则跳过
+    img_url = next(((e.get("match") or {}).get("artist_img_url") for e in ok_entries
+                    if (e.get("match") or {}).get("artist_img_url")), None)
+    _save_artist_image(album_dir.parent, img_url)
 
     status, summary, errors = _summarize(results)
+    # 归档后自动清理下载产物：全曲 ok 且入库无失败才算完全成功（整目录清，含 manifest）；
+    # 有 unmatched/failed 曲目时保留 manifest 与产物供复查补下，只清已入库曲目
+    album_complete = (bool(results) and all(r.action != "failed" for r in results)
+                      and all(e.get("status") == "ok" for e in entries))
+    ok_files = [e["file"] for e, r in zip(ok_entries, results)
+                if r.action in ("linked", "copied", "skipped", "tag_unsupported") and e.get("file")]
+    from .cleanup import cleanup_task_dir
+    cleanup_task_dir(str(src_dir), ok_files, complete=album_complete)
     return ArchiveResult(status=status, library_dir=str(album_dir), summary=summary,
                          tracks=results, errors=errors)
 
@@ -265,17 +278,85 @@ def _cover_mime(cover_bytes: bytes) -> str:
     return "image/jpeg"
 
 
+def _cover_url_candidates(url: str) -> list[str]:
+    """酷我图片 URL 生成降级候选：
+    albumcover（专辑封面）500 尺寸在部分节点 404，120 恒可用；
+    starheads（艺人头像）无 500/700，按 300→240→120 降级。"""
+    m = re.match(r"https://img\d\.kuwo\.cn/star/(albumcover|starheads)/\d+(/.+)", url)
+    if not m:
+        return [url]
+    kind, path = m.group(1), m.group(2)
+    sizes = ("500", "120") if kind == "albumcover" else ("300", "240", "120")
+    hosts = ("1", "3") if kind == "albumcover" else ("1", "4")
+    return [f"https://img{h}.kuwo.cn/star/{kind}/{size}{path}" for size in sizes for h in hosts]
+
+
 def _download_cover_bytes(url: str | None) -> bytes | None:
-    """按 URL 下载封面字节；失败返回 None（不阻塞归档）。"""
+    """按 URL 下载封面字节；失败按候选降级重试，最终失败返回 None（不阻塞归档）。"""
+    if not url:
+        return None
+    import httpx
+    for u in _cover_url_candidates(url):
+        try:
+            r = httpx.get(u, timeout=_COVER_TIMEOUT, follow_redirects=True)
+            r.raise_for_status()
+            return r.content
+        except Exception:
+            continue
+    return None
+
+
+def _itunes_cover_fallback(title: str, artist: str) -> bytes | None:
+    """iTunes 单曲封面兜底：cover_url 缺失/下载失败时按 曲名+艺人 查 iTunes，取 600x600 封面。"""
+    try:
+        import httpx
+        from .itunes import SEARCH_URL, _TIMEOUT, _hi_res_cover
+        term = f"{artist} {title}".strip()
+        r = httpx.get(SEARCH_URL, params={"term": term, "entity": "song", "limit": 5},
+                      timeout=_TIMEOUT)
+        r.raise_for_status()
+        for item in r.json().get("results", []):
+            cover = _download_cover_bytes(_hi_res_cover(item.get("artworkUrl100")))
+            if cover:
+                return cover
+    except Exception:
+        pass
+    return None
+
+
+_ARTIST_IMG_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
+
+
+def _img_suffix(data: bytes) -> str:
+    """按魔数定图片扩展名（jpeg/png/webp）。"""
+    if data[:4] == b"\x89PNG":
+        return ".png"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return ".webp"
+    return ".jpg"
+
+
+def _save_artist_image(artist_dir: Path, url: str | None) -> str | None:
+    """艺人目录写 artist.{jpg,png,webp}（Navidrome 本地艺人头像约定，ArtistArtPriority 默认含 artist.*）。
+
+    幂等：目录已有 artist.* 图片则跳过（用户手动放置的头像永远优先）；
+    无 URL 或下载失败返回 None（不阻塞归档）。返回写入的文件名。
+    """
     if not url:
         return None
     try:
-        import httpx
-        r = httpx.get(url, timeout=_COVER_TIMEOUT, follow_redirects=True)
-        r.raise_for_status()
-        return r.content
+        for p in artist_dir.iterdir():
+            if p.is_file() and p.stem.lower() == "artist" and p.suffix.lower() in _ARTIST_IMG_EXTS:
+                return None
     except Exception:
+        pass
+    data = _download_cover_bytes(url)
+    if not data:
         return None
+    artist_dir.mkdir(parents=True, exist_ok=True)
+    name = f"artist{_img_suffix(data)}"
+    (artist_dir / name).write_bytes(data)
+    return name
 
 
 def _summarize(results: list[ArchiveTrackResult]) -> tuple[str, dict[str, int], list[str]]:
@@ -292,7 +373,9 @@ def archive_tracks(task_id: str, library: str | None = None, overwrite: bool = F
     """把单曲下载任务的产物归档进媒体库（同步，幂等）。
 
     目标结构：{库根}/{艺人}/{曲名.ext}；同名 .lrc 放旁边并嵌入 tag；
-    不写序号类 tag，ALBUM 用候选专辑名，DATE 跳过；封面从候选 cover_url 下载嵌入。
+    不写序号类 tag，ALBUM 用候选专辑名，DATE 跳过；封面按 候选 cover_url（酷我源搜索时已拼接兜底）
+    → 酷我节点/尺寸降级 → iTunes 单曲封面 的顺序获取，均失败则不嵌图（不阻塞归档）。
+    另按候选 artist_img_url 在艺人目录写 artist.*（Navidrome 艺人头像，幂等，已有则跳过）。
     library 为命名库根（见 libraries 模块），留空用默认库。
     """
     root = Path(resolve_library_root(library))
@@ -301,6 +384,7 @@ def archive_tracks(task_id: str, library: str | None = None, overwrite: bool = F
         raise LookupError(f"任务 {task_id} 不在内存中（服务重启后单曲任务无法归档，请重新下载）")
 
     results: list[ArchiveTrackResult] = []
+    archived_files: list[str] = []  # 成功入库的源文件名（归档后清理用）
     for item in task.results:
         title = t2s(item.get("title") or "")
         artists = item.get("artists") or []
@@ -337,8 +421,10 @@ def archive_tracks(task_id: str, library: str | None = None, overwrite: bool = F
                     if lrc_src.exists():
                         lyric_text = lrc_src.read_text(encoding="utf-8", errors="ignore").strip() or None
                         shutil.copy2(lrc_src, target.with_suffix(".lrc"))
+                    cover_bytes = (_download_cover_bytes(item.get("cover_url"))
+                                   or _itunes_cover_fallback(title, artist_dir))
                     _write_tags(target, title, artist_dir, t2s(item.get("album") or ""),
-                                cover_bytes=_download_cover_bytes(item.get("cover_url")),
+                                cover_bytes=cover_bytes,
                                 lyric_text=lyric_text)
                 else:
                     res.action = "tag_unsupported"
@@ -346,7 +432,15 @@ def archive_tracks(task_id: str, library: str | None = None, overwrite: bool = F
             res.action = "failed"
             res.error = str(e)
         results.append(res)
+        if res.action in ("linked", "copied", "skipped", "tag_unsupported") and item.get("file"):
+            archived_files.append(item["file"])
+        # 艺人头像：艺人目录无 artist.* 时按候选头像写一份（幂等，已有则跳过）
+        _save_artist_image(root / artist_dir, item.get("artist_img_url"))
 
     status, summary, errors = _summarize(results)
+    # 归档后自动清理下载产物：全成功整目录清，部分成功只清已入库曲目
+    from .cleanup import cleanup_task_dir
+    cleanup_task_dir(task.save_dir or "", archived_files,
+                     complete=bool(results) and all(r.action != "failed" for r in results))
     return ArchiveResult(status=status, library_dir=str(root), summary=summary,
                          tracks=results, errors=errors)

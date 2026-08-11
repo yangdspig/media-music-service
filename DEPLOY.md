@@ -72,8 +72,10 @@ curl 'http://127.0.0.1:8765/api/v1/search?keyword=周杰伦&limit=3' | jq '.tota
 
 - 下载文件：宿主机 `./downloads`（compose 里映射到 `/app/downloads`），建议改成你的媒体库路径
 - 任务/历史库：宿主机 `./data/music_service.db`
-- 配置：宿主机 `./config.yaml` 挂载进容器，改完 `docker compose restart music-service` 生效
+- 配置：宿主机 `./config.yaml` 挂载进两个容器，是**唯一配置源**（核心服务 + MCP 适配器共用），改完 `docker compose restart` 生效
+- **【常见坑】`config.yaml` 里的所有路径（`download_root`/`db_path`/`library_root` 等）必须填容器内路径**——即 compose volumes 冒号**右侧**的挂载点（如 `/app/downloads`、`/app/data/...`、`/library`）。填宿主机路径不会报错，服务会静默在容器临时层建目录：下载显示"成功"但宿主机上看不到文件、数据库重启即丢失
 - **媒体库（可选，archive_album 归档目标）**：在 `docker-compose.yml` 的 volumes 里取消注释媒体库挂载行（如 `/vol02/1000-0-ba5fad3f/Music:/library:rw`），并把 `config.yaml` 的 `library_root` 设为 `/library`，重启生效。归档目录结构为 `{library_root}/{艺人}/{专辑}/`，多 Disc 专辑用 `CD1/CD2` 子目录
+- **MCP HTTP 适配器（可选）**：启用前在 `config.yaml` 把 `mcp.transport` 改为 `http`、`mcp.service_url` 改为 `http://music-service:8765`，再 `docker compose --profile mcp up -d`。适配器配置全部来自 `config.yaml` 的 `mcp` 段，compose 里无需再设环境变量
 
 ## 六、常见问题
 

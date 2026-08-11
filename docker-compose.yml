@@ -8,19 +8,19 @@ services:
     ports:
       - "8765:8765"
     volumes:
-      # 下载目录：改成你 NAS 的音乐媒体库路径
+      # 下载目录：左侧改成你 NAS 的音乐下载目录；注意 config.yaml 的 download_root
+      # 必须填右侧的容器内路径（/app/downloads），不要填宿主机路径
       - ./downloads:/app/downloads
-      # 任务/历史数据库
+      # 任务/历史数据库（config.yaml 的 db_path 同理填 /app/data/...）
       - ./data:/app/data
-      # 配置文件（改完重启生效；也可直接在镜像外编辑）
+      # 配置文件（核心服务与 MCP 适配器共用的唯一配置源，改完重启生效）
       - ./config.yaml:/app/config.yaml
       # 媒体库（archive_album 归档目标，结构 {library_root}/{艺人}/{专辑}/）
       - ./library:/library:rw
       # 若要直接归档到 NAS 媒体库，改挂这里（同时把 config.yaml 的 library_root 设为 /library）
       # - /vol02/1000-0-ba5fad3f/Music:/library:rw
     environment:
-      # 可选 API Key；不设或留空则不启用鉴权（纯内网推荐）
-      # MUSIC_SERVICE_API_KEY: "change-me"
+      # API Key 请在 config.yaml 的 api_key 配置；MUSIC_SERVICE_API_KEY 环境变量仅作临时覆盖
       TZ: Asia/Shanghai
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8765/api/v1/health',timeout=5).status==200 else 1)"]
@@ -31,6 +31,8 @@ services:
 
   # MCP 适配器（可选）：仅当你需要远程 Agent 通过 HTTP 连接时才启用
   # 本地 Agent（如 Trae/Claude Desktop）建议直接用 stdio 方式拉起 mcp_adapter.py，不走此容器
+  # 配置全部来自 config.yaml 的 mcp 段：启用本容器前把 transport 改为 http、
+  # service_url 改为 http://music-service:8765
   mcp-adapter:
     build: .
     image: media-music-service:latest
@@ -38,12 +40,10 @@ services:
     restart: unless-stopped
     profiles: ["mcp"]  # 默认不启动；docker compose --profile mcp up 才拉起
     command: ["python", "mcp_adapter.py"]
+    volumes:
+      # 与核心服务共用同一份配置文件（读取其中的 mcp 段与 api_key）
+      - ./config.yaml:/app/config.yaml
     environment:
-      MUSIC_MCP_TRANSPORT: http
-      MUSIC_MCP_HOST: 0.0.0.0
-      MUSIC_MCP_PORT: 8766
-      MUSIC_SERVICE_URL: http://music-service:8765
-      # MUSIC_SERVICE_API_KEY: "change-me"  # 若核心服务开了鉴权，这里要一致
       TZ: Asia/Shanghai
     ports:
       - "8766:8766"

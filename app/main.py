@@ -21,6 +21,8 @@ app = FastAPI(title="MediaMusicService", version="0.1.0")
 @app.on_event("startup")
 def _startup() -> None:
     storage.init_db()
+    from .cleanup import start_periodic_sweep
+    start_periodic_sweep()  # 下载目录定期容量清理（按 config.yaml cleanup 段）
 
 
 async def auth(x_api_key: str | None = Header(default=None)) -> None:

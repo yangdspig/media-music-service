@@ -5,7 +5,7 @@ from typing import Any
 
 from .registry import build_client
 from .schemas import Track
-from .search import normalize_song
+from .search import cache_tracks, normalize_song
 
 
 def parse_playlist(url: str, source: str | None = None) -> list[Track]:
@@ -19,4 +19,5 @@ def parse_playlist(url: str, source: str | None = None) -> list[Track]:
             tracks.append(normalize_song(src, d))
         except Exception:
             continue
+    cache_tracks(tracks)  # 落缓存，submit_download 可仅按 id 提交
     return tracks

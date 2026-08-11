@@ -69,6 +69,15 @@ def record_file(task_id: str, track: dict, save_path: str) -> None:
         )
 
 
+def list_task_dirs() -> list[tuple[str, float]]:
+    """全部任务记录过的 save_dir 及最早创建时间（下载目录清理的白名单来源）。"""
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT save_dir, MIN(created_at) AS ts FROM tasks WHERE save_dir IS NOT NULL GROUP BY save_dir"
+        ).fetchall()
+    return [(r["save_dir"], r["ts"]) for r in rows]
+
+
 def list_history(limit: int = 50) -> list[dict]:
     with _conn() as c:
         rows = c.execute("SELECT * FROM tasks ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()

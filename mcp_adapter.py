@@ -1,20 +1,45 @@
 """MCP 适配器：把核心 REST 服务封装为 MCP 工具，供 Agent 调用。
 
 设计要点（按设计方案 M2）：
-- 薄客户端，不直接依赖 musicdl，所有逻辑通过 HTTP 调用核心服务；
-- 默认 stdio 传输（本地 Agent 直接拉起），也可用 SSE/HTTP（远程 Agent）；
+- 薄客户端，不直接依赖 musicdl 与 app 包，所有逻辑通过 HTTP 调用核心服务；
+- 默认 stdio 传输（本地 Agent 直接拉起），也可用 HTTP（远程 Agent）；
 - 工具与核心服务能力一一对应：搜索 / 歌单解析 / 提交下载 / 查询状态 / 列出可用源。
+
+配置来源（优先级：环境变量 > config.yaml 的 mcp 段 > 默认值）：
+- 配置文件路径默认取脚本旁的 config.yaml，可用 MUSIC_SERVICE_CONFIG 指定；
+- api_key 复用 config.yaml 顶层 api_key 项，与核心服务保持一致，无需单独配置；
+- 环境变量 MUSIC_SERVICE_URL / MUSIC_SERVICE_API_KEY / MUSIC_MCP_TRANSPORT /
+  MUSIC_MCP_HOST / MUSIC_MCP_PORT 仍可覆盖，便于无配置文件的 stdio 场景。
 """
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 import httpx
 from fastmcp import FastMCP
 
-BASE_URL = os.environ.get("MUSIC_SERVICE_URL", "http://127.0.0.1:8765")
-API_KEY = os.environ.get("MUSIC_SERVICE_API_KEY", "")
+
+def _file_config() -> dict[str, Any]:
+    """读 config.yaml 的 mcp 段与顶层 api_key；文件缺失/解析失败时静默回退默认。"""
+    path = Path(os.environ.get("MUSIC_SERVICE_CONFIG",
+                               str(Path(__file__).resolve().parent / "config.yaml")))
+    try:
+        import yaml
+        with open(path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        cfg = dict(data.get("mcp") or {})
+        cfg.setdefault("api_key", data.get("api_key"))
+        return cfg
+    except Exception:
+        return {}
+
+
+_CFG = _file_config()
+
+BASE_URL = os.environ.get("MUSIC_SERVICE_URL") or _CFG.get("service_url") or "http://127.0.0.1:8765"
+API_KEY = os.environ.get("MUSIC_SERVICE_API_KEY") or _CFG.get("api_key") or ""
 
 mcp = FastMCP("media-music")
 
@@ -67,13 +92,12 @@ def search_tracks(keyword: str, sources: str | None = None, limit: int = 20) -> 
         r = c.get("/api/v1/search", params=params)
         r.raise_for_status()
         data = r.json()
-    # 精简返回，避免把 musicdl 原始大字段塞给 Agent；下载时按 id 回取
+    # 精简返回，避免把 musicdl 原始大字段塞给 Agent；下载时只需回传 id，服务端按缓存补全
     tracks = [{
         "id": t["id"], "source": t["source"], "title": t["title"],
         "artists": t["artists"], "album": t["album"], "ext": t["ext"],
         "quality": t["quality"], "size_bytes": t["size_bytes"],
         "duration_s": t["duration_s"], "cover_url": t["cover_url"],
-        "raw": t["raw"],  # 下载时需原样回传给服务端
     } for t in data["tracks"]]
     return {"keyword": data["keyword"], "total": data["total"],
             "failed_sources": data["failed_sources"], "tracks": tracks}
@@ -91,8 +115,7 @@ def parse_playlist(url: str, source: str | None = None) -> dict:
         tracks = r.json()
     return {"total": len(tracks),
             "tracks": [{"id": t["id"], "source": t["source"], "title": t["title"],
-                        "artists": t["artists"], "album": t["album"], "ext": t["ext"],
-                        "raw": t["raw"]} for t in tracks]}
+                        "artists": t["artists"], "album": t["album"], "ext": t["ext"]} for t in tracks]}
 
 
 @mcp.tool()
@@ -101,13 +124,16 @@ def submit_download(tracks: list[dict], subdir: str | None = None, library: str 
     """提交下载任务（异步）。
 
     Args:
-        tracks: 完整 track 对象列表，须包含 raw 字段（直接取自 search_tracks / parse_playlist 的返回项）
+        tracks: 待下载曲目列表。推荐每项只传 id 字段（取自 search_tracks / parse_playlist
+            返回项的 id），如 [{"id": "KuwoMusicClient:594551679"}]，服务端按搜索缓存自动
+            补全下载上下文；缓存有效期 1 小时，过期或服务重启后需重新搜索。
+            也兼容直接回传 search_tracks 的完整返回项（含 raw），但没必要。
         subdir: 下载根目录下的子目录名，留空则按"时间戳_首曲名"自动组织
         library: 目标库名（可选，见 list_libraries）；传入则下载完成后自动归档到该库，
             单曲入库结构为 {库根}/{艺人}/{曲名.ext}（专辑请用 download_album + archive_album）
         max_size_mb: 单文件体积上限（MB，可选）；>0 时超限曲目跳过且优先于服务端配置，0/空不限
     Returns:
-        task_id 等，可用 get_download_status 轮询进度。
+        task_id 等，用 get_download_status 轮询进度，以其 status/errors 为最终结果。
     """
     payload: dict[str, Any] = {"tracks": tracks}
     if subdir:
@@ -267,11 +293,11 @@ def archive_tracks(task_id: str, library: str | None = None, overwrite: bool = F
 
 
 if __name__ == "__main__":
-    transport = os.environ.get("MUSIC_MCP_TRANSPORT", "stdio")
+    transport = os.environ.get("MUSIC_MCP_TRANSPORT") or _CFG.get("transport") or "stdio"
     if transport == "stdio":
         mcp.run()
     else:
-        # 供远程 Agent 通过 HTTP/SSE 连接
-        host = os.environ.get("MUSIC_MCP_HOST", "0.0.0.0")
-        port = int(os.environ.get("MUSIC_MCP_PORT", "8766"))
+        # 供远程 Agent 通过 HTTP 连接
+        host = os.environ.get("MUSIC_MCP_HOST") or _CFG.get("host") or "0.0.0.0"
+        port = int(os.environ.get("MUSIC_MCP_PORT") or _CFG.get("port") or 8766)
         mcp.run(transport="http", host=host, port=port)

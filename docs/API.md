@@ -55,10 +55,13 @@
 | `ext` | string \| null | 文件格式，如 `flac` / `mp3` / `m4a` |
 | `size_bytes` | int \| null | 文件大小（字节） |
 | `cover_url` | string \| null | 封面图 URL |
+| `artist_img_url` | string \| null | 艺人头像 URL（源提供时；归档用于在艺人目录写 `artist.*`） |
 | `lyric` | string \| null | 歌词文本（若有） |
-| `raw` | object | musicdl 原始 `SongInfo` dict，**提交下载时必须原样回传** |
+| `raw` | object | musicdl 原始 `SongInfo` dict（服务端下载上下文） |
 
-> 说明：`raw` 字段体积较大且各源结构不一，客户端展示时可忽略，但**下载时必须带上**，服务端据此还原 musicdl 的 `SongInfo` 对象。
+> 说明：`raw` 字段体积较大且各源结构不一。搜索/歌单结果会在服务端缓存 1 小时，
+> **提交下载时只需回传 `id`**，服务端按缓存自动补全 `raw`（缓存在服务重启后失效，需重新搜索）；
+> 含 `raw` 的完整 Track 直传也兼容（此时以传入值为准，不查缓存）。
 
 ### SourceInfo（源信息）
 
@@ -191,12 +194,12 @@
 
 | 字段 | 必填 | 默认 | 说明 |
 |---|---|---|---|
-| `tracks` | 是 | — | 含 `raw` 的完整 Track 列表 |
+| `tracks` | 是 | — | 待下载曲目列表；每项**只需 `id`**（服务端按搜索缓存补全），含 `raw` 的完整 Track 也兼容 |
 | `subdir` | 否 | 自动组织 | 下载根目录下的子目录 |
 | `library` | 否 | — | 目标库名（见 `/libraries`）；传入则下载完成后**自动归档**到该库（单曲结构 `{库根}/{艺人}/{曲名.ext}`） |
 | `max_size_mb` | 否 | 配置文件 | 单文件体积上限（MB）；>0 生效且优先于 `config.yaml` 的 `max_size_mb`，0/空不限。超限曲目跳过并记入 `errors`，全部超限返回 400 |
 
-**响应 200**：`DownloadTask`；**400**：`tracks` 为空 / 未知库名 / 全部曲目体积超限
+**响应 200**：`DownloadTask`；**400**：`tracks` 为空 / 未知库名 / 全部曲目体积超限 / 仅传 `id` 但缓存未命中（需重新搜索）
 
 ---
 
@@ -252,7 +255,7 @@
 
 专辑整单下载（**异步**，立即返回 `task_id`）。服务端编排：逐曲在音乐源中搜索 → 打分消歧（标题/歌手/专辑/时长，阈值 0.6，低于阈值记 `unmatched` 不强行下载）→ **音质择优**（与最高分相差 ≤0.1 的同分段候选中优先无损 flac 等，没有合格无损才选 MP3；分数明显更高的候选不受音质影响）→ 按曲目序号命名落盘 → 下载封面 → 产出 `manifest.json`。
 
-**请求体**：`{"sources": ["可选，源名列表"], "subdir": "可选，默认'{艺人} - {专辑}'", "album_title": "可选，显示用专辑名覆盖", "artist": "可选，显示用艺人名覆盖", "max_size_mb": "可选，单文件体积上限（MB），超限候选不参与匹配；>0 优先于配置，0/空不限"}`
+**请求体**：`{"sources": ["可选，源名列表"], "subdir": "可选，默认'{艺人} - {专辑}'", "album_title": "可选，显示用专辑名覆盖", "artist": "可选，显示用艺人名覆盖", "max_size_mb": "可选，单文件体积上限（MB）；>0 优先于配置，0/空不限。超限不是硬剔除：优先选不超限的合格候选，无合格不超限候选时才放宽限制选超限最高分（保专辑完整性），manifest 标注 oversized_relaxed"}`
 
 > `album_title`/`artist` 用于应对 iTunes 罗马音专辑名（如 "Kou Shi Xin Fei"）：传入中文名后写入 manifest 的 `album.display_title`/`display_artist`，归档时作为目录名与 ALBUM/ARTIST tag 使用。
 

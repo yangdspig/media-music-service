@@ -21,6 +21,7 @@ class Track(BaseModel):
     ext: Optional[str] = Field(default=None, description="文件格式，如 flac/mp3/m4a")
     size_bytes: Optional[int] = Field(default=None, description="文件大小（字节）")
     cover_url: Optional[str] = Field(default=None, description="封面图 URL")
+    artist_img_url: Optional[str] = Field(default=None, description="艺人头像 URL（源提供时；归档用于写艺人目录 artist.*）")
     lyric: Optional[str] = Field(default=None, description="歌词文本（若有）")
     raw: dict[str, Any] = Field(default_factory=dict, description="musicdl 原始 SongInfo dict，供下载时回传")
 
@@ -43,8 +44,15 @@ class SourceInfo(BaseModel):
     note: str = ""
 
 
+class DownloadTrackInput(Track):
+    """下载提交项：仅 id 必填（服务端按搜索/歌单缓存补全 raw 与其余字段）；
+    也兼容完整 Track（含 raw）直传——raw 非空时优先使用传入值，不查缓存。"""
+    source: str = Field(default="", description="留空则按 id 从缓存补全")
+    title: str = Field(default="", description="留空则按 id 从缓存补全")
+
+
 class DownloadRequest(BaseModel):
-    tracks: list[Track] = Field(description="待下载的音轨（通常来自 search/playlist 结果）")
+    tracks: list[DownloadTrackInput] = Field(description="待下载的音轨：只需传 id（取自 search/playlist 结果）；含 raw 的完整 Track 也兼容")
     subdir: Optional[str] = Field(default=None, description="下载根目录下的子目录，默认按规则自动组织")
     library: Optional[str] = Field(default=None, description="目标库名（见 GET /api/v1/libraries）；传入则下载完成后自动归档到该库")
     max_size_mb: Optional[float] = Field(default=None, description="单文件体积上限（MB），超限曲目跳过；>0 才生效且优先于配置，0/空不限")

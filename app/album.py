@@ -35,7 +35,7 @@ _T2S = OpenCC("t2s")
 
 ACCEPT_THRESHOLD = 0.6  # 低于此分数记为 unmatched，不强行下载
 _SCORE_TIE_MARGIN = 0.1  # 与最高分相差在此范围内视为"同分段"，此时音质优先于分数
-_MATCH_LIMIT = 10  # 每首曲目聚合搜索的候选上限
+_MATCH_LIMIT = 20  # 每首曲目聚合搜索的候选上限（五源结果波动大，上限放宽防正确候选被挤出）
 _DOWNLOAD_TIMEOUT = 30.0  # 封面下载超时
 
 _LOSSLESS_EXTS = {"flac", "ape", "wav", "alac", "tak", "tta", "dsd", "dff", "dsf"}
@@ -104,12 +104,29 @@ def _duration_sim(expected_s: Any, actual_s: Any) -> float:
 
 
 def score_candidate(expected: AlbumTrack, album_title: str, cand: Track) -> float:
-    """对一个候选 Track 打分（0~1）。权重：标题 0.45 / 时长 0.25 / 歌手 0.15 / 专辑 0.15。"""
+    """对一个候选 Track 打分（0~1）。权重：标题 0.45 / 时长 0.25 / 歌手 0.15 / 专辑 0.15。
+
+    版本标记惩罚：候选曲名含有期望曲名没有的版本标记（Mix/Remix/Dance/Live/伴奏等，
+    含被归一化剥离的括号内容）时扣 0.2 分——防止括号剥离后 remix 与原版同分错配。
+    """
     title = _sim(expected.title, cand.title)
     artist = _artist_sim(expected.artists, cand.artists)
     album_s = _sim(album_title, cand.album) if cand.album else 0.3
     dur = _duration_sim(expected.duration_s, cand.duration_s)
-    return round(0.45 * title + 0.15 * artist + 0.15 * album_s + 0.25 * dur, 3)
+    base = 0.45 * title + 0.15 * artist + 0.15 * album_s + 0.25 * dur
+    extra_markers = _version_markers(cand.title) - _version_markers(expected.title)
+    if extra_markers:
+        base -= 0.2
+    return round(max(base, 0.0), 3)
+
+
+_VERSION_MARKERS = ("remix", "mix", "dance", "live", "karaoke", "cover", "伴奏", "翻唱")
+
+
+def _version_markers(s: str | None) -> set[str]:
+    """提取曲名中的版本标记（繁转简小写后子串匹配）。"""
+    low = t2s(s).lower()
+    return {m for m in _VERSION_MARKERS if m in low}
 
 
 def pick_best(scored: list[tuple[float, Track]]) -> tuple[float, Track]:
@@ -126,52 +143,55 @@ def match_track(expected: AlbumTrack, album: AlbumInfo, sources: list[str] | Non
                 max_size_mb: float | None = None) -> dict[str, Any]:
     """对一首期望曲目做聚合搜索 + 打分消歧，返回匹配结论（含最高分候选，供 manifest）。
 
-    max_size_mb：单文件体积上限（接口传参 >0 优先，否则用配置 max_size_mb，0/空不限）；
-    size_bytes 超限的候选在打分前剔除（size_bytes 未知的放行），全被剔除记 unmatched。
+    max_size_mb：单文件体积上限（接口传参 >0 优先，否则用配置 max_size_mb，0/空不限）。
+    体积规则为"优先权"而非硬剔除：全部候选参与打分，优先选不超限且达阈值的最优者；
+    无合格的不超限候选时才选超限最高分（≥阈值），manifest 标注 oversized_relaxed——
+    宁可下超限文件也不让专辑缺曲或错配版本。
     """
-    keyword = t2s(expected.title)
+    keyword = t2s(_PAREN_RE.sub("", expected.title or "")).strip() or t2s(expected.title)
+    # 搜索关键词剔除括号补充（国语/[Album Version] 等）：平台搜索对括号内容敏感，
+    # 带括号易引入无关结果、挤出正确候选；版本消歧交给打分阶段处理
     if expected.artists:
         keyword += " " + t2s(expected.artists[0])
     try:
         candidates, _failed = search(keyword=keyword.strip(), sources=sources, limit=_MATCH_LIMIT)
     except Exception as e:
         return {"status": "unmatched", "error": f"搜索失败: {e}", "match": None}
-    # 体积上限过滤（size_bytes 未知的候选放行）
-    limit_mb = effective_max_size_mb(max_size_mb)
-    oversized = 0
-    if limit_mb:
-        limit_bytes = limit_mb * 1024 * 1024
-        kept = []
-        for c in candidates:
-            if c.size_bytes and c.size_bytes > limit_bytes:
-                oversized += 1
-            else:
-                kept.append(c)
-        candidates = kept
     if not candidates:
-        err = (f"全部候选体积超限（上限 {limit_mb:g}MB，剔除 {oversized} 首）" if oversized
-               else "无候选结果")
-        return {"status": "unmatched", "error": err, "match": None}
+        return {"status": "unmatched", "error": "无候选结果", "match": None}
     scored = sorted(
         ((score_candidate(expected, album.title, c), c) for c in candidates),
         key=lambda x: x[0], reverse=True,
     )
     top_score = scored[0][0]
 
-    def _match_info(score: float, c: Track) -> dict:
+    # 体积统计（size_bytes 未知的按不超限放行）
+    limit_mb = effective_max_size_mb(max_size_mb)
+    limit_bytes = (limit_mb or 0) * 1024 * 1024
+
+    def _oversized(c: Track) -> bool:
+        return bool(limit_bytes and c.size_bytes and c.size_bytes > limit_bytes)
+
+    oversized = sum(1 for _, c in scored if _oversized(c))
+
+    def _match_info(score: float, c: Track, relaxed: bool) -> dict:
         return {
             "source": c.source, "track_id": c.id, "title": c.title,
             "artists": c.artists, "album": c.album, "ext": c.ext, "quality": c.quality,
-            "quality_tier": quality_tier(c),
+            "quality_tier": quality_tier(c), "artist_img_url": c.artist_img_url,
             "score": score, "candidates": len(candidates), "oversized_filtered": oversized,
+            "oversized_relaxed": relaxed,  # True = 无合格不超限候选，已放宽体积限制下载
         }
 
-    if top_score < ACCEPT_THRESHOLD:
+    qualified = [(s, c) for s, c in scored if s >= ACCEPT_THRESHOLD]
+    if not qualified:
         return {"status": "unmatched",
                 "error": f"最高匹配分 {top_score} 低于阈值 {ACCEPT_THRESHOLD}",
-                "match": _match_info(top_score, scored[0][1])}
-    best_score, best = pick_best(scored)
-    return {"status": "matched", "match": _match_info(best_score, best), "track": best}
+                "match": _match_info(top_score, scored[0][1], relaxed=False)}
+    within = [(s, c) for s, c in qualified if not _oversized(c)]
+    pool, relaxed = (within, False) if within else (qualified, True)
+    best_score, best = pick_best(pool)
+    return {"status": "matched", "match": _match_info(best_score, best, relaxed), "track": best}
 
 
 _CJK_RE = re.compile(r"[一-鿿]")
@@ -309,7 +329,7 @@ def _run_album(task: DownloadTask, album: AlbumInfo, sources: list[str] | None,
         except Exception as e:  # 单源失败不拖垮整体，该源曲目统一记 failed
             for i in idxs:
                 to_download[i][0]["status"] = "failed"
-                to_download[i][0]["error"] = f"{source}: {e}"
+                to_download[i][0]["error"] = f"{source}: {type(e).__name__}: {e}"
             dl.save_task(task)
             continue
         # 逐曲核验落盘结果（musicdl 单曲失败不抛异常，需检查文件是否存在）
