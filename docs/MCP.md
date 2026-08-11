@@ -6,7 +6,7 @@
 
 - 服务名：`media-music`
 - 实现：基于 FastMCP 的**薄客户端**，不直接依赖 musicdl，所有能力通过 HTTP 调用核心 REST 服务
-- 工具数：9 个
+- 工具数：11 个
 - 传输方式：**stdio**（默认，本地 Agent 直接拉起，推荐）/ **http**（远程 Agent）
 
 ### 与 REST API 的关系
@@ -14,6 +14,7 @@
 | MCP 工具 | 对应 REST 接口 |
 |---|---|
 | `list_sources` | `GET /api/v1/sources` |
+| `list_libraries` | `GET /api/v1/libraries` |
 | `search_tracks` | `GET /api/v1/search` |
 | `parse_playlist` | `GET /api/v1/playlist` |
 | `submit_download` | `POST /api/v1/downloads` |
@@ -22,6 +23,7 @@
 | `get_album_info` | `GET /api/v1/albums/{collection_id}` |
 | `download_album` | `POST /api/v1/albums/{collection_id}/download` |
 | `archive_album` | `POST /api/v1/albums/archive` |
+| `archive_tracks` | `POST /api/v1/tracks/archive` |
 
 > 核心 REST 服务必须先启动并可达（默认 `http://127.0.0.1:8765`），MCP 适配器只是它的客户端。
 
@@ -68,14 +70,17 @@
 ### list_sources
 列出全部音乐源及可用性，拆分为 available / unavailable 两组。典型用途：搜索前先判断哪些源可用、哪些需要补 cookies。
 
+### list_libraries
+列出全部归档目标库（命名库根）：默认库 `default` + 服务端 `extra_library_roots` 配置的命名附加库（如单曲库 `singles`）。归档/下载时的 `library` 参数从这里选；留空用默认库。只能传库名（白名单），不接受裸路径。
+
 ### search_tracks(keyword, sources?, limit?)
 按关键词搜索。返回精简 Track + `raw`（供下载回传）。
 
 ### parse_playlist(url, source?)
 解析歌单 URL 为曲目列表（Track 含 `raw`）。
 
-### submit_download(tracks, subdir?)
-提交下载任务（异步）。`tracks` 元素**必须含 `raw` 字段**（取自 `search_tracks`/`parse_playlist` 返回项）。返回 `task_id`。
+### submit_download(tracks, subdir?, library?, max_size_mb?)
+提交下载任务（异步）。`tracks` 元素**必须含 `raw` 字段**（取自 `search_tracks`/`parse_playlist` 返回项）。返回 `task_id`。传 `library` 时下载完成后**自动归档**到该库（单曲结构 `{库根}/{艺人}/{曲名.ext}`，一步到位）；`max_size_mb` 为单文件体积上限（MB），>0 时超限曲目跳过且优先于服务端配置，0/空不限。
 
 ### get_download_status(task_id)
 查询下载任务进度（status/completed/failed/save_dir/results/errors）。单曲与专辑任务通用；专辑任务完成后 `manifest_path` 指向结构化清单。
@@ -86,21 +91,25 @@
 ### get_album_info(collection_id)
 获取专辑详情：官方曲目表（含 disc/序号/时长）、发行日期、封面等。**下载前建议先调用此工具向用户确认专辑版本**（同名专辑可能有 Single/EP/ deluxe 等多个版本）。
 
-### download_album(collection_id, sources?, subdir?, album_title?, artist?)
-专辑整单下载（异步）。服务端逐曲搜索匹配消歧（打分含标题/歌手/专辑/时长，低于阈值记 `unmatched` 不强行下载；同分段候选优先无损音质，没有合格无损才选 MP3），按曲目序号命名落盘（`01 曲名.flac`，多 Disc 为 `1-01 曲名.flac`），附 `cover.jpg` 与 `manifest.json`。返回 `task_id`，用 `get_download_status` 轮询。`album_title`/`artist` 用于 iTunes 专辑名是罗马音/拼音时显式指定中文显示名（写入 manifest 供归档使用）。
+### download_album(collection_id, sources?, subdir?, album_title?, artist?, max_size_mb?)
+专辑整单下载（异步）。服务端逐曲搜索匹配消歧（打分含标题/歌手/专辑/时长，低于阈值记 `unmatched` 不强行下载；同分段候选优先无损音质，没有合格无损才选 MP3），按曲目序号命名落盘（`01 曲名.flac`，多 Disc 为 `1-01 曲名.flac`），附 `cover.jpg` 与 `manifest.json`。返回 `task_id`，用 `get_download_status` 轮询。`album_title`/`artist` 用于 iTunes 专辑名是罗马音/拼音时显式指定中文显示名（写入 manifest 供归档使用）。`max_size_mb` 为单文件体积上限（MB），超限候选不参与匹配（全部超限时该曲记 `unmatched` 并注明原因）。
 
-### archive_album(task_id?, manifest_path?, overwrite?, album_title?, artist?)
-把专辑下载产物归档进媒体库（同步，秒级）：硬链接（失败回退复制）入库 → 断链后写 tag → 嵌封面歌词 → `cover.jpg` + `album_info.txt`。库内结构 `{library_root}/{艺人}/{专辑}/`，多 Disc 用 `CD1/CD2` 子目录。`task_id`（服务未重启时）与 `manifest_path` 二选一；默认幂等跳过已存在文件。前置：服务端已配置 `library_root` 并挂载媒体库卷。专辑名/艺人名按解析链确定：显式参数 > manifest display_* > 自动推断（国内源多数表决，仅在原名为罗马音时生效）> iTunes 原名——**罗马音专辑名一般无需手动传参，归档会自动纠正为中文**。
+### archive_album(task_id?, manifest_path?, overwrite?, album_title?, artist?, library?)
+把专辑下载产物归档进媒体库（同步，秒级）：硬链接（失败回退复制）入库 → 断链后写 tag → 嵌封面歌词 → `cover.jpg` + `album_info.txt`。库内结构 `{库根}/{艺人}/{专辑}/`，多 Disc 用 `CD1/CD2` 子目录。`task_id`（服务未重启时）与 `manifest_path` 二选一；默认幂等跳过已存在文件。前置：服务端已配置 `library_root` 并挂载媒体库卷；`library` 选择目标库（见 `list_libraries`），留空用默认库。专辑名/艺人名按解析链确定：显式参数 > manifest display_* > 自动推断（国内源多数表决，仅在原名为罗马音时生效）> iTunes 原名——**罗马音专辑名一般无需手动传参，归档会自动纠正为中文**。
+
+### archive_tracks(task_id, library?, overwrite?)
+把单曲下载任务的产物归档进媒体库（同步）：硬链接/复制入库 → 断链后写 tag → 嵌封面歌词（封面从候选 `cover_url` 下载）。结构 `{库根}/{艺人}/{曲名.ext}`，同名 `.lrc` 放旁边；不写曲目序号。`submit_download` 传了 `library` 时已自动归档，本工具用于事后补归档或换库重归档；默认幂等跳过。任务在内存中才可用（服务重启后需重新下载）。
 
 ## 五、典型调用流程
 
-### 单曲下载
+### 单曲下载（可自动归档入库）
 
-1. `list_sources` 确认可用源；
+1. `list_sources` 确认可用源；要入库时先 `list_libraries` 确认目标库名（如单曲库 `singles`）；
 2. `search_tracks(keyword, sources, limit)` 拿到候选曲目；
 3. 从结果中**保留含 `raw` 的完整 Track 对象**；
-4. `submit_download(tracks=[…])` 提交，拿到 `task_id`；
-5. 用 `get_download_status(task_id)` 轮询，直到 `status` 为 `success`/`failed`。
+4. `submit_download(tracks=[…], library="singles")` 提交，拿到 `task_id`；传了 `library` 则下载完成后自动归档；
+5. 用 `get_download_status(task_id)` 轮询，直到 `status` 为 `success`/`failed`；`message` 中含自动归档结果摘要；
+6. 未传 `library` 的事后补归档：`archive_tracks(task_id, library="singles")`。
 
 > 关键约束：`submit_download` 的 `tracks` 元素必须带 `raw` 字段，否则服务端无法还原 musicdl 的下载上下文。
 

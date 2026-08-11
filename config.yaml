@@ -22,6 +22,10 @@ library_root: "/library"
 # 归档时统一写入音频文件的 COMMENT tag（用于标记整理来源、覆盖平台水印）
 archive_comment: "yangds整理"
 
+# 单文件体积上限（MB）：超出则专辑匹配跳过该候选、单曲下载直接拒绝
+# 0 或留空不限；接口传参（max_size_mb > 0）优先于此配置
+# max_size_mb: 100
+
 # 每个源的下载线程数
 num_threads: 5
 

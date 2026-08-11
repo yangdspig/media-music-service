@@ -47,6 +47,7 @@ class DownloadRequest(BaseModel):
     tracks: list[Track] = Field(description="待下载的音轨（通常来自 search/playlist 结果）")
     subdir: Optional[str] = Field(default=None, description="下载根目录下的子目录，默认按规则自动组织")
     library: Optional[str] = Field(default=None, description="目标库名（见 GET /api/v1/libraries）；传入则下载完成后自动归档到该库")
+    max_size_mb: Optional[float] = Field(default=None, description="单文件体积上限（MB），超限曲目跳过；>0 才生效且优先于配置，0/空不限")
 
 
 class AlbumSummary(BaseModel):
@@ -80,6 +81,7 @@ class AlbumDownloadRequest(BaseModel):
     subdir: Optional[str] = Field(default=None, description="下载根目录下的子目录，默认'{艺人} - {专辑}'")
     album_title: Optional[str] = Field(default=None, description="显示用专辑名覆盖（应对 iTunes 罗马音专辑名，写入 manifest 供归档使用）")
     artist: Optional[str] = Field(default=None, description="显示用艺人名覆盖")
+    max_size_mb: Optional[float] = Field(default=None, description="单文件体积上限（MB），超限候选不参与匹配；>0 才生效且优先于配置，0/空不限")
 
 
 class ArchiveRequest(BaseModel):

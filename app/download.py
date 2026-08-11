@@ -14,7 +14,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from .config import settings
+from .config import effective_max_size_mb, settings
 from .registry import build_client
 from .schemas import DownloadTask, TaskStatus, Track
 from . import storage
@@ -54,21 +54,40 @@ def download_songs(source: str, song_dicts: list[dict], save_dir: str) -> int:
     return len(song_infos)
 
 
+_AUDIO_EXTS = {".flac", ".mp3", ".m4a", ".ape", ".wav", ".alac", ".ogg", ".aac",
+               ".dsf", ".dff", ".tak", ".tta", ".opus", ".wma"}
+
+
 def _find_downloaded_file(save_dir: str, filename: str, identifier: str, before: set[str]) -> str | None:
-    """下载后定位落盘文件：优先按指定文件名，其次按 identifier 匹配新增文件。"""
+    """下载后定位落盘文件：优先按指定文件名，其次按 identifier 匹配新增的音频文件。
+
+    注意必须限定音频扩展名：musicdl 会同时落盘同名 .lrc 歌词，
+    不限定时可能把歌词文件误当成音频返回。
+    """
     if filename and (Path(save_dir) / filename).exists():
         return filename
     for p in Path(save_dir).iterdir():
-        if p.is_file() and p.name not in before and identifier and identifier in p.name:
+        if (p.is_file() and p.suffix.lower() in _AUDIO_EXTS
+                and p.name not in before and identifier and identifier in p.name):
             return p.name
     return None
 
 
-def submit(tracks: list[Track], subdir: str | None = None, library: str | None = None) -> DownloadTask:
+def submit(tracks: list[Track], subdir: str | None = None, library: str | None = None,
+           max_size_mb: float | None = None) -> DownloadTask:
     if library:
         # 提前校验库名（白名单），避免下载完成后才发现归档目标不存在
         from .libraries import resolve_library_root
         resolve_library_root(library)
+    # 体积上限过滤：超限曲目直接拒绝下载（接口传参 >0 优先，否则用配置，0/空不限）
+    limit_mb = effective_max_size_mb(max_size_mb)
+    rejected: list[Track] = []
+    if limit_mb:
+        limit_bytes = limit_mb * 1024 * 1024
+        rejected = [t for t in tracks if t.size_bytes and t.size_bytes > limit_bytes]
+        tracks = [t for t in tracks if t not in rejected]
+        if not tracks:
+            raise ValueError(f"全部曲目体积超限（上限 {limit_mb:g}MB，拒绝 {len(rejected)} 首）")
     task_id = uuid.uuid4().hex[:12]
     # 落盘目录：根目录 / 子目录（默认 时间戳_首曲名）
     if not subdir:
@@ -79,6 +98,8 @@ def submit(tracks: list[Track], subdir: str | None = None, library: str | None =
     Path(save_dir).mkdir(parents=True, exist_ok=True)
 
     task = DownloadTask(task_id=task_id, total=len(tracks), save_dir=save_dir, library=library)
+    for t in rejected:
+        task.errors.append(f"体积超限跳过: {t.title}（{(t.size_bytes or 0) / 1024 / 1024:.1f}MB > {limit_mb:g}MB）")
     register_task(task)
 
     th = threading.Thread(target=_run, args=(task, tracks), daemon=True)

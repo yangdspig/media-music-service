@@ -22,12 +22,14 @@
    - **已完成补充**（2026-08-10）：罗马音专辑名修复——iTunes 对部分老中文专辑只存罗马音专辑名（如 "Kou Shi Xin Fei"），归档按"显式参数 > manifest display_* > 自动推断（国内源候选多数表决 + CJK 保护）> iTunes 原名"解析显示名；`download_album`/`archive_album` 新增 `album_title`/`artist` 覆盖参数；旧 manifest 重跑归档即可自动纠正
    - 风险：网易云/QQ 网页接口可能变动或限流，需多源交叉验证；消歧可能误中 Live/翻唱版本，manifest 必须带置信信息供复核
 
-2. **单曲体积上限控制（无损防超大文件）**（2026-08-10 记录的需求）
+2. **单曲体积上限控制（无损防超大文件）** ✅ 已完成（2026-08-11）
    - 背景：无损音频体积差异大（普通 flac 约 25-60MB，Hi-Res 24bit/192kHz 可超 200MB/首），需要一道上限防止下载到超大文件
-   - 参数设计：`max_size_mb`（单曲体积上限，MB；空/0 表示不限制）
-   - **配置优先级**：接口传参 > 配置文件。`config.yaml` 新增 `max_size_mb` 全局默认；`POST /api/v1/downloads`（单曲）与 `POST /api/v1/albums/{id}/download`（专辑）请求体均可传 `max_size_mb` 覆盖；MCP 工具 `submit_download`/`download_album` 同步加参
-   - 生效点：专辑下载在 `match_track` 候选阶段过滤超限候选（被过滤的候选写入 manifest 供复核），全部超限时该曲记 `unmatched` 并在 error 注明"体积超限"；单曲下载提交前校验，超限曲目直接拒绝并说明
-   - 边界策略：候选 `size_bytes` 未知（部分源不给体积）时不做拦截（放行并在 manifest 标注 size 未知）；体积判断以搜索结果的 `size_bytes` 为准，不做下载后补救
+   - 已实现：`config.yaml` 新增 `max_size_mb` 全局默认；`POST /api/v1/downloads` 与 `POST /api/v1/albums/{id}/download` 请求体可传 `max_size_mb` 覆盖（>0 优先于配置，0/空不限）；MCP `submit_download`/`download_album` 同步加参
+   - 生效点：专辑在 `match_track` 候选阶段过滤超限候选（manifest 的 match 记录 `oversized_filtered`，size_bytes 未知的放行），全部超限记 `unmatched` 并注明"体积超限"；单曲提交前校验，部分超限跳过并记入任务 `errors`，全部超限返回 400
+
+2b. **命名库根与单曲归档** ✅ 已完成（2026-08-11）
+   - 背景：专辑与单曲需要分库存放（如 library 放专辑、singles 放单曲）
+   - 已实现：`config.yaml` 新增 `extra_library_roots` 白名单式命名附加库根（调用方传库名不传裸路径）；`GET /api/v1/libraries` + MCP `list_libraries`；`POST /api/v1/tracks/archive` + MCP `archive_tracks`（结构 `{库根}/{艺人}/{曲名.ext}`，写 tag/嵌封面歌词、sidecar .lrc、不写曲目序号，幂等跳过）；`submit_download` 传 `library` 下载完成后自动归档（单曲一步到位）；`archive_album` 增加 `library` 参数保持对称
 
 3. **MoviePilot 薄客户端插件**
    - 目标：在 MoviePilot 内完成"搜索 → 勾选 → 下载 → 入库整理"闭环

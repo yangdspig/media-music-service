@@ -96,7 +96,8 @@ def parse_playlist(url: str, source: str | None = None) -> dict:
 
 
 @mcp.tool()
-def submit_download(tracks: list[dict], subdir: str | None = None, library: str | None = None) -> dict:
+def submit_download(tracks: list[dict], subdir: str | None = None, library: str | None = None,
+                    max_size_mb: float | None = None) -> dict:
     """提交下载任务（异步）。
 
     Args:
@@ -104,6 +105,7 @@ def submit_download(tracks: list[dict], subdir: str | None = None, library: str 
         subdir: 下载根目录下的子目录名，留空则按"时间戳_首曲名"自动组织
         library: 目标库名（可选，见 list_libraries）；传入则下载完成后自动归档到该库，
             单曲入库结构为 {库根}/{艺人}/{曲名.ext}（专辑请用 download_album + archive_album）
+        max_size_mb: 单文件体积上限（MB，可选）；>0 时超限曲目跳过且优先于服务端配置，0/空不限
     Returns:
         task_id 等，可用 get_download_status 轮询进度。
     """
@@ -112,6 +114,8 @@ def submit_download(tracks: list[dict], subdir: str | None = None, library: str 
         payload["subdir"] = subdir
     if library:
         payload["library"] = library
+    if max_size_mb:
+        payload["max_size_mb"] = max_size_mb
     with _client() as c:
         r = c.post("/api/v1/downloads", json=payload)
         r.raise_for_status()
@@ -170,7 +174,8 @@ def get_album_info(collection_id: str) -> dict:
 
 @mcp.tool()
 def download_album(collection_id: str, sources: str | None = None, subdir: str | None = None,
-                   album_title: str | None = None, artist: str | None = None) -> dict:
+                   album_title: str | None = None, artist: str | None = None,
+                   max_size_mb: float | None = None) -> dict:
     """专辑整单下载（异步）：服务端逐曲搜索匹配、按曲目序号命名落盘，并产出 manifest.json。
 
     Args:
@@ -180,6 +185,7 @@ def download_album(collection_id: str, sources: str | None = None, subdir: str |
         album_title: 显示用专辑名覆盖（可选；iTunes 专辑名为罗马音/拼音时建议传入中文名，
             会写入 manifest 供归档作为目录名与 ALBUM tag）
         artist: 显示用艺人名覆盖（可选，同上）
+        max_size_mb: 单文件体积上限（MB，可选）；>0 时超限候选不参与匹配且优先于服务端配置，0/空不限
     Returns:
         task_id / save_dir，用 get_download_status 轮询进度；完成后
         manifest_path 指向的 manifest.json 含逐曲匹配分数、落盘文件与失败原因，供复核。
@@ -193,6 +199,8 @@ def download_album(collection_id: str, sources: str | None = None, subdir: str |
         payload["album_title"] = album_title
     if artist:
         payload["artist"] = artist
+    if max_size_mb:
+        payload["max_size_mb"] = max_size_mb
     with _client() as c:
         r = c.post(f"/api/v1/albums/{collection_id}/download", json=payload)
         r.raise_for_status()

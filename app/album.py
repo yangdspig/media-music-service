@@ -27,7 +27,7 @@ from opencc import OpenCC
 
 from . import download as dl
 from . import storage
-from .config import settings
+from .config import effective_max_size_mb, settings
 from .schemas import AlbumInfo, AlbumTrack, DownloadTask, TaskStatus, Track
 from .search import search
 
@@ -122,8 +122,13 @@ def pick_best(scored: list[tuple[float, Track]]) -> tuple[float, Track]:
     return max(competitive, key=lambda x: (quality_tier(x[1]), x[0]))
 
 
-def match_track(expected: AlbumTrack, album: AlbumInfo, sources: list[str] | None) -> dict[str, Any]:
-    """对一首期望曲目做聚合搜索 + 打分消歧，返回匹配结论（含最高分候选，供 manifest）。"""
+def match_track(expected: AlbumTrack, album: AlbumInfo, sources: list[str] | None,
+                max_size_mb: float | None = None) -> dict[str, Any]:
+    """对一首期望曲目做聚合搜索 + 打分消歧，返回匹配结论（含最高分候选，供 manifest）。
+
+    max_size_mb：单文件体积上限（接口传参 >0 优先，否则用配置 max_size_mb，0/空不限）；
+    size_bytes 超限的候选在打分前剔除（size_bytes 未知的放行），全被剔除记 unmatched。
+    """
     keyword = t2s(expected.title)
     if expected.artists:
         keyword += " " + t2s(expected.artists[0])
@@ -131,8 +136,22 @@ def match_track(expected: AlbumTrack, album: AlbumInfo, sources: list[str] | Non
         candidates, _failed = search(keyword=keyword.strip(), sources=sources, limit=_MATCH_LIMIT)
     except Exception as e:
         return {"status": "unmatched", "error": f"搜索失败: {e}", "match": None}
+    # 体积上限过滤（size_bytes 未知的候选放行）
+    limit_mb = effective_max_size_mb(max_size_mb)
+    oversized = 0
+    if limit_mb:
+        limit_bytes = limit_mb * 1024 * 1024
+        kept = []
+        for c in candidates:
+            if c.size_bytes and c.size_bytes > limit_bytes:
+                oversized += 1
+            else:
+                kept.append(c)
+        candidates = kept
     if not candidates:
-        return {"status": "unmatched", "error": "无候选结果", "match": None}
+        err = (f"全部候选体积超限（上限 {limit_mb:g}MB，剔除 {oversized} 首）" if oversized
+               else "无候选结果")
+        return {"status": "unmatched", "error": err, "match": None}
     scored = sorted(
         ((score_candidate(expected, album.title, c), c) for c in candidates),
         key=lambda x: x[0], reverse=True,
@@ -144,7 +163,7 @@ def match_track(expected: AlbumTrack, album: AlbumInfo, sources: list[str] | Non
             "source": c.source, "track_id": c.id, "title": c.title,
             "artists": c.artists, "album": c.album, "ext": c.ext, "quality": c.quality,
             "quality_tier": quality_tier(c),
-            "score": score, "candidates": len(candidates),
+            "score": score, "candidates": len(candidates), "oversized_filtered": oversized,
         }
 
     if top_score < ACCEPT_THRESHOLD:
@@ -218,11 +237,13 @@ def _download_cover(album: AlbumInfo, save_dir: str) -> Optional[str]:
 
 
 def submit_album_download(album: AlbumInfo, sources: list[str] | None = None, subdir: str | None = None,
-                          album_title: str | None = None, artist: str | None = None) -> DownloadTask:
+                          album_title: str | None = None, artist: str | None = None,
+                          max_size_mb: float | None = None) -> DownloadTask:
     """提交专辑下载任务（异步）：先逐曲匹配消歧，再按源分组下载，最后产出 manifest.json。
 
     album_title/artist 为显式显示名覆盖（应对 iTunes 罗马音专辑名），
     会写入 manifest 供归档使用；subdir 命名也优先采用。
+    max_size_mb 为单文件体积上限（MB），超限候选不参与匹配（>0 优先于配置，0/空不限）。
     """
     task_id = uuid.uuid4().hex[:12]
     if not subdir:
@@ -235,12 +256,12 @@ def submit_album_download(album: AlbumInfo, sources: list[str] | None = None, su
     task = DownloadTask(task_id=task_id, total=len(album.tracks), save_dir=save_dir)
     dl.register_task(task)
     display = {k: v for k, v in {"display_title": album_title, "display_artist": artist}.items() if v}
-    threading.Thread(target=_run_album, args=(task, album, sources, display), daemon=True).start()
+    threading.Thread(target=_run_album, args=(task, album, sources, display, max_size_mb), daemon=True).start()
     return task
 
 
 def _run_album(task: DownloadTask, album: AlbumInfo, sources: list[str] | None,
-               display: dict[str, str] | None = None) -> None:
+               display: dict[str, str] | None = None, max_size_mb: float | None = None) -> None:
     task.status = TaskStatus.RUNNING
     dl.save_task(task)
     save_dir = task.save_dir or settings.download_root
@@ -251,7 +272,7 @@ def _run_album(task: DownloadTask, album: AlbumInfo, sources: list[str] | None,
     # ---- 1) 逐曲匹配消歧 ----
     for expected in album.tracks:
         task.current = f"匹配: {expected.title}"
-        r = match_track(expected, album, sources)
+        r = match_track(expected, album, sources, max_size_mb=max_size_mb)
         entry: dict[str, Any] = {
             "disc": expected.disc, "track": expected.track,
             "title": expected.title, "artists": expected.artists,

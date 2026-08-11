@@ -85,9 +85,10 @@
 | `current` | string \| null | 当前正在下载的来源 |
 | `message` | string | 状态描述 |
 | `save_dir` | string | 实际落盘目录 |
-| `results` | object[] | 成功项（含 `source`/`title`/`artists`/`save_dir`） |
+| `results` | object[] | 成功项（含 `source`/`title`/`artists`/`album`/`ext`/`cover_url`/`file`/`save_dir`；`file` 为实际落盘音频文件名，未落盘为 null） |
 | `errors` | string[] | 错误信息列表 |
 | `manifest_path` | string \| null | 专辑任务产出的 `manifest.json` 路径（单曲任务为 null） |
+| `library` | string \| null | 目标库名；单曲任务传入时下载完成后自动归档到该库 |
 
 ### AlbumSummary（专辑摘要）
 
@@ -165,13 +166,37 @@
 
 ---
 
+### GET /api/v1/libraries
+
+列出全部归档目标库（命名库根）：默认库 `default`（`library_root`）+ `extra_library_roots` 配置的命名附加库。归档/下载时传 `library` 参数选择目标库，留空用默认库。
+
+**响应 200**
+
+```json
+[
+  {"name": "default", "root": "/library", "default": true},
+  {"name": "singles", "root": "/singles", "default": false}
+]
+```
+
+> 设计约束：调用方只能传**库名**（白名单），不接受裸路径，防止任意路径写入。命名库在 `config.yaml` 的 `extra_library_roots` 中配置（如 `singles: "/singles"`），Docker 部署需同时挂载对应卷。
+
+---
+
 ### POST /api/v1/downloads
 
 提交下载任务（**异步**，立即返回 `task_id`）。
 
-**请求体**：`{"tracks": [...], "subdir": "可选"}`，`tracks` 元素为含 `raw` 的完整 Track。
+**请求体**
 
-**响应 200**：`DownloadTask`；**400**：`tracks` 为空
+| 字段 | 必填 | 默认 | 说明 |
+|---|---|---|---|
+| `tracks` | 是 | — | 含 `raw` 的完整 Track 列表 |
+| `subdir` | 否 | 自动组织 | 下载根目录下的子目录 |
+| `library` | 否 | — | 目标库名（见 `/libraries`）；传入则下载完成后**自动归档**到该库（单曲结构 `{库根}/{艺人}/{曲名.ext}`） |
+| `max_size_mb` | 否 | 配置文件 | 单文件体积上限（MB）；>0 生效且优先于 `config.yaml` 的 `max_size_mb`，0/空不限。超限曲目跳过并记入 `errors`，全部超限返回 400 |
+
+**响应 200**：`DownloadTask`；**400**：`tracks` 为空 / 未知库名 / 全部曲目体积超限
 
 ---
 
@@ -227,7 +252,7 @@
 
 专辑整单下载（**异步**，立即返回 `task_id`）。服务端编排：逐曲在音乐源中搜索 → 打分消歧（标题/歌手/专辑/时长，阈值 0.6，低于阈值记 `unmatched` 不强行下载）→ **音质择优**（与最高分相差 ≤0.1 的同分段候选中优先无损 flac 等，没有合格无损才选 MP3；分数明显更高的候选不受音质影响）→ 按曲目序号命名落盘 → 下载封面 → 产出 `manifest.json`。
 
-**请求体**：`{"sources": ["可选，源名列表"], "subdir": "可选，默认'{艺人} - {专辑}'", "album_title": "可选，显示用专辑名覆盖", "artist": "可选，显示用艺人名覆盖"}`
+**请求体**：`{"sources": ["可选，源名列表"], "subdir": "可选，默认'{艺人} - {专辑}'", "album_title": "可选，显示用专辑名覆盖", "artist": "可选，显示用艺人名覆盖", "max_size_mb": "可选，单文件体积上限（MB），超限候选不参与匹配；>0 优先于配置，0/空不限"}`
 
 > `album_title`/`artist` 用于应对 iTunes 罗马音专辑名（如 "Kou Shi Xin Fei"）：传入中文名后写入 manifest 的 `album.display_title`/`display_artist`，归档时作为目录名与 ALBUM/ARTIST tag 使用。
 
@@ -253,7 +278,7 @@
       "status": "ok | unmatched | failed",
       "match": { "source": "…", "track_id": "…", "title": "…", "artists": ["…"],
                  "album": "…", "ext": "flac", "quality": "lossless", "quality_tier": 3,
-                 "score": 0.92, "candidates": 5 },
+                 "score": 0.92, "candidates": 5, "oversized_filtered": 0 },
       "file": "01 曲名.flac", "ext": "flac", "size_bytes": 30000000, "error": null }
   ],
   "summary": { "total": 10, "ok": 9, "unmatched": 1, "failed": 0 }
@@ -281,6 +306,7 @@
 | `overwrite` | 否 | false | 目标已存在时是否覆盖重建；默认跳过（幂等） |
 | `album_title` | 否 | — | 显示用专辑名覆盖（最高优先级，影响目录名与 ALBUM tag） |
 | `artist` | 否 | — | 显示用艺人名覆盖（最高优先级，影响目录名与 ARTIST tag） |
+| `library` | 否 | 默认库 | 目标库名（见 `/api/v1/libraries`）；未知库名返回 400 |
 
 **响应 200**：`ArchiveResult`
 
@@ -312,12 +338,30 @@
 
 ---
 
+### POST /api/v1/tracks/archive
+
+把**单曲下载任务**的产物归档进媒体库（**同步**，秒级返回）。输入为单曲下载任务 ID（其 `results` 含实际落盘文件名）；`submit_download` 传了 `library` 时已自动归档，本接口用于事后补归档或换库重归档。
+
+**请求体**
+
+| 字段 | 必填 | 默认 | 说明 |
+|---|---|---|---|
+| `task_id` | 是 | — | 单曲下载任务 ID（任务在内存中；服务重启后需重新下载） |
+| `library` | 否 | 默认库 | 目标库名（见 `/api/v1/libraries`） |
+| `overwrite` | 否 | false | 目标已存在时是否覆盖重建；默认跳过（幂等） |
+
+**响应 200**：`ArchiveResult`（同专辑归档）；**400**：任务不存在 / 未知库名
+
+**单曲库内结构**：`{库根}/{艺人}/{曲名.ext}`，同名 `.lrc` 放旁边并嵌入 tag；不写曲目序号（无 TRACKNUMBER/DISCNUMBER），`ALBUM` 用候选专辑名，`DATE` 跳过；封面从候选 `cover_url` 下载嵌入。
+
+---
+
 ## 错误码
 
 | 状态码 | 场景 |
 |---|---|
 | 200 | 成功 |
-| 400 | 参数错误（如 `tracks` 为空、歌单解析失败） |
+| 400 | 参数错误（如 `tracks` 为空、歌单解析失败、未知库名、全部曲目体积超限） |
 | 401 | 鉴权失败 |
 | 404 | 资源不存在 |
 | 422 | 请求体/查询参数格式错误 |

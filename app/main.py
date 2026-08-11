@@ -118,7 +118,8 @@ def api_album_download(collection_id: str, req: AlbumDownloadRequest) -> Downloa
     if not album.tracks:
         raise HTTPException(status_code=400, detail="专辑曲目表为空，无法下载")
     return album_svc.submit_album_download(album, sources=req.sources, subdir=req.subdir,
-                                           album_title=req.album_title, artist=req.artist)
+                                           album_title=req.album_title, artist=req.artist,
+                                           max_size_mb=req.max_size_mb)
 
 
 @app.post("/api/v1/downloads", response_model=DownloadTask, dependencies=[Depends(auth)])
@@ -126,8 +127,9 @@ def api_submit(req: DownloadRequest) -> DownloadTask:
     if not req.tracks:
         raise HTTPException(status_code=400, detail="tracks 不能为空")
     try:
-        return dl.submit(req.tracks, subdir=req.subdir, library=req.library)
-    except (LookupError, RuntimeError) as e:  # 未知库名 / 未配置默认库
+        return dl.submit(req.tracks, subdir=req.subdir, library=req.library,
+                         max_size_mb=req.max_size_mb)
+    except (ValueError, LookupError, RuntimeError) as e:  # 全部超限 / 未知库名 / 未配置默认库
         raise HTTPException(status_code=400, detail=str(e))
 
 
