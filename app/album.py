@@ -202,16 +202,6 @@ def _track_filename(expected: AlbumTrack, multi_disc: bool, ext: str) -> str:
     return f"{prefix} {_safe_name(t2s(expected.title))}.{ext.lstrip('.')}"
 
 
-def _find_downloaded_file(save_dir: str, filename: str, identifier: str, before: set[str]) -> Optional[str]:
-    """下载后定位落盘文件：优先按指定文件名，其次按 identifier 匹配新增文件。"""
-    if filename and (Path(save_dir) / filename).exists():
-        return filename
-    for p in Path(save_dir).iterdir():
-        if p.is_file() and p.name not in before and identifier and identifier in p.name:
-            return p.name
-    return None
-
-
 def _download_cover(album: AlbumInfo, save_dir: str) -> Optional[str]:
     """下载高清封面到专辑目录，返回文件名；失败返回 None（不阻塞任务）。"""
     if not album.cover_url:
@@ -304,7 +294,7 @@ def _run_album(task: DownloadTask, album: AlbumInfo, sources: list[str] | None,
         # 逐曲核验落盘结果（musicdl 单曲失败不抛异常，需检查文件是否存在）
         for i in idxs:
             entry, expected, chosen, fname = to_download[i]
-            found = _find_downloaded_file(save_dir, fname, str(chosen.raw.get("identifier", "")), before)
+            found = dl._find_downloaded_file(save_dir, fname, str(chosen.raw.get("identifier", "")), before)
             if found:
                 fpath = Path(save_dir) / found
                 entry.update(status="ok", file=found,

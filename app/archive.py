@@ -21,6 +21,7 @@ from typing import Any, Optional
 from . import download as dl
 from .album import _safe_name, infer_display_names, t2s
 from .config import settings
+from .libraries import resolve_library_root
 from .schemas import ArchiveResult, ArchiveTrackResult
 
 _TAGGABLE_EXTS = {"flac", "mp3"}
@@ -65,14 +66,17 @@ def _break_link_if_needed(path: Path) -> None:
         os.replace(tmp, path)
 
 
-def _write_tags(path: Path, entry: dict, artist: str, album_title: str, date: str,
-                disc_total: int, disc_track_total: int,
-                cover_bytes: bytes | None, lyric_text: str | None) -> None:
-    """按库约定重写 tag 并嵌封面/歌词（仅 flac/mp3）。artist/album_title 为解析后的显示名。"""
+def _write_tags(path: Path, title: str, artist: str, album_title: str, date: str = "",
+                numbers: dict[str, str] | None = None,
+                cover_bytes: bytes | None = None, lyric_text: str | None = None) -> None:
+    """按库约定重写 tag 并嵌封面/歌词（仅 flac/mp3）。artist/album_title 为解析后的显示名。
+
+    numbers 为序号类 tag（TRACKNUMBER/TRACKTOTAL/DISCNUMBER/DISCTOTAL），专辑归档传入，
+    单曲归档传 None（不写序号）；date 为空则不写 DATE。
+    """
     ext = path.suffix.lstrip(".").lower()
-    title = t2s(entry.get("title") or "")
-    track_no = f"{entry['track']}/{disc_track_total}"
-    disc_no = f"{entry['disc']}/{disc_total}" if disc_total > 1 else None
+    title = t2s(title or "")
+    numbers = numbers or {}
     comment = settings.archive_comment
 
     if ext == "flac":
@@ -86,15 +90,13 @@ def _write_tags(path: Path, entry: dict, artist: str, album_title: str, date: st
                 del audio[key]
         audio["ARTIST"] = artist
         audio["ALBUMARTIST"] = artist
-        audio["ALBUM"] = album_title
+        if album_title:
+            audio["ALBUM"] = album_title
         audio["TITLE"] = title
         if date:
             audio["DATE"] = date
-        audio["TRACKNUMBER"] = track_no
-        audio["TRACKTOTAL"] = str(disc_track_total)
-        if disc_no:
-            audio["DISCNUMBER"] = disc_no
-            audio["DISCTOTAL"] = str(disc_total)
+        for k, v in numbers.items():
+            audio[k] = v
         audio["COMMENT"] = comment
         if lyric_text:
             audio["LYRICS"] = lyric_text
@@ -102,7 +104,7 @@ def _write_tags(path: Path, entry: dict, artist: str, album_title: str, date: st
             audio.clear_pictures()
             pic = Picture()
             pic.type = 3
-            pic.mime = "image/png" if cover_bytes[:4] == b"\x89PNG" else "image/jpeg"
+            pic.mime = _cover_mime(cover_bytes)
             pic.desc = "cover"
             pic.data = cover_bytes
             audio.add_picture(pic)
@@ -115,19 +117,21 @@ def _write_tags(path: Path, entry: dict, artist: str, album_title: str, date: st
             audio = ID3()
         audio.delall("TPE1"); audio.add(TPE1(encoding=3, text=artist))
         audio.delall("TPE2"); audio.add(TPE2(encoding=3, text=artist))
-        audio.delall("TALB"); audio.add(TALB(encoding=3, text=album_title))
+        if album_title:
+            audio.delall("TALB"); audio.add(TALB(encoding=3, text=album_title))
         audio.delall("TIT2"); audio.add(TIT2(encoding=3, text=title))
         if date:
             audio.delall("TDRC"); audio.add(TDRC(encoding=3, text=date))
-        audio.delall("TRCK"); audio.add(TRCK(encoding=3, text=track_no))
-        if disc_no:
-            audio.delall("TPOS"); audio.add(TPOS(encoding=3, text=disc_no))
+        if numbers.get("TRACKNUMBER"):
+            audio.delall("TRCK"); audio.add(TRCK(encoding=3, text=numbers["TRACKNUMBER"]))
+        if numbers.get("DISCNUMBER"):
+            audio.delall("TPOS"); audio.add(TPOS(encoding=3, text=numbers["DISCNUMBER"]))
         audio.delall("COMM"); audio.add(COMM(encoding=3, lang="eng", desc="", text=comment))
         if lyric_text:
             audio.delall("USLT"); audio.add(USLT(encoding=3, lang="eng", desc="", text=lyric_text))
         if cover_bytes:
             audio.delall("APIC")
-            mime = "image/png" if cover_bytes[:4] == b"\x89PNG" else "image/jpeg"
+            mime = _cover_mime(cover_bytes)
             audio.add(APIC(encoding=3, mime=mime, type=3, desc="cover", data=cover_bytes))
         audio.save(path)
     else:
@@ -165,20 +169,20 @@ def _write_album_info(album_dir: Path, album: dict, entries: list[dict],
 
 def archive_album(task_id: str | None = None, manifest_path: str | None = None,
                   overwrite: bool = False, album_title: str | None = None,
-                  artist: str | None = None) -> ArchiveResult:
+                  artist: str | None = None, library: str | None = None) -> ArchiveResult:
     """按 manifest 把专辑下载产物归档进媒体库（同步，幂等）。
 
     目录名与 tag 用的专辑名/艺人名按解析链确定：
     显式 album_title/artist 参数 > manifest display_* > 自动推断 > iTunes 原名。
+    library 为命名库根（见 libraries 模块），留空用默认库。
     """
-    if not settings.library_root:
-        raise RuntimeError("未配置 library_root（媒体库根目录），归档不可用；请在 config.yaml 配置并挂载媒体库卷")
+    root = Path(resolve_library_root(library))
     manifest, src_dir = _load_manifest(task_id, manifest_path)
     album = manifest.get("album") or {}
     entries = manifest.get("tracks") or []
     ok_entries = [e for e in entries if e.get("status") == "ok" and e.get("file")]
     disp_title, disp_artist = _resolve_names(album, ok_entries, album_title, artist)
-    album_dir = Path(settings.library_root) / _safe_name(disp_artist) / _safe_name(disp_title)
+    album_dir = root / _safe_name(disp_artist) / _safe_name(disp_title)
     multi_disc = len({e["disc"] for e in entries}) > 1
     disc_total = max((e["disc"] for e in entries), default=1)
     cover_bytes: bytes | None = None
@@ -217,9 +221,14 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None,
                         lrc_dir.mkdir(exist_ok=True)
                         shutil.copy2(lrc_src, lrc_dir / f"{target.stem}.lrc")
                     disc_track_total = sum(1 for e in ok_entries if e["disc"] == entry["disc"])
-                    _write_tags(target, entry, disp_artist, disp_title,
+                    numbers = {"TRACKNUMBER": f"{entry['track']}/{disc_track_total}",
+                               "TRACKTOTAL": str(disc_track_total)}
+                    if disc_total > 1:
+                        numbers["DISCNUMBER"] = f"{entry['disc']}/{disc_total}"
+                        numbers["DISCTOTAL"] = str(disc_total)
+                    _write_tags(target, entry.get("title") or "", disp_artist, disp_title,
                                 (album.get("release_date") or "")[:10],
-                                disc_total, disc_track_total, cover_bytes, lyric_text)
+                                numbers=numbers, cover_bytes=cover_bytes, lyric_text=lyric_text)
                 else:
                     res.action = "tag_unsupported"
         except Exception as e:  # 单曲失败不中断整体
@@ -239,11 +248,105 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None,
                     (cd_dir / f"cover{suffix}").write_bytes(cover_bytes)
     _write_album_info(album_dir, album, entries, disp_title, disp_artist)
 
+    status, summary, errors = _summarize(results)
+    return ArchiveResult(status=status, library_dir=str(album_dir), summary=summary,
+                         tracks=results, errors=errors)
+
+
+_COVER_TIMEOUT = 30.0  # 单曲封面下载超时
+
+
+def _cover_mime(cover_bytes: bytes) -> str:
+    """按魔数识别封面 MIME（jpeg/png/webp），供嵌图 tag 使用。"""
+    if cover_bytes[:4] == b"\x89PNG":
+        return "image/png"
+    if cover_bytes[:4] == b"RIFF" and cover_bytes[8:12] == b"WEBP":
+        return "image/webp"
+    return "image/jpeg"
+
+
+def _download_cover_bytes(url: str | None) -> bytes | None:
+    """按 URL 下载封面字节；失败返回 None（不阻塞归档）。"""
+    if not url:
+        return None
+    try:
+        import httpx
+        r = httpx.get(url, timeout=_COVER_TIMEOUT, follow_redirects=True)
+        r.raise_for_status()
+        return r.content
+    except Exception:
+        return None
+
+
+def _summarize(results: list[ArchiveTrackResult]) -> tuple[str, dict[str, int], list[str]]:
     summary: dict[str, int] = {}
     for r in results:
         summary[r.action] = summary.get(r.action, 0) + 1
     failed = summary.get("failed", 0)
     status = "success" if failed == 0 else ("failed" if failed == len(results) and results else "partial")
     errors = [f"{r.title}: {r.error}" for r in results if r.action == "failed"]
-    return ArchiveResult(status=status, library_dir=str(album_dir), summary=summary,
+    return status, summary, errors
+
+
+def archive_tracks(task_id: str, library: str | None = None, overwrite: bool = False) -> ArchiveResult:
+    """把单曲下载任务的产物归档进媒体库（同步，幂等）。
+
+    目标结构：{库根}/{艺人}/{曲名.ext}；同名 .lrc 放旁边并嵌入 tag；
+    不写序号类 tag，ALBUM 用候选专辑名，DATE 跳过；封面从候选 cover_url 下载嵌入。
+    library 为命名库根（见 libraries 模块），留空用默认库。
+    """
+    root = Path(resolve_library_root(library))
+    task = dl.get(task_id)
+    if not task:
+        raise LookupError(f"任务 {task_id} 不在内存中（服务重启后单曲任务无法归档，请重新下载）")
+
+    results: list[ArchiveTrackResult] = []
+    for item in task.results:
+        title = t2s(item.get("title") or "")
+        artists = item.get("artists") or []
+        artist_dir = _safe_name(t2s(artists[0])) if artists else "未知艺人"
+        res = ArchiveTrackResult(title=title, action="")
+        try:
+            if not item.get("file"):
+                res.action = "failed"
+                res.error = "下载未落盘（无文件）"
+                results.append(res)
+                continue
+            src = Path(item.get("save_dir") or "") / item["file"]
+            ext = src.suffix.lstrip(".") or (item.get("ext") or "flac").lstrip(".")
+            rel = f"{artist_dir}/{_safe_name(title)}.{ext}"
+            target = root / rel
+            res.target = rel
+            if target.exists() and not overwrite:
+                res.action = "skipped"
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if target.exists():
+                    target.unlink()
+                try:
+                    os.link(src, target)
+                    res.action = "linked"
+                except OSError:
+                    shutil.copy2(src, target)
+                    res.action = "copied"
+                if target.suffix.lstrip(".").lower() in _TAGGABLE_EXTS:
+                    _break_link_if_needed(target)
+                    # sidecar 歌词：嵌入 tag 并复制到目标旁
+                    lyric_text = None
+                    lrc_src = src.with_suffix(".lrc")
+                    if lrc_src.exists():
+                        lyric_text = lrc_src.read_text(encoding="utf-8", errors="ignore").strip() or None
+                        shutil.copy2(lrc_src, target.with_suffix(".lrc"))
+                    _write_tags(target, title, artist_dir, t2s(item.get("album") or ""),
+                                cover_bytes=_download_cover_bytes(item.get("cover_url")),
+                                lyric_text=lyric_text)
+                else:
+                    res.action = "tag_unsupported"
+        except Exception as e:  # 单曲失败不中断整体
+            res.action = "failed"
+            res.error = str(e)
+        results.append(res)
+
+    status, summary, errors = _summarize(results)
+    return ArchiveResult(status=status, library_dir=str(root), summary=summary,
                          tracks=results, errors=errors)

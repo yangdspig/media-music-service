@@ -46,6 +46,7 @@ class SourceInfo(BaseModel):
 class DownloadRequest(BaseModel):
     tracks: list[Track] = Field(description="待下载的音轨（通常来自 search/playlist 结果）")
     subdir: Optional[str] = Field(default=None, description="下载根目录下的子目录，默认按规则自动组织")
+    library: Optional[str] = Field(default=None, description="目标库名（见 GET /api/v1/libraries）；传入则下载完成后自动归档到该库")
 
 
 class AlbumSummary(BaseModel):
@@ -88,6 +89,14 @@ class ArchiveRequest(BaseModel):
     overwrite: bool = Field(default=False, description="目标已存在时是否覆盖重建；默认跳过（幂等）")
     album_title: Optional[str] = Field(default=None, description="显示用专辑名覆盖（最高优先级，影响目录名与 ALBUM tag）")
     artist: Optional[str] = Field(default=None, description="显示用艺人名覆盖（最高优先级，影响目录名与 ARTIST tag）")
+    library: Optional[str] = Field(default=None, description="目标库名（命名库根，见 GET /api/v1/libraries）；留空用默认库")
+
+
+class TrackArchiveRequest(BaseModel):
+    """单曲归档请求：把单曲下载任务的产物归档进媒体库。"""
+    task_id: str = Field(description="单曲下载任务 ID（其 results 须含落盘文件信息）")
+    library: Optional[str] = Field(default=None, description="目标库名（命名库根，见 GET /api/v1/libraries）；留空用默认库")
+    overwrite: bool = Field(default=False, description="目标已存在时是否覆盖重建；默认跳过（幂等）")
 
 
 class ArchiveTrackResult(BaseModel):
@@ -127,3 +136,4 @@ class DownloadTask(BaseModel):
     results: list[dict[str, Any]] = Field(default_factory=list, description="成功项的落盘信息")
     errors: list[str] = Field(default_factory=list)
     manifest_path: Optional[str] = Field(default=None, description="专辑下载产出的 manifest.json 路径（仅专辑任务）")
+    library: Optional[str] = Field(default=None, description="目标库名；单曲任务传入时下载完成后自动归档到该库")

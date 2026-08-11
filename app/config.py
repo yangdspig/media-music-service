@@ -37,6 +37,7 @@ class Settings(BaseModel):
     download_timeout_s: int = 300  # 单源下载超时保护，防止 musicdl 内部无限等待
     api_key: str | None = None  # 为空则不启用鉴权
     library_root: str | None = None  # 媒体库根目录（archive_album 归档目标）；为空则归档不可用
+    extra_library_roots: dict[str, str] = {}  # 命名附加库根（如 {"singles": "/singles"}），归档可按库名选择目标（白名单，调用方不传裸路径）
     archive_comment: str = "yangds整理"  # 归档时统一写入的 COMMENT tag
     default_sources: list[str] = [
         "MiguMusicClient", "NeteaseMusicClient", "QQMusicClient",
@@ -69,6 +70,10 @@ def load_settings() -> Settings:
         v = getattr(s, attr)
         if v and not os.path.isabs(v):
             setattr(s, attr, str(project_root / v))
+    s.extra_library_roots = {
+        k: (v if os.path.isabs(v) else str(project_root / v))
+        for k, v in (s.extra_library_roots or {}).items()
+    }
     # 确保目录存在
     Path(s.download_root).mkdir(parents=True, exist_ok=True)
     Path(s.db_path).parent.mkdir(parents=True, exist_ok=True)

@@ -54,7 +54,21 @@ def download_songs(source: str, song_dicts: list[dict], save_dir: str) -> int:
     return len(song_infos)
 
 
-def submit(tracks: list[Track], subdir: str | None = None) -> DownloadTask:
+def _find_downloaded_file(save_dir: str, filename: str, identifier: str, before: set[str]) -> str | None:
+    """下载后定位落盘文件：优先按指定文件名，其次按 identifier 匹配新增文件。"""
+    if filename and (Path(save_dir) / filename).exists():
+        return filename
+    for p in Path(save_dir).iterdir():
+        if p.is_file() and p.name not in before and identifier and identifier in p.name:
+            return p.name
+    return None
+
+
+def submit(tracks: list[Track], subdir: str | None = None, library: str | None = None) -> DownloadTask:
+    if library:
+        # 提前校验库名（白名单），避免下载完成后才发现归档目标不存在
+        from .libraries import resolve_library_root
+        resolve_library_root(library)
     task_id = uuid.uuid4().hex[:12]
     # 落盘目录：根目录 / 子目录（默认 时间戳_首曲名）
     if not subdir:
@@ -64,7 +78,7 @@ def submit(tracks: list[Track], subdir: str | None = None) -> DownloadTask:
     save_dir = str(Path(settings.download_root) / subdir)
     Path(save_dir).mkdir(parents=True, exist_ok=True)
 
-    task = DownloadTask(task_id=task_id, total=len(tracks), save_dir=save_dir)
+    task = DownloadTask(task_id=task_id, total=len(tracks), save_dir=save_dir, library=library)
     register_task(task)
 
     th = threading.Thread(target=_run, args=(task, tracks), daemon=True)
@@ -103,18 +117,28 @@ def _dicts_to_songinfos(song_dicts: list[dict], save_dir: str) -> list[Any]:
 def _run(task: DownloadTask, tracks: list[Track]) -> None:
     task.status = TaskStatus.RUNNING
     save_task(task)
+    save_dir = task.save_dir or settings.download_root
     # 按来源分组，逐组用对应 client 下载（musicdl 按 source 分发）
     groups: dict[str, list[dict]] = {}
     for t in tracks:
         groups.setdefault(t.source, []).append(t.raw)
     for source, song_dicts in groups.items():
+        grp_tracks = [x for x in tracks if x.source == source]
+        before = {p.name for p in Path(save_dir).iterdir()} if Path(save_dir).exists() else set()
         try:
             task.current = source
-            download_songs(source, song_dicts, task.save_dir or settings.download_root)
+            download_songs(source, song_dicts, save_dir)
             task.completed += len(song_dicts)
-            for t in [x for x in tracks if x.source == source]:
-                task.results.append({"source": source, "title": t.title, "artists": t.artists, "save_dir": task.save_dir})
-                storage.record_file(task.task_id, t.model_dump(), save_path=task.save_dir or "")
+            # 逐曲定位实际落盘文件（musicdl 单曲失败不抛异常，找不到时 file=None，归档跳过）
+            for t in grp_tracks:
+                fname = _find_downloaded_file(save_dir, "", str(t.raw.get("identifier", "")), before)
+                task.results.append({
+                    "source": source, "title": t.title, "artists": t.artists,
+                    "album": t.album, "ext": t.ext, "cover_url": t.cover_url,
+                    "file": fname, "save_dir": save_dir,
+                })
+                storage.record_file(task.task_id, t.model_dump(),
+                                    save_path=str(Path(save_dir) / fname) if fname else save_dir)
         except Exception as e:  # 单源失败不拖垮整体
             task.failed += len(song_dicts)
             task.errors.append(f"{source}: {e}")
@@ -122,6 +146,16 @@ def _run(task: DownloadTask, tracks: list[Track]) -> None:
     task.current = None
     task.status = TaskStatus.SUCCESS if task.failed == 0 else (TaskStatus.FAILED if task.completed == 0 else TaskStatus.SUCCESS)
     task.message = f"完成 {task.completed}/{task.total}，失败 {task.failed}"
+    # 指定了目标库时，下载完成后自动归档（单曲一步到位）
+    if task.library:
+        try:
+            from .archive import archive_tracks  # 晚期 import 防循环（archive 依赖 download）
+            res = archive_tracks(task.task_id, library=task.library)
+            task.message += f"；自动归档[{task.library}] {res.status} {res.summary}"
+            task.errors.extend(res.errors)
+        except Exception as e:
+            task.errors.append(f"自动归档失败: {e}")
+            task.message += f"；自动归档失败: {e}"
     save_task(task)
 
 

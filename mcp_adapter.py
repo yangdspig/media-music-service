@@ -39,6 +39,19 @@ def list_sources() -> dict:
 
 
 @mcp.tool()
+def list_libraries() -> dict:
+    """列出全部归档目标库（命名库根）：默认库 default + config.yaml 配置的命名附加库。
+
+    归档/下载时传 library 参数选择目标库（如单曲库 "singles"），留空用默认库。
+    """
+    with _client() as c:
+        r = c.get("/api/v1/libraries")
+        r.raise_for_status()
+        libs = r.json()
+    return {"total": len(libs), "libraries": libs}
+
+
+@mcp.tool()
 def search_tracks(keyword: str, sources: str | None = None, limit: int = 20) -> dict:
     """按关键词搜索歌曲或有声读物。
 
@@ -83,18 +96,22 @@ def parse_playlist(url: str, source: str | None = None) -> dict:
 
 
 @mcp.tool()
-def submit_download(tracks: list[dict], subdir: str | None = None) -> dict:
+def submit_download(tracks: list[dict], subdir: str | None = None, library: str | None = None) -> dict:
     """提交下载任务（异步）。
 
     Args:
         tracks: 完整 track 对象列表，须包含 raw 字段（直接取自 search_tracks / parse_playlist 的返回项）
         subdir: 下载根目录下的子目录名，留空则按"时间戳_首曲名"自动组织
+        library: 目标库名（可选，见 list_libraries）；传入则下载完成后自动归档到该库，
+            单曲入库结构为 {库根}/{艺人}/{曲名.ext}（专辑请用 download_album + archive_album）
     Returns:
         task_id 等，可用 get_download_status 轮询进度。
     """
     payload: dict[str, Any] = {"tracks": tracks}
     if subdir:
         payload["subdir"] = subdir
+    if library:
+        payload["library"] = library
     with _client() as c:
         r = c.post("/api/v1/downloads", json=payload)
         r.raise_for_status()
@@ -185,7 +202,8 @@ def download_album(collection_id: str, sources: str | None = None, subdir: str |
 
 @mcp.tool()
 def archive_album(task_id: str | None = None, manifest_path: str | None = None, overwrite: bool = False,
-                  album_title: str | None = None, artist: str | None = None) -> dict:
+                  album_title: str | None = None, artist: str | None = None,
+                  library: str | None = None) -> dict:
     """把专辑下载产物归档进媒体库（同步）：硬链接/复制入库、写 tag、嵌封面歌词、生成 album_info.txt。
 
     目录名与 tag 的专辑名/艺人名按解析链确定：显式参数 > manifest display_*
@@ -197,9 +215,10 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None, 
         overwrite: 目标已存在时是否覆盖重建；默认 False（幂等跳过）
         album_title: 显示用专辑名覆盖（可选，最高优先级；自动推断仍不对时用它兜底）
         artist: 显示用艺人名覆盖（可选，最高优先级）
+        library: 目标库名（可选，见 list_libraries；留空用默认库）
     Returns:
         归档结果：library_dir（库内专辑目录）、逐曲 action（linked/copied/skipped/failed）、
-        summary 计数、errors。目录结构为 {library_root}/{艺人}/{专辑}/，多 Disc 用 CD1/CD2 子目录。
+        summary 计数、errors。目录结构为 {库根}/{艺人}/{专辑}/，多 Disc 用 CD1/CD2 子目录。
     """
     payload: dict[str, Any] = {"overwrite": overwrite}
     if task_id:
@@ -210,8 +229,31 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None, 
         payload["album_title"] = album_title
     if artist:
         payload["artist"] = artist
+    if library:
+        payload["library"] = library
     with _client() as c:
         r = c.post("/api/v1/albums/archive", json=payload)
+        r.raise_for_status()
+        return r.json()
+
+
+@mcp.tool()
+def archive_tracks(task_id: str, library: str | None = None, overwrite: bool = False) -> dict:
+    """把单曲下载任务的产物归档进媒体库（同步）：硬链接/复制入库、写 tag、嵌封面歌词。
+
+    Args:
+        task_id: submit_download 返回的任务 ID（服务重启后内存任务丢失，需重新下载）
+        library: 目标库名（可选，见 list_libraries；留空用默认库）
+        overwrite: 目标已存在时是否覆盖重建；默认 False（幂等跳过）
+    Returns:
+        归档结果：逐曲 action、summary 计数、errors。
+        入库结构为 {库根}/{艺人}/{曲名.ext}，同名 .lrc 放旁边；不写曲目序号。
+    """
+    payload: dict[str, Any] = {"task_id": task_id, "overwrite": overwrite}
+    if library:
+        payload["library"] = library
+    with _client() as c:
+        r = c.post("/api/v1/tracks/archive", json=payload)
         r.raise_for_status()
         return r.json()
 

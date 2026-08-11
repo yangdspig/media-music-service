@@ -7,11 +7,11 @@ from __future__ import annotations
 from fastapi import Depends, FastAPI, Header, HTTPException
 
 from .config import settings
-from .schemas import AlbumDownloadRequest, AlbumInfo, AlbumSummary, ArchiveRequest, ArchiveResult, DownloadRequest, DownloadTask, SearchResponse, SourceInfo, Track
+from .schemas import AlbumDownloadRequest, AlbumInfo, AlbumSummary, ArchiveRequest, ArchiveResult, DownloadRequest, DownloadTask, SearchResponse, SourceInfo, Track, TrackArchiveRequest
 from . import album as album_svc
 from . import archive as archive_svc
 from . import download as dl
-from . import itunes, registry, storage
+from . import itunes, libraries, registry, storage
 from .playlist import parse_playlist
 from .search import search
 
@@ -70,6 +70,11 @@ def _get_album_or_404(collection_id: str) -> AlbumInfo:
         raise HTTPException(status_code=502, detail=f"iTunes 查询失败: {e}")
 
 
+@app.get("/api/v1/libraries", dependencies=[Depends(auth)])
+def api_libraries() -> list[dict]:
+    return libraries.list_libraries()
+
+
 # 注意：/albums/search 必须声明在 /albums/{collection_id} 之前，否则会被路径参数吃掉
 @app.get("/api/v1/albums/search", response_model=list[AlbumSummary], dependencies=[Depends(auth)])
 def api_album_search(keyword: str, artist: str | None = None, limit: int = 10) -> list[AlbumSummary]:
@@ -85,7 +90,17 @@ def api_album_archive(req: ArchiveRequest) -> ArchiveResult:
     try:
         return archive_svc.archive_album(task_id=req.task_id, manifest_path=req.manifest_path,
                                          overwrite=req.overwrite, album_title=req.album_title,
-                                         artist=req.artist)
+                                         artist=req.artist, library=req.library)
+    except (ValueError, LookupError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/v1/tracks/archive", response_model=ArchiveResult, dependencies=[Depends(auth)])
+def api_tracks_archive(req: TrackArchiveRequest) -> ArchiveResult:
+    try:
+        return archive_svc.archive_tracks(req.task_id, library=req.library, overwrite=req.overwrite)
     except (ValueError, LookupError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
@@ -110,7 +125,10 @@ def api_album_download(collection_id: str, req: AlbumDownloadRequest) -> Downloa
 def api_submit(req: DownloadRequest) -> DownloadTask:
     if not req.tracks:
         raise HTTPException(status_code=400, detail="tracks 不能为空")
-    return dl.submit(req.tracks, subdir=req.subdir)
+    try:
+        return dl.submit(req.tracks, subdir=req.subdir, library=req.library)
+    except (LookupError, RuntimeError) as e:  # 未知库名 / 未配置默认库
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/api/v1/downloads/{task_id}", response_model=DownloadTask, dependencies=[Depends(auth)])
