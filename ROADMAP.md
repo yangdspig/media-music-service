@@ -29,7 +29,13 @@
 
 2b. **命名库根与单曲归档** ✅ 已完成（2026-08-11）
    - 背景：专辑与单曲需要分库存放（如 library 放专辑、singles 放单曲）
-   - 已实现：`config.yaml` 新增 `extra_library_roots` 白名单式命名附加库根（调用方传库名不传裸路径）；`GET /api/v1/libraries` + MCP `list_libraries`；`POST /api/v1/tracks/archive` + MCP `archive_tracks`（结构 `{库根}/{艺人}/{曲名.ext}`，写 tag/嵌封面歌词、sidecar .lrc、不写曲目序号，幂等跳过）；`submit_download` 传 `library` 下载完成后自动归档（单曲一步到位）；`archive_album` 增加 `library` 参数保持对称
+   - 已实现：`config.yaml` 新增 `extra_library_roots` 白名单式命名附加库根（调用方传库名不传裸路径，支持配置任意多个库）；`GET /api/v1/libraries` + MCP `list_libraries`；`POST /api/v1/tracks/archive` + MCP `archive_tracks`（结构 `{库根}/{艺人}/{曲名.ext}`，写 tag/嵌封面歌词、sidecar .lrc、不写曲目序号，幂等跳过）；`submit_download` 传 `library` 下载完成后自动归档（单曲一步到位）；`archive_album` 增加 `library` 参数保持对称
+
+2c. **手动放置文件的归档**（2026-08-11 记录的需求）
+   - 背景：用户可能手动把歌曲文件拷进 `downloads/` 目录（非本服务下载的产物），目前没有接口可整理它们——`archive_album` 要 manifest.json、`archive_tracks` 要内存中的下载任务，两者都不覆盖这个场景
+   - 现状变通：专辑形态可手写 manifest.json 后用 `manifest_path` 调 `archive_album`，但繁琐
+   - 方向：新增 `POST /api/v1/tracks/archive_dir`（+ MCP 工具）：指定 `downloads/` 下子目录 + 目标库，扫描目录内音频文件，**从文件已有 tag（或文件名）解析艺人/曲名**，按单曲结构 `{库根}/{艺人}/{曲名.ext}` 归档；写 tag/嵌歌词逻辑复用 `archive_tracks`
+   - 要点：手动文件通常自带平台 tag，解析即可入库；tag 缺失时的命名兜底策略（文件名解析/留原样）需在实现时定夺
 
 3. **MoviePilot 薄客户端插件**
    - 目标：在 MoviePilot 内完成"搜索 → 勾选 → 下载 → 入库整理"闭环
