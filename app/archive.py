@@ -69,11 +69,13 @@ def _break_link_if_needed(path: Path) -> None:
 
 def _write_tags(path: Path, title: str, artist: str, album_title: str, date: str = "",
                 numbers: dict[str, str] | None = None,
-                cover_bytes: bytes | None = None, lyric_text: str | None = None) -> None:
+                cover_bytes: bytes | None = None, lyric_text: str | None = None,
+                strip_numbers: bool = False) -> None:
     """按库约定重写 tag 并嵌封面/歌词（仅 flac/mp3）。artist/album_title 为解析后的显示名。
 
     numbers 为序号类 tag（TRACKNUMBER/TRACKTOTAL/DISCNUMBER/DISCTOTAL），专辑归档传入，
-    单曲归档传 None（不写序号）；date 为空则不写 DATE。
+    单曲归档传 None（不写序号）；strip_numbers=True 时显式清除已有序号类 tag（单曲迁移用）；
+    date 为空则不写 DATE。
     """
     ext = path.suffix.lstrip(".").lower()
     title = t2s(title or "")
@@ -96,6 +98,10 @@ def _write_tags(path: Path, title: str, artist: str, album_title: str, date: str
         audio["TITLE"] = title
         if date:
             audio["DATE"] = date
+        if strip_numbers:
+            for k in ("TRACKNUMBER", "TRACKTOTAL", "DISCNUMBER", "DISCTOTAL"):
+                if k in audio:
+                    del audio[k]
         for k, v in numbers.items():
             audio[k] = v
         audio["COMMENT"] = comment
@@ -123,6 +129,8 @@ def _write_tags(path: Path, title: str, artist: str, album_title: str, date: str
         audio.delall("TIT2"); audio.add(TIT2(encoding=3, text=title))
         if date:
             audio.delall("TDRC"); audio.add(TDRC(encoding=3, text=date))
+        if strip_numbers:
+            audio.delall("TRCK"); audio.delall("TPOS")
         if numbers.get("TRACKNUMBER"):
             audio.delall("TRCK"); audio.add(TRCK(encoding=3, text=numbers["TRACKNUMBER"]))
         if numbers.get("DISCNUMBER"):
@@ -254,6 +262,17 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None,
     _save_artist_image(album_dir.parent, img_url)
 
     status, summary, errors = _summarize(results)
+    # singles 复用迁移：成功入库后删除 singles 源文件与同名 .lrc，并清理空艺人目录
+    try:
+        singles_root = resolve_library_root("singles")
+    except (RuntimeError, LookupError):
+        singles_root = None
+    if singles_root:
+        from .libops import remove_reused_single
+        for e, r in zip(ok_entries, results):
+            src = (e.get("match") or {}).get("reused_from")
+            if src and r.action in ("linked", "copied", "skipped", "tag_unsupported"):
+                remove_reused_single(src, singles_root)
     # 归档后自动清理下载产物：全曲 ok 且入库无失败才算完全成功（整目录清，含 manifest）；
     # 有 unmatched/failed 曲目时保留 manifest 与产物供复查补下，只清已入库曲目
     album_complete = (bool(results) and all(r.action != "failed" for r in results)

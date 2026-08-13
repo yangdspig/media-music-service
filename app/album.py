@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import difflib
 import json
+import os
 import re
+import shutil
 import threading
 import time
 import uuid
@@ -284,6 +286,15 @@ def _run_album(task: DownloadTask, album: AlbumInfo, sources: list[str] | None,
                display: dict[str, str] | None = None, max_size_mb: float | None = None) -> None:
     task.status = TaskStatus.RUNNING
     dl.save_task(task)
+
+    # singles 库复用：同专辑曲目已存在时不重复下载，归档时迁移进专辑库
+    singles_root: str | None = None
+    try:
+        from .libraries import resolve_library_root
+        singles_root = resolve_library_root("singles")
+    except (RuntimeError, LookupError):
+        pass
+
     save_dir = task.save_dir or settings.download_root
     multi_disc = len({t.disc for t in album.tracks}) > 1
     entries: list[dict[str, Any]] = []
@@ -292,14 +303,42 @@ def _run_album(task: DownloadTask, album: AlbumInfo, sources: list[str] | None,
     # ---- 1) 逐曲匹配消歧 ----
     for expected in album.tracks:
         task.current = f"匹配: {expected.title}"
-        r = match_track(expected, album, sources, max_size_mb=max_size_mb)
         entry: dict[str, Any] = {
             "disc": expected.disc, "track": expected.track,
             "title": expected.title, "artists": expected.artists,
             "duration_s": expected.duration_s,
-            "status": r["status"], "match": r.get("match"),
-            "file": None, "ext": None, "size_bytes": None, "error": r.get("error"),
+            "status": None, "match": None,
+            "file": None, "ext": None, "size_bytes": None, "error": None,
         }
+        if singles_root:
+            from . import libops  # 延迟 import 防模块级循环（libops 依赖 album）
+            reused = libops.find_in_singles(expected.title, expected.artists, album.title,
+                                            expected.duration_s, singles_root)
+            if reused:
+                ext = reused.suffix.lstrip(".")
+                fname = _track_filename(expected, multi_disc, ext)
+                dst = Path(save_dir) / fname
+                try:
+                    os.link(reused, dst)
+                except OSError:
+                    shutil.copy2(reused, dst)
+                lrc = reused.with_suffix(".lrc")
+                if lrc.exists():
+                    shutil.copy2(lrc, dst.with_suffix(".lrc"))
+                entry.update(status="ok", file=fname, ext=ext,
+                             size_bytes=dst.stat().st_size if dst.exists() else None,
+                             match={"source": "singles", "reused_from": str(reused),
+                                    "title": expected.title, "artists": expected.artists,
+                                    "album": album.title, "ext": ext,
+                                    "quality_tier": libops.file_quality_tier(reused)})
+                task.completed += 1
+                task.results.append({"disc": expected.disc, "track": expected.track,
+                                     "title": expected.title, "file": fname, "source": "singles"})
+                entries.append(entry)
+                dl.save_task(task)
+                continue
+        r = match_track(expected, album, sources, max_size_mb=max_size_mb)
+        entry.update(status=r["status"], match=r.get("match"), error=r.get("error"))
         if r["status"] == "matched":
             chosen: Track = r["track"]
             ext = (chosen.ext or "").lstrip(".")

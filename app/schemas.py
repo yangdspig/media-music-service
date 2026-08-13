@@ -126,6 +126,34 @@ class ArchiveResult(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
 
+class CleanupLibraryRequest(BaseModel):
+    """库内清理请求：tracks 指定曲目 > album 整专辑 > artist 整艺人；空目录一并清理。"""
+    library: Optional[str] = Field(default=None, description="库名（见 GET /api/v1/libraries）；留空用默认库")
+    artist: str = Field(description="艺人名（对应库内一级目录）")
+    album: Optional[str] = Field(default=None, description="专辑名（对应库内二级目录）；留空则清理整个艺人目录")
+    tracks: Optional[list[Any]] = Field(default=None, description="要清理的曲目：序号（如 3）或曲名；留空则清理整个专辑")
+    dry_run: bool = Field(default=False, description="只报告将删除的项，不实际删除")
+
+
+class MigrateSinglesRequest(BaseModel):
+    """单曲专辑迁移请求：把只有一个音频文件的专辑目录迁移到 singles 库。"""
+    library: Optional[str] = Field(default=None, description="源库名；留空用默认库")
+    target_library: str = Field(default="singles", description="目标库名（默认 singles）")
+    artist: Optional[str] = Field(default=None, description="限定单个艺人；留空扫描整个源库")
+    dry_run: bool = Field(default=False, description="只报告将迁移的项，不实际迁移")
+
+
+class ReplaceTrackRequest(BaseModel):
+    """专辑指定曲目重搜替换请求：新候选音质更高（或 force）才替换。"""
+    library: Optional[str] = Field(default=None, description="库名；留空用默认库")
+    artist: str = Field(description="艺人名（对应库内一级目录）")
+    album: str = Field(description="专辑名（对应库内二级目录）")
+    track: Any = Field(description="曲目序号（如 3）或曲名")
+    sources: Optional[list[str]] = Field(default=None, description="参与搜索的源，留空用默认五源")
+    force: bool = Field(default=False, description="新候选音质不高于现有版本也强制替换")
+    max_size_mb: Optional[float] = Field(default=None, description="单文件体积上限（MB），>0 优先于配置，0/空不限")
+
+
 class TaskStatus:
     PENDING = "pending"
     RUNNING = "running"

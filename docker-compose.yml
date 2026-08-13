@@ -17,6 +17,8 @@ services:
       - ./config.yaml:/app/config.yaml
       # 媒体库（archive_album 归档目标，结构 {library_root}/{艺人}/{专辑}/）
       - ./library:/library:rw
+      # 单曲库（命名库 singles，download_album 复用与 migrate_singles 迁移目标）
+      - ./singles:/singles:rw
       # 若要直接归档到 NAS 媒体库，改挂这里（同时把 config.yaml 的 library_root 设为 /library）
       # - /vol02/1000-0-ba5fad3f/Music:/library:rw
     environment:

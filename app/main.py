@@ -7,11 +7,11 @@ from __future__ import annotations
 from fastapi import Depends, FastAPI, Header, HTTPException
 
 from .config import settings
-from .schemas import AlbumDownloadRequest, AlbumInfo, AlbumSummary, ArchiveRequest, ArchiveResult, DownloadRequest, DownloadTask, SearchResponse, SourceInfo, Track, TrackArchiveRequest
+from .schemas import AlbumDownloadRequest, AlbumInfo, AlbumSummary, ArchiveRequest, ArchiveResult, CleanupLibraryRequest, DownloadRequest, DownloadTask, MigrateSinglesRequest, ReplaceTrackRequest, SearchResponse, SourceInfo, Track, TrackArchiveRequest
 from . import album as album_svc
 from . import archive as archive_svc
 from . import download as dl
-from . import itunes, libraries, registry, storage
+from . import itunes, libraries, libops, registry, storage
 from .playlist import parse_playlist
 from .search import search
 
@@ -106,6 +106,34 @@ def api_tracks_archive(req: TrackArchiveRequest) -> ArchiveResult:
     except (ValueError, LookupError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/v1/library/cleanup", dependencies=[Depends(auth)])
+def api_library_cleanup(req: CleanupLibraryRequest) -> dict:
+    try:
+        return libops.cleanup_library(library=req.library, artist=req.artist, album=req.album,
+                                      tracks=req.tracks, dry_run=req.dry_run)
+    except (ValueError, LookupError, RuntimeError, OSError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/v1/library/migrate_singles", dependencies=[Depends(auth)])
+def api_migrate_singles(req: MigrateSinglesRequest) -> dict:
+    try:
+        return libops.migrate_singles(library=req.library, target_library=req.target_library,
+                                      artist=req.artist, dry_run=req.dry_run)
+    except (ValueError, LookupError, RuntimeError, OSError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/v1/library/replace_track", dependencies=[Depends(auth)])
+def api_replace_track(req: ReplaceTrackRequest) -> dict:
+    try:
+        return libops.replace_album_track(library=req.library, artist=req.artist, album=req.album,
+                                          track=req.track, sources=req.sources, force=req.force,
+                                          max_size_mb=req.max_size_mb)
+    except (ValueError, LookupError, RuntimeError, OSError) as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 

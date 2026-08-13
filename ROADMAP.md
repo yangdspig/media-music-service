@@ -42,6 +42,12 @@
    - 方向：新增 `POST /api/v1/albums/repair`（+ MCP 工具）：输入专辑目录（或 iTunes collection_id + 目标库根），扫描库内现有曲目，与曲目表比对找出缺失/可疑条目（unmatched、failed、oversized_relaxed、版本标记不符），按现有匹配打分逻辑重新搜索下载缺失曲目，补齐 tag/封面/歌词后入库
    - 要点：复用 `match_track` 的放宽与版本惩罚逻辑；"可疑曲目"的判定与替换策略（只补缺失 vs 允许替换错版本）需在实现时定夺；保持幂等，已齐全且无异常的专辑应为 no-op
 
+2e. **媒体库生命周期管理（四场景）** ✅ 已完成（2026-08-13）
+   - 场景一（singles 复用）：配置了 `singles` 命名库时，`download_album` 逐曲匹配前先在 singles 库查找同专辑曲目（保守匹配），命中则不搜索不下载（manifest `match.source="singles"` 含 `reused_from`），归档成功后自动从 singles 库删除源文件与同名 `.lrc` 并清理空艺人目录
+   - 场景二（曲目替换）：`POST /api/v1/library/replace_track` + MCP `replace_album_track`——重搜专辑指定曲目（`track` 支持 `"D-NN"` 多碟消歧），新候选音质分档更高或 `force` 才替换，序号/日期/封面沿用旧数据
+   - 场景三（库内清理）：`POST /api/v1/library/cleanup` + MCP `cleanup_library`——按曲目/专辑/艺人三级粒度删除，空目录自底向上一并清理，解析后越出库根的目录名（如 `..`）返回 400（`album="."` 不拦截，按整艺人目录处理），支持 `dry_run`
+   - 场景四（单曲专辑迁移）：`POST /api/v1/library/migrate_singles` + MCP `migrate_singles`——只有一个音频文件的专辑目录迁入 singles 库（清序号类 tag、带 `.lrc`），原目录与空艺人目录自动清理，支持 `dry_run`
+
 3. **MoviePilot 薄客户端插件**
    - 目标：在 MoviePilot 内完成"搜索 → 勾选 → 下载 → 入库整理"闭环
    - 要点：继承 `_PluginBase`，只做表单与 REST 调用，不直接依赖 musicdl

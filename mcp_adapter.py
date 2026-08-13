@@ -292,6 +292,93 @@ def archive_tracks(task_id: str, library: str | None = None, overwrite: bool = F
         return r.json()
 
 
+@mcp.tool()
+def cleanup_library(artist: str, album: str | None = None, tracks: list[str] | None = None,
+                    library: str | None = None, dry_run: bool = False) -> dict:
+    """清理媒体库中的专辑或曲目文件；存放文件的目录变空时一并清理（不留空目录）。
+
+    Args:
+        artist: 艺人名（库内一级目录）
+        album: 专辑名（可选；留空则删除整个艺人目录）
+        tracks: 要删除的曲目（可选，序号如 "3" 或曲名；留空则删除整个专辑）
+        library: 库名（可选，见 list_libraries；留空用默认库）
+        dry_run: True 时只报告将删除的项，不实际删除（建议先跑一遍确认范围）
+    Returns:
+        deleted_files（已删文件）、removed_dirs（已清目录）、errors。
+    """
+    payload: dict[str, Any] = {"artist": artist, "dry_run": dry_run}
+    if album:
+        payload["album"] = album
+    if tracks:
+        payload["tracks"] = tracks
+    if library:
+        payload["library"] = library
+    with _client() as c:
+        r = c.post("/api/v1/library/cleanup", json=payload)
+        r.raise_for_status()
+        return r.json()
+
+
+@mcp.tool()
+def migrate_singles(library: str | None = None, target_library: str = "singles",
+                    artist: str | None = None, dry_run: bool = False) -> dict:
+    """扫描专辑库中只有一个音频文件的专辑目录（单曲专辑），迁移到 singles 库。
+
+    迁移后清除曲目序号类 tag（保留专辑名/封面/歌词），同名 .lrc 一并移动，
+    原专辑目录与空艺人目录自动清理；目标已存在同名文件则跳过。
+
+    Args:
+        library: 源库名（可选，见 list_libraries；留空用默认库）
+        target_library: 目标库名（默认 singles）
+        artist: 限定单个艺人（可选；留空扫描整个源库）
+        dry_run: True 时只报告将迁移的项，不实际迁移（建议先跑一遍确认范围）
+    Returns:
+        migrated（from/to 列表）、skipped（含原因）、errors。
+    """
+    payload: dict[str, Any] = {"target_library": target_library, "dry_run": dry_run}
+    if library:
+        payload["library"] = library
+    if artist:
+        payload["artist"] = artist
+    with _client() as c:
+        r = c.post("/api/v1/library/migrate_singles", json=payload)
+        r.raise_for_status()
+        return r.json()
+
+
+@mcp.tool()
+def replace_album_track(artist: str, album: str, track: str, library: str | None = None,
+                        sources: str | None = None, force: bool = False,
+                        max_size_mb: float | None = None) -> dict:
+    """重新搜索专辑中指定曲目，用规格更高、更好的版本替换（同步）。
+
+    新候选音质高于现有文件（无损 > 320k > 其他）时才替换，否则返回 action=kept；
+    force=True 强制替换。替换后序号/专辑/艺人/日期沿用旧 tag，封面沿用专辑 cover。
+
+    Args:
+        artist: 艺人名（库内一级目录）
+        album: 专辑名（库内二级目录）
+        track: 曲目序号（如 "3"）或曲名
+        library: 库名（可选，见 list_libraries；留空用默认库）
+        sources: 逗号分隔的源名（可选，留空用默认五源）
+        force: 新候选音质不高于现有版本也强制替换
+        max_size_mb: 单文件体积上限（MB，可选）
+    Returns:
+        action（replaced/kept/unmatched/failed）、old/new 规格信息、error。
+    """
+    payload: dict[str, Any] = {"artist": artist, "album": album, "track": track, "force": force}
+    if library:
+        payload["library"] = library
+    if sources:
+        payload["sources"] = [s.strip() for s in sources.split(",") if s.strip()]
+    if max_size_mb:
+        payload["max_size_mb"] = max_size_mb
+    with _client() as c:
+        r = c.post("/api/v1/library/replace_track", json=payload)
+        r.raise_for_status()
+        return r.json()
+
+
 if __name__ == "__main__":
     transport = os.environ.get("MUSIC_MCP_TRANSPORT") or _CFG.get("transport") or "stdio"
     if transport == "stdio":

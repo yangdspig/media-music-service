@@ -23,8 +23,8 @@ db_path: "./data/music_service.db"
 library_root: "/library"
 
 # 命名附加库根（可选）：按库名区分归档目标，如单曲库。调用方传库名而非裸路径
-# extra_library_roots:
-#   singles: "/singles"
+extra_library_roots:
+  singles: "/singles"
 
 # 归档时统一写入音频文件的 COMMENT tag（用于标记整理来源、覆盖平台水印）
 archive_comment: "yangds整理"

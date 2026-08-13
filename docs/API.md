@@ -259,6 +259,8 @@
 
 > `album_title`/`artist` 用于应对 iTunes 罗马音专辑名（如 "Kou Shi Xin Fei"）：传入中文名后写入 manifest 的 `album.display_title`/`display_artist`，归档时作为目录名与 ALBUM/ARTIST tag 使用。
 
+> **singles 库复用**：配置了 `singles` 命名库（`extra_library_roots`）时，逐曲匹配前会先在 singles 库（`{singles根}/{艺人}/{曲名.ext}`）查找同专辑曲目——保守匹配（曲名与文件名相似度 ≥0.85，有 tag TITLE/ALBUM/时长时交叉校验），命中则**不搜索不下载**，直接硬链接（失败回退复制）进下载目录，manifest 的 `match.source` 为 `"singles"` 且带 `reused_from` 原路径。归档成功后该曲目从 singles 库迁移（删除源文件与同名 `.lrc`，并清理空艺人目录），见 `POST /api/v1/albums/archive`。
+
 **响应 200**：`DownloadTask`（进度用 `GET /api/v1/downloads/{task_id}` 查询）；**400**：曲目表为空；**404/502**：同专辑详情接口
 
 **落盘产物**（`save_dir` 下）：
@@ -289,6 +291,7 @@
 ```
 
 > `match.score` 与 `match.candidates` 供人工/Agent 复核置信度；`unmatched`/`failed` 的 `error` 写明原因（无候选、低于阈值、下载未落盘等）。
+> 复用 singles 库命中的曲目，`match.source` 为 `"singles"` 且另含 `reused_from`（singles 库内原路径，归档成功后该源文件被删除）；此类曲目没有 `score`/`candidates` 字段。
 
 ---
 
@@ -356,6 +359,107 @@
 **响应 200**：`ArchiveResult`（同专辑归档）；**400**：任务不存在 / 未知库名
 
 **单曲库内结构**：`{库根}/{艺人}/{曲名.ext}`，同名 `.lrc` 放旁边并嵌入 tag；不写曲目序号（无 TRACKNUMBER/DISCNUMBER），`ALBUM` 用候选专辑名，`DATE` 跳过；封面从候选 `cover_url` 下载嵌入。
+
+---
+
+### POST /api/v1/library/replace_track
+
+专辑指定曲目重搜替换（**同步**，含一次搜索+下载，耗时数十秒）。在库内专辑目录中定位曲目，沿用专辑匹配打分逻辑重新搜索，新候选音质分档（无损 3 / ≥320k 2 / 其他 1）**高于现有文件**或 `force=true` 时才替换，否则保留原文件。替换后曲目序号/专辑/艺人/日期沿用旧 tag，封面沿用专辑目录 `cover.*`，新下载歌词更新 `lyrics/` 并嵌入 tag；临时下载目录用完即清。
+
+**请求体**
+
+| 字段 | 必填 | 默认 | 说明 |
+|---|---|---|---|
+| `library` | 否 | 默认库 | 库名（见 `/api/v1/libraries`） |
+| `artist` | 是 | — | 艺人名（对应库内一级目录） |
+| `album` | 是 | — | 专辑名（对应库内二级目录） |
+| `track` | 是 | — | 曲目序号（如 `3`）或曲名；多 Disc 专辑可用 `"D-NN"` 形式消歧（如 `"2-03"` 指 CD2 的第 3 首，无该 CD 子目录时退回主目录匹配） |
+| `sources` | 否 | 默认五源 | 参与搜索的源名列表 |
+| `force` | 否 | false | 新候选音质不高于现有版本也强制替换 |
+| `max_size_mb` | 否 | 配置文件 | 单文件体积上限（MB）；>0 优先于配置，0/空不限 |
+
+**响应 200**
+
+```json
+{
+  "status": "success",
+  "action": "replaced | kept | unmatched | failed",
+  "old": {"file": "周杰伦/范特西/01 - 爱在西元前.mp3", "ext": "mp3", "tier": 2},
+  "new": {"source": "…", "title": "…", "ext": "flac", "quality": "lossless",
+          "tier": 3, "score": 0.92, "file": "周杰伦/范特西/01 - 爱在西元前.flac"},
+  "error": null
+}
+```
+
+> `action` 语义：`replaced` 已替换；`kept` 新候选音质不高于现有（未动文件）；`unmatched` 搜索未命中合格候选；`failed` 下载未落盘。后三种 `old` 文件均保持不变，`error` 写明原因。
+
+**400**：未知库名 / 专辑目录不存在 / 曲目未命中 / 目录名解析后越出库根（如 `..`；`album="."` 不拦截，按整艺人目录处理）
+
+---
+
+### POST /api/v1/library/cleanup
+
+清理媒体库中的专辑/曲目文件（**同步**）。粒度：`tracks` 指定曲目 > `album` 整专辑 > `artist` 整艺人。删除曲目后**空目录自底向上一并清理**（不留空目录）：空 `CDx/` → 无音频残留的专辑目录（连同 `cover.jpg`/`album_info.txt`/`lyrics/`）→ 空艺人目录。删除文件时同名 `.lrc`（`lyrics/` 内与文件旁的）一并删除。
+
+**请求体**
+
+| 字段 | 必填 | 默认 | 说明 |
+|---|---|---|---|
+| `library` | 否 | 默认库 | 库名（见 `/api/v1/libraries`） |
+| `artist` | 是 | — | 艺人名（对应库内一级目录） |
+| `album` | 否 | — | 专辑名（对应库内二级目录）；留空则清理整个艺人目录 |
+| `tracks` | 否 | — | 要清理的曲目：序号（如 `3`）、`"D-NN"`（多碟消歧，同 replace_track）或曲名（相似度 ≥0.7 取最高分）；留空则清理整个专辑 |
+| `dry_run` | 否 | false | 只报告将删除的项，不实际删除（**建议先跑一遍确认范围**） |
+
+**响应 200**
+
+```json
+{
+  "status": "success | partial",
+  "dry_run": false,
+  "deleted_files": ["/library/周杰伦/范特西/01 - 爱在西元前.flac"],
+  "removed_dirs": ["/library/周杰伦/范特西"],
+  "errors": []
+}
+```
+
+> 部分文件删除失败时 `status` 为 `partial` 且 `errors` 非空；整专辑/整艺人删除与 `dry_run` 时 `removed_dirs` 报告将清理的目录。
+
+**400**：未知库名 / 艺人或专辑目录不存在 / 曲目未命中 / 目录名解析后越出库根（如 `..`；`album="."` 不拦截，按整艺人目录处理）
+
+---
+
+### POST /api/v1/library/migrate_singles
+
+把专辑库中**只有一个音频文件**的专辑目录（单曲专辑）迁移到 singles 库（**同步**）。目标结构 `{目标库根}/{艺人}/{曲名.ext}`（曲名取 tag TITLE，缺失时去文件名序号前缀）。迁移后重写 tag：清除序号类（TRACKNUMBER/TRACKTOTAL/DISCNUMBER/DISCTOTAL，仅 flac/mp3），保留 ALBUM/ARTIST/DATE/封面/歌词；`lyrics/` 或文件旁的同名 `.lrc` 一并移到目标旁；原专辑目录整目录删除，空艺人目录一并清理；目标已存在同名文件则跳过（记 `skipped`）。**艺人头像同步**：目标艺人目录无 `artist.*` 时从源艺人目录复制一份；若源艺人目录迁移后只剩头像（该艺人在专辑库已无专辑），头像直接搬到目标并清掉源艺人目录。
+
+> 防护：若目标库根位于源库之内（如 singles 目录挂在专辑库下，或同一宿主目录经两个挂载点暴露为 `/library/singles` 与 `/singles`），该子树会被自动跳过（路径包含 + inode 比对双重判定），防止 singles 库内容被误判为单曲专辑"自我搬迁"。
+
+**请求体**
+
+| 字段 | 必填 | 默认 | 说明 |
+|---|---|---|---|
+| `library` | 否 | 默认库 | 源库名（见 `/api/v1/libraries`） |
+| `target_library` | 否 | `singles` | 目标库名 |
+| `artist` | 否 | — | 限定单个艺人；留空扫描整个源库 |
+| `dry_run` | 否 | false | 只报告将迁移的项，不实际迁移（**建议先跑一遍确认范围**） |
+
+**响应 200**
+
+```json
+{
+  "status": "success | partial | failed",
+  "dry_run": false,
+  "migrated": [{"from": "/library/周杰伦/范特西 - Single/01 - 蜗牛.flac",
+                "to": "/singles/周杰伦/蜗牛.flac"}],
+  "skipped": [{"from": "…", "to": "…", "reason": "目标已存在"}],
+  "errors": []
+}
+```
+
+> 全部失败时 `status` 为 `failed`，部分失败为 `partial`；`dry_run` 时 `migrated` 报告将迁移的项（不动文件系统）。
+
+**400**：未知库名 / 指定艺人目录不存在
 
 ---
 
