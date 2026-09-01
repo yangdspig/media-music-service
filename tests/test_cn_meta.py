@@ -2,8 +2,8 @@
 import httpx
 import pytest
 
-from app import netease_meta, qq_meta
-from app.schemas import AlbumInfo
+from app import meta, netease_meta, qq_meta
+from app.schemas import AlbumInfo, AlbumSummary, AlbumTrack
 
 
 class FakeResp:
@@ -136,3 +136,135 @@ def test_qq_get_album_not_found(monkeypatch):
     monkeypatch.setattr(httpx, "post", lambda *a, **kw: FakeResp(empty))
     with pytest.raises(LookupError):
         qq_meta.get_album("00000000000000")
+
+
+def _summary(cid: str, title: str, artists=None, **kw) -> AlbumSummary:
+    return AlbumSummary(collection_id=cid, title=title, artists=artists or [], **kw)
+
+
+def _itunes_album(**over) -> AlbumInfo:
+    base = dict(collection_id="12345", title="Ye Hui Mei", artists=["Jay Chou"],
+                release_date="2003-07-31T07:00:00Z", track_count=1, storefront="US",
+                tracks=[AlbumTrack(disc=1, track=1, title="Yi Fu Zhi Ming",
+                                   artists=["Jay Chou"], duration_s=342.0)])
+    base.update(over)
+    return AlbumInfo(**base)
+
+
+def test_search_fallback_itunes_empty(monkeypatch):
+    monkeypatch.setattr(meta.itunes, "search_albums", lambda **kw: [])
+    monkeypatch.setattr(meta.netease_meta, "search_albums",
+                        lambda *a, **kw: [_summary("netease:18905", "叶惠美", ["周杰伦"], meta_source="netease")])
+    out = meta.search_albums("叶惠美")
+    assert [a.collection_id for a in out] == ["netease:18905"]
+
+
+def test_search_appends_cn_when_results_lack_cjk(monkeypatch):
+    monkeypatch.setattr(meta.itunes, "search_albums",
+                        lambda **kw: [_summary("100", "Fantasy")])
+    monkeypatch.setattr(meta.qq_meta, "search_albums",
+                        lambda *a, **kw: [_summary("qq:mid1", "范特西", ["周杰伦"], meta_source="qq")])
+    calls = []
+    monkeypatch.setattr(meta.netease_meta, "search_albums",
+                        lambda *a, **kw: calls.append(1) or [])
+    out = meta.search_albums("范特西", artist="周杰伦", limit=10)
+    assert [a.collection_id for a in out] == ["100", "qq:mid1"]
+    assert calls == [1]  # 先查网易云，为空再查 QQ
+
+
+def test_search_no_cn_when_cjk_covered(monkeypatch):
+    monkeypatch.setattr(meta.itunes, "search_albums",
+                        lambda **kw: [_summary("100", "范特西", ["周杰伦"])])
+    monkeypatch.setattr(meta.netease_meta, "search_albums",
+                        lambda *a, **kw: (_ for _ in ()).throw(AssertionError("不应调用中文源")))
+    out = meta.search_albums("范特西")
+    assert [a.collection_id for a in out] == ["100"]
+
+
+def test_get_album_prefix_routing(monkeypatch):
+    marker = _itunes_album(collection_id="qq:x", meta_source="qq")
+    monkeypatch.setattr(meta.qq_meta, "get_album", lambda mid: marker)
+    assert meta.get_album("qq:x") is marker
+
+
+def test_get_album_merges_cn_supplement(monkeypatch):
+    monkeypatch.setattr(meta.itunes, "get_album", lambda cid: _itunes_album())
+    monkeypatch.setattr(meta.netease_meta, "search_albums",
+                        lambda *a, **kw: [_summary("netease:18905", "叶惠美", ["周杰伦"],
+                                                   release_date="2003-07-31", track_count=1)])
+    monkeypatch.setattr(meta.netease_meta, "get_album",
+                        lambda aid: _itunes_album(collection_id="netease:18905", title="叶惠美",
+                                                  artists=["周杰伦"], description="中文简介",
+                                                  meta_source="netease"))
+    info = meta.get_album("12345")
+    # 罗马音标题/艺人被中文名替换，简介合并，来源标记复合值；曲目表保持 iTunes 的
+    assert info.title == "叶惠美"
+    assert info.artists == ["周杰伦"]
+    assert info.description == "中文简介"
+    assert info.meta_source == "itunes+netease"
+    assert info.tracks[0].title == "Yi Fu Zhi Ming"
+
+
+def test_get_album_merge_rejects_low_similarity(monkeypatch):
+    monkeypatch.setattr(meta.itunes, "get_album",
+                        lambda cid: _itunes_album(title="叶惠美", artists=["周杰伦"]))
+    monkeypatch.setattr(meta.netease_meta, "search_albums",
+                        lambda *a, **kw: [_summary("netease:999", "完全无关的专辑", ["张三"])])
+    monkeypatch.setattr(meta.qq_meta, "search_albums", lambda *a, **kw: [])
+    info = meta.get_album("12345")
+    assert info.title == "叶惠美"
+    assert info.description is None
+    assert info.meta_source == "itunes"
+
+
+def test_get_album_romanized_fallback_by_date_and_count(monkeypatch):
+    # 罗马音标题与中文名相似度为 0：放宽为发行日期+曲目数精确一致即接受
+    monkeypatch.setattr(meta.itunes, "get_album", lambda cid: _itunes_album())
+    monkeypatch.setattr(meta.netease_meta, "search_albums",
+                        lambda *a, **kw: [_summary("netease:18905", "叶惠美", ["周杰伦"],
+                                                   release_date="2003-07-31", track_count=1)])
+    monkeypatch.setattr(meta.netease_meta, "get_album",
+                        lambda aid: _itunes_album(collection_id="netease:18905", title="叶惠美",
+                                                  artists=["周杰伦"], description="中文简介",
+                                                  meta_source="netease"))
+    info = meta.get_album("12345")
+    assert info.description == "中文简介"
+    assert info.meta_source == "itunes+netease"
+
+
+def test_get_album_takeover_when_itunes_has_no_tracks(monkeypatch):
+    def _raise(cid):
+        raise LookupError("no tracks")
+    monkeypatch.setattr(meta.itunes, "get_album", _raise)
+    monkeypatch.setattr(meta, "_itunes_summary",
+                        lambda cid: _summary("12345", "Ye Hui Mei", ["Jay Chou"],
+                                             release_date="2003-07-31T07:00:00Z", track_count=1))
+    cn_album = _itunes_album(collection_id="netease:18905", title="叶惠美", artists=["周杰伦"],
+                             meta_source="netease")
+    monkeypatch.setattr(meta.netease_meta, "search_albums",
+                        lambda *a, **kw: [_summary("netease:18905", "叶惠美", ["周杰伦"],
+                                                   release_date="2003-07-31", track_count=1)])
+    monkeypatch.setattr(meta.netease_meta, "get_album", lambda aid: cn_album)
+    info = meta.get_album("12345")
+    assert info is cn_album
+    assert info.meta_source == "netease"
+
+
+def test_get_album_takeover_all_fail_keeps_lookup_error(monkeypatch):
+    def _raise(cid):
+        raise LookupError("no tracks")
+    monkeypatch.setattr(meta.itunes, "get_album", _raise)
+    monkeypatch.setattr(meta, "_itunes_summary", lambda cid: None)
+    with pytest.raises(LookupError):
+        meta.get_album("12345")
+
+
+def test_cn_failure_degrades_gracefully(monkeypatch):
+    monkeypatch.setattr(meta.itunes, "get_album", lambda cid: _itunes_album(title="范特西", artists=["周杰伦"]))
+
+    def _boom(*a, **kw):
+        raise httpx.ConnectError("network down")
+    monkeypatch.setattr(meta.netease_meta, "search_albums", _boom)
+    monkeypatch.setattr(meta.qq_meta, "search_albums", _boom)
+    info = meta.get_album("12345")  # 中文源全部失败不抛错
+    assert info.meta_source == "itunes"
