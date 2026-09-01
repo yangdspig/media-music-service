@@ -17,7 +17,8 @@
    - 背景：实测"给一个专辑名 → 自动搜索资料/下载/整理入库"场景，现有 MCP 只有单曲级工具，专辑元数据确认、逐曲消歧、批量编排全靠 Agent 手工绕路，出错率最高的恰是专辑元数据环节
    - **第一期已完成**（2026-08-10）：`search_albums` / `get_album_info`（iTunes Search/Lookup API 主干，storefront 链 CN→HK→TW→US→JP 兜底，繁体曲目表自动转简体匹配）；`download_album`（服务端编排逐曲搜索 → 打分消歧（阈值 0.6，低于阈值记 unmatched）→ 按序号命名落盘 → `cover.jpg` + `manifest.json`（含逐曲 score/candidates/失败原因），替代解析私有 `download_results.pkl`）；REST 三端点 + MCP 三工具，E2E 验证通过
    - **第二期已完成**（2026-08-10）：`archive_album` 服务端归档（REST + MCP）：以 manifest.json 为契约，硬链接（CIFS/跨设备回退复制）入库 `{library_root}/{艺人}/{专辑}/`，断链后写 tag（TRACKNUMBER n/N、多 Disc CD1/CD2 + DISCNUMBER d/D）、嵌封面/歌词、`lyrics/`、`cover.jpg`、`album_info.txt`，幂等跳过；新增 `library_root`/`archive_comment` 配置与 compose 媒体库卷挂载示例
-   - **后续待做**：网易云/QQ 网页接口补充中文专辑与简介（iTunes 覆盖不足时）；`get_artist_info` + 艺人 `artist.jpg` 头像；WAV→FLAC 转换
+   - **后续待做**：`get_artist_info` + 艺人 `artist.jpg` 头像；WAV→FLAC 转换
+   - **已完成补充**（2026-09-01）：中文专辑元数据补充——新增 `meta.py` 编排层 + 网易云/QQ 网页接口客户端（免登录公开 API）；iTunes 无结果/覆盖不足时自动回退，`collection_id` 支持 `netease:`/`qq:` 前缀路由；iTunes 各 storefront 无曲目时中文源整体接管；命中时合并中文简介与中文显示名（罗马音场景按发行日期+曲目数放宽匹配），`AlbumSummary` 新增 `description`/`meta_source`，`album_info.txt` 正式写入简介
    - **已完成补充**（2026-08-10）：匹配音质偏好——同分段（与最高分差 ≤0.1）候选优先无损（`quality_tier`：无损 3 / 320k 2 / 其他 1），没有合格无损才选 MP3；manifest 的 match 增加 `ext`/`quality`/`quality_tier` 字段
    - **已完成补充**（2026-08-10）：罗马音专辑名修复——iTunes 对部分老中文专辑只存罗马音专辑名（如 "Kou Shi Xin Fei"），归档按"显式参数 > manifest display_* > 自动推断（国内源候选多数表决 + CJK 保护）> iTunes 原名"解析显示名；`download_album`/`archive_album` 新增 `album_title`/`artist` 覆盖参数；旧 manifest 重跑归档即可自动纠正
    - 风险：网易云/QQ 网页接口可能变动或限流，需多源交叉验证；消歧可能误中 Live/翻唱版本，manifest 必须带置信信息供复核

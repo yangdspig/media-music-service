@@ -104,10 +104,10 @@ mcp:
 查询下载任务进度（status/completed/failed/save_dir/results/errors）。单曲与专辑任务通用；专辑任务完成后 `manifest_path` 指向结构化清单。
 
 ### search_albums(keyword, artist?, limit?)
-按专辑名搜索专辑（iTunes 官方元数据）。返回 `collection_id`（供后续两个工具使用）、曲目数、发行日期、高清封面 URL。
+按专辑名搜索专辑（iTunes 优先；覆盖不足时自动回退网易云/QQ）。返回 `collection_id`（供后续两个工具使用；iTunes 专辑为纯数字，中文源专辑带 `netease:`/`qq:` 前缀）、曲目数、发行日期、高清封面 URL、`description`（简介，可为空）、`meta_source`。
 
 ### get_album_info(collection_id)
-获取专辑详情：官方曲目表（含 disc/序号/时长）、发行日期、封面等。**下载前建议先调用此工具向用户确认专辑版本**（同名专辑可能有 Single/EP/ deluxe 等多个版本）。
+获取专辑详情：官方曲目表（含 disc/序号/时长）、发行日期、封面、简介等。`collection_id` 支持 `netease:`/`qq:` 前缀；iTunes id 在其各 storefront 均无曲目时自动回退中文源整体接管。**下载前建议先调用此工具向用户确认专辑版本**（同名专辑可能有 Single/EP/ deluxe 等多个版本）。
 
 ### download_album(collection_id, sources?, subdir?, album_title?, artist?, max_size_mb?)
 专辑整单下载（异步）。服务端逐曲搜索匹配消歧（打分含标题/歌手/专辑/时长，低于阈值记 `unmatched` 不强行下载；同分段候选优先无损音质，没有合格无损才选 MP3），按曲目序号命名落盘（`01 曲名.flac`，多 Disc 为 `1-01 曲名.flac`），附 `cover.jpg` 与 `manifest.json`。**singles 库复用**：服务端配置了 `singles` 命名库时，逐曲匹配前先在 singles 库查找同专辑曲目，命中则不搜索不下载（manifest 的 `match.source` 为 `"singles"` 且带 `reused_from` 原路径），归档成功后该曲目自动从 singles 库迁移删除。返回 `task_id`，用 `get_download_status` 轮询。`album_title`/`artist` 用于 iTunes 专辑名是罗马音/拼音时显式指定中文显示名（写入 manifest 供归档使用）。`max_size_mb` 为单文件体积上限（MB）：超限不是硬剔除，优先选不超限且达阈值的候选，无合格不超限候选时才放宽限制选超限最高分（优先保专辑完整与版本正确），并在 manifest 标注 `oversized_relaxed: true` 供复核。

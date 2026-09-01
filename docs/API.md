@@ -99,13 +99,15 @@
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `collection_id` | string | iTunes collectionId，`get_album_info`/`download_album` 的入参 |
+| `collection_id` | string | 专辑 id：iTunes collectionId（纯数字），或中文源的 `netease:xxx` / `qq:xxx` 前缀 id；`get_album_info`/`download_album` 的入参 |
 | `title` | string | 专辑名 |
 | `artists` | string[] | 艺人列表 |
 | `release_date` | string \| null | 发行日期（ISO） |
 | `track_count` | int | 曲目数 |
 | `cover_url` | string \| null | 高清封面 URL（600x600） |
 | `genre` | string \| null | 流派 |
+| `description` | string \| null | 专辑简介（来自网易云/QQ 补充，可能为空） |
+| `meta_source` | string | 元数据来源：`itunes` / `netease` / `qq` / `itunes+netease` / `itunes+qq` |
 
 ### AlbumInfo（专辑详情）
 
@@ -229,7 +231,7 @@
 
 ### GET /api/v1/albums/search
 
-按专辑名搜索专辑（iTunes 官方元数据）。
+按专辑名搜索专辑。iTunes 优先；iTunes 无结果或中文覆盖不足（关键词含中文而结果无中文）时自动回退网易云 → QQ，首个非空中文源的结果追加在 iTunes 结果之后（总数不超 limit）。
 
 **查询参数**
 
@@ -239,15 +241,15 @@
 | `artist` | 否 | — | 艺人名（叠加可提高准确度） |
 | `limit` | 否 | 10 | 返回条数上限 |
 
-**响应 200**：`AlbumSummary[]`；**502**：iTunes 接口异常
+**响应 200**：`AlbumSummary[]`；**502**：元数据接口异常
 
 ---
 
 ### GET /api/v1/albums/{collection_id}
 
-获取专辑详情与官方曲目表（服务端按 storefront 链 CN→HK→TW→US→JP 兜底取首个有曲目的）。
+获取专辑详情与官方曲目表。`collection_id` 按前缀路由：无前缀走 iTunes（storefront 链 CN→HK→TW→US→JP 兜底取首个有曲目的），`netease:`/`qq:` 前缀直接取对应中文源。iTunes 各 storefront 均无曲目时，自动用「专辑名+艺人」在网易云/QQ 找同专辑整体接管（含曲目表）；iTunes 命中时也会尽量合并中文源的专辑简介（`description`）与中文显示名（罗马音名按 CJK 规则替换），命中后 `meta_source` 为 `itunes+netease`/`itunes+qq`。
 
-**响应 200**：`AlbumInfo`；**404**：各 storefront 均无该专辑曲目；**502**：iTunes 接口异常
+**响应 200**：`AlbumInfo`；**404**：各来源均无该专辑曲目；**502**：元数据接口异常
 
 ---
 
