@@ -112,8 +112,8 @@ mcp:
 ### download_album(collection_id, sources?, subdir?, album_title?, artist?, max_size_mb?)
 专辑整单下载（异步）。服务端逐曲搜索匹配消歧（打分含标题/歌手/专辑/时长，低于阈值记 `unmatched` 不强行下载；同分段候选优先无损音质，没有合格无损才选 MP3），按曲目序号命名落盘（`01 曲名.flac`，多 Disc 为 `1-01 曲名.flac`），附 `cover.jpg` 与 `manifest.json`。**singles 库复用**：服务端配置了 `singles` 命名库时，逐曲匹配前先在 singles 库查找同专辑曲目，命中则不搜索不下载（manifest 的 `match.source` 为 `"singles"` 且带 `reused_from` 原路径），归档成功后该曲目自动从 singles 库迁移删除。返回 `task_id`，用 `get_download_status` 轮询。`album_title`/`artist` 用于 iTunes 专辑名是罗马音/拼音时显式指定中文显示名（写入 manifest 供归档使用）。`max_size_mb` 为单文件体积上限（MB）：超限不是硬剔除，优先选不超限且达阈值的候选，无合格不超限候选时才放宽限制选超限最高分（优先保专辑完整与版本正确），并在 manifest 标注 `oversized_relaxed: true` 供复核。
 
-### archive_album(task_id?, manifest_path?, overwrite?, album_title?, artist?, library?)
-把专辑下载产物归档进媒体库（同步，秒级）：硬链接（失败回退复制）入库 → 断链后写 tag → 嵌封面歌词 → `cover.jpg` + `album_info.txt`。库内结构 `{库根}/{艺人}/{专辑}/`，多 Disc 用 `CD1/CD2` 子目录。`task_id`（服务未重启时）与 `manifest_path` 二选一；默认幂等跳过已存在文件。前置：服务端已配置 `library_root` 并挂载媒体库卷；`library` 选择目标库（见 `list_libraries`），留空用默认库。专辑名/艺人名按解析链确定：显式参数 > manifest display_* > 自动推断（国内源多数表决，仅在原名为罗马音时生效）> iTunes 原名——**罗马音专辑名一般无需手动传参，归档会自动纠正为中文**。
+### archive_album(task_id?, manifest_path?, overwrite?, album_title?, artist?, library?, compilation?)
+把专辑下载产物归档进媒体库（同步，秒级）：硬链接（失败回退复制）入库 → 断链后写 tag → 嵌封面歌词 → `cover.jpg` + `album_info.txt`。库内结构 `{库根}/{艺人}/{专辑}/`，多 Disc 用 `CD1/CD2` 子目录。`task_id`（服务未重启时）与 `manifest_path` 二选一；默认幂等跳过已存在文件。前置：服务端已配置 `library_root` 并挂载媒体库卷；`library` 选择目标库（见 `list_libraries`），留空用默认库。专辑名/艺人名按解析链确定：显式参数 > manifest display_* > 自动推断（国内源多数表决，仅在原名为罗马音时生效）> iTunes 原名——**罗马音专辑名一般无需手动传参，归档会自动纠正为中文**。合集专辑（Various Artists/群星）自动归档到 `{库根}/群星/{专辑}/`，逐曲艺人写 ARTIST、COMPILATION=1；`compilation` 参数可强制覆盖自动判定。
 
 ### archive_tracks(task_id, library?, overwrite?)
 把单曲下载任务的产物归档进媒体库（同步）：硬链接/复制入库 → 断链后写 tag → 嵌封面歌词（封面从候选 `cover_url` 下载）。结构 `{库根}/{艺人}/{曲名.ext}`，同名 `.lrc` 放旁边；不写曲目序号。艺人目录无 `artist.*` 时按候选 `artist_img_url` 补一份艺人头像（Navidrome 本地头像约定，幂等，已有不覆盖）。`submit_download` 传了 `library` 时已自动归档，本工具用于事后补归档或换库重归档；默认幂等跳过。任务在内存中才可用（服务重启后需重新下载）。

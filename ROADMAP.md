@@ -49,6 +49,11 @@
    - 场景三（库内清理）：`POST /api/v1/library/cleanup` + MCP `cleanup_library`——按曲目/专辑/艺人三级粒度删除，空目录自底向上一并清理，解析后越出库根的目录名（如 `..`）返回 400（`album="."` 不拦截，按整艺人目录处理），支持 `dry_run`
    - 场景四（单曲专辑迁移）：`POST /api/v1/library/migrate_singles` + MCP `migrate_singles`——只有一个音频文件的专辑目录迁入 singles 库（清序号类 tag、带 `.lrc`），原目录与空艺人目录自动清理，支持 `dry_run`
 
+2f. **合集（Various Artists）专辑归档** ✅ 已完成（2026-09-01）
+   - 背景：合集/原声带（如《仙剑奇侠传》电视原声带）不是单一艺人专辑，按 `{艺人}/{专辑}/` 归档会让目录名不一致（Various Artists/群星混杂）且 tag 丢失逐曲艺人
+   - 已实现：VA 名单（various artists/va/群星/华语群星/合辑）自动判定 + `compilation` 显式覆盖参数（REST + MCP）；合集归档到 `{库根}/群星/{专辑}/`，逐曲艺人写 ARTIST、ALBUMARTIST=群星、COMPILATION=1（FLAC/MP3-TCMP，Navidrome 按合集分组），不写艺人头像，`album_info.txt` 曲目表附逐曲艺人；`replace_album_track` 顺带修正为沿用旧文件 ARTIST/ALBUMARTIST/COMPILATION（与其 docstring 对齐）
+   - 兼容性：老 manifest 重跑 overwrite 归档即迁入群星目录；显式 artist 参数优先于名单判定
+
 3. **MoviePilot 薄客户端插件**
    - 目标：在 MoviePilot 内完成"搜索 → 勾选 → 下载 → 入库整理"闭环
    - 要点：继承 `_PluginBase`，只做表单与 REST 调用，不直接依赖 musicdl

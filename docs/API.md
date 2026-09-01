@@ -315,6 +315,9 @@
 | `album_title` | 否 | — | 显示用专辑名覆盖（最高优先级，影响目录名与 ALBUM tag） |
 | `artist` | 否 | — | 显示用艺人名覆盖（最高优先级，影响目录名与 ARTIST tag） |
 | `library` | 否 | 默认库 | 目标库名（见 `/api/v1/libraries`）；未知库名返回 400 |
+| `compilation` | 否 | null | 合集标记：`null` 按 VA 名单自动判定，`true`/`false` 强制走/不走合集归档 |
+
+> **合集（Various Artists）专辑**：专辑艺人命中 VA 名单（various artists / va / 群星 / 华语群星 / 合辑，繁简大小写不敏感）或显式传 `compilation: true` 时，归档到 `{库根}/群星/{专辑}/`：逐曲艺人写 ARTIST tag，ALBUMARTIST=群星，COMPILATION=1（Navidrome 按合集分组），不写艺人头像，`album_info.txt` 曲目表附逐曲艺人。显式传 `artist` 而未传 `compilation` 时按普通专辑处理；`compilation: false` 可强制普通归档。老 manifest 重跑 `overwrite: true` 归档即可迁入群星目录（旧位置目录用 `cleanup_library` 按需清理）。
 
 **响应 200**：`ArchiveResult`
 
