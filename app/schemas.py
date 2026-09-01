@@ -59,14 +59,16 @@ class DownloadRequest(BaseModel):
 
 
 class AlbumSummary(BaseModel):
-    """专辑摘要（iTunes 搜索结果项）。"""
-    collection_id: str = Field(description="iTunes collectionId")
+    """专辑摘要（iTunes / 网易云 / QQ 搜索结果项）。"""
+    collection_id: str = Field(description="专辑 id：iTunes collectionId，或带前缀的中文源 id（netease:xxx / qq:xxx）")
     title: str = Field(description="专辑名")
     artists: list[str] = Field(default_factory=list, description="艺人列表")
     release_date: Optional[str] = Field(default=None, description="发行日期（ISO）")
     track_count: int = Field(default=0, description="曲目数")
-    cover_url: Optional[str] = Field(default=None, description="高清封面 URL（600x600）")
+    cover_url: Optional[str] = Field(default=None, description="高清封面 URL")
     genre: Optional[str] = Field(default=None, description="流派")
+    description: Optional[str] = Field(default=None, description="专辑简介（网易云/QQ 提供，可能为空）")
+    meta_source: str = Field(default="itunes", description="元数据来源：itunes / netease / qq / itunes+netease / itunes+qq")
 
 
 class AlbumTrack(BaseModel):
