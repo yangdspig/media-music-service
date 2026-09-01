@@ -11,7 +11,7 @@ from .schemas import AlbumDownloadRequest, AlbumInfo, AlbumSummary, ArchiveReque
 from . import album as album_svc
 from . import archive as archive_svc
 from . import download as dl
-from . import itunes, libraries, libops, registry, storage
+from . import libraries, libops, meta, registry, storage
 from .playlist import parse_playlist
 from .search import search
 
@@ -65,11 +65,11 @@ def api_playlist(url: str, source: str | None = None) -> list[Track]:
 
 def _get_album_or_404(collection_id: str) -> AlbumInfo:
     try:
-        return itunes.get_album(collection_id)
+        return meta.get_album(collection_id)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"iTunes 查询失败: {e}")
+        raise HTTPException(status_code=502, detail=f"专辑元数据查询失败: {e}")
 
 
 @app.get("/api/v1/libraries", dependencies=[Depends(auth)])
@@ -81,9 +81,9 @@ def api_libraries() -> list[dict]:
 @app.get("/api/v1/albums/search", response_model=list[AlbumSummary], dependencies=[Depends(auth)])
 def api_album_search(keyword: str, artist: str | None = None, limit: int = 10) -> list[AlbumSummary]:
     try:
-        return itunes.search_albums(keyword=keyword, artist=artist, limit=limit)
+        return meta.search_albums(keyword=keyword, artist=artist, limit=limit)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"iTunes 搜索失败: {e}")
+        raise HTTPException(status_code=502, detail=f"专辑搜索失败: {e}")
 
 
 # 注意：/albums/archive 必须声明在 /albums/{collection_id} 之前，否则会被路径参数吃掉

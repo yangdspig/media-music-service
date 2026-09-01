@@ -1,7 +1,7 @@
 """专辑级编排：逐曲匹配消歧 → 按序号命名落盘 → 输出 manifest.json。
 
 设计要点（对应 ROADMAP M4-1 第一期）：
-- 专辑元数据来自 itunes.py（iTunes 官方 API），下载仍走 musicdl 聚合源；
+- 专辑元数据来自 meta.py 编排层（iTunes 首选，网易云/QQ 回退补充简介与中文名），下载仍走 musicdl 聚合源；
 - 消歧打分：标题相似度为主，歌手/专辑/时长为辅；iTunes 各 storefront 可能返回
   繁体或罗马音，统一先做繁转简再比对；低于阈值宁可 unmatched 也不错配，
   分数与候选数写入 manifest 供人工/Agent 复核；
@@ -398,7 +398,7 @@ def _run_album(task: DownloadTask, album: AlbumInfo, sources: list[str] | None,
     failed = sum(1 for e in entries if e["status"] == "failed")
     ok = sum(1 for e in entries if e["status"] == "ok")
     task.failed = unmatched + failed
-    album_dict = {**album.model_dump(exclude={"tracks"}), "meta_source": "itunes"}
+    album_dict = album.model_dump(exclude={"tracks"})
     # 显示名：显式覆盖优先，否则从匹配候选自动推断（应对 iTunes 罗马音专辑名）
     display = display or infer_display_names(album_dict, [e for e in entries if e["status"] == "ok"])
     manifest = {

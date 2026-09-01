@@ -268,3 +268,12 @@ def test_cn_failure_degrades_gracefully(monkeypatch):
     monkeypatch.setattr(meta.qq_meta, "search_albums", _boom)
     info = meta.get_album("12345")  # 中文源全部失败不抛错
     assert info.meta_source == "itunes"
+
+
+def test_album_dict_keeps_real_meta_source():
+    # album.py 生成 manifest 时不得再把 meta_source 硬编码为 "itunes"
+    import inspect
+    from app import album as album_mod
+    src = inspect.getsource(album_mod._run_album)
+    assert '"meta_source": "itunes"' not in src
+    assert 'album.model_dump(exclude={"tracks"})' in src

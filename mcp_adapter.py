@@ -165,15 +165,16 @@ def get_download_status(task_id: str) -> dict:
 
 @mcp.tool()
 def search_albums(keyword: str, artist: str | None = None, limit: int = 10) -> dict:
-    """按专辑名搜索专辑（iTunes 官方元数据）。
+    """按专辑名搜索专辑（iTunes 优先；覆盖不足时自动回退网易云/QQ，尽量补充中文简介）。
 
     Args:
         keyword: 专辑名
         artist: 艺人名（可选，叠加可提高准确度）
         limit: 返回条数上限
     Returns:
-        专辑列表，含 collection_id（供 get_album_info / download_album 使用）、
-        曲目数、发行日期、高清封面 URL。
+        专辑列表，含 collection_id（供 get_album_info / download_album 使用；
+        iTunes 专辑为纯数字，中文源专辑带 netease:/qq: 前缀）、曲目数、发行日期、
+        高清封面 URL、description（简介，可为空）、meta_source（元数据来源）。
     """
     params: dict[str, Any] = {"keyword": keyword, "limit": limit}
     if artist:
@@ -187,10 +188,11 @@ def search_albums(keyword: str, artist: str | None = None, limit: int = 10) -> d
 
 @mcp.tool()
 def get_album_info(collection_id: str) -> dict:
-    """获取专辑详情：官方曲目表（含 disc/序号/时长）、发行日期、封面等。
+    """获取专辑详情：官方曲目表（含 disc/序号/时长）、发行日期、封面、简介等。
 
     Args:
-        collection_id: search_albums 返回的 collection_id
+        collection_id: search_albums 返回的 collection_id（支持 netease:/qq: 前缀的中文源专辑；
+            iTunes id 在其各 storefront 均无曲目时自动回退中文源整体接管）
     """
     with _client() as c:
         r = c.get(f"/api/v1/albums/{collection_id}")
@@ -205,7 +207,7 @@ def download_album(collection_id: str, sources: str | None = None, subdir: str |
     """专辑整单下载（异步）：服务端逐曲搜索匹配、按曲目序号命名落盘，并产出 manifest.json。
 
     Args:
-        collection_id: search_albums 返回的 collection_id
+        collection_id: search_albums 返回的 collection_id（支持 netease:/qq: 前缀）
         sources: 逗号分隔的源名（可选，留空用默认五源）
         subdir: 下载根目录下的子目录名（可选，默认"{艺人} - {专辑}"）
         album_title: 显示用专辑名覆盖（可选；iTunes 专辑名为罗马音/拼音时建议传入中文名，
