@@ -114,10 +114,12 @@ def _read_tags(path: Path) -> dict[str, Any]:
 
         out["title"] = _get("TITLE", "TIT2")
         out["artist"] = _get("ARTIST", "TPE1")
+        out["albumartist"] = _get("ALBUMARTIST", "TPE2")
         out["album"] = _get("ALBUM", "TALB")
         out["date"] = _get("DATE", "TDRC")
         out["tracknumber"] = _get("TRACKNUMBER", "TRCK")
         out["discnumber"] = _get("DISCNUMBER", "TPOS")
+        out["compilation"] = _get("COMPILATION", "TCMP")
         return out
     except Exception:
         return {}
@@ -438,7 +440,7 @@ def replace_album_track(library: str | None, artist: str, album: str, track: Any
 
     expected = AlbumTrack(disc=_num(old_tags.get("discnumber"), 1),
                           track=_num(old_tags.get("tracknumber"), 0),
-                          title=title, artists=[t2s(artist)],
+                          title=title, artists=[t2s(old_tags.get("artist") or artist)],
                           duration_s=old_tags.get("duration_s"))
     r = match_track(expected,
                     AlbumInfo(collection_id="", title=t2s(album), artists=[t2s(artist)]),
@@ -507,8 +509,12 @@ def replace_album_track(library: str | None, artist: str, album: str, track: Any
                 if c.is_file():
                     cover_bytes = c.read_bytes()
                     break
-            _write_tags(new_file, title, t2s(artist), t2s(album), old_tags.get("date") or "",
-                        numbers=numbers, cover_bytes=cover_bytes, lyric_text=lyric_text)
+            _write_tags(new_file, title,
+                        t2s(old_tags.get("albumartist") or artist), t2s(album),
+                        old_tags.get("date") or "",
+                        numbers=numbers, cover_bytes=cover_bytes, lyric_text=lyric_text,
+                        track_artist=old_tags.get("artist") or None,
+                        compilation="1" in (old_tags.get("compilation") or ""))
         new_info["file"] = str(new_file.relative_to(root))
         return {"status": "success", "action": "replaced", "old": old_info, "new": new_info,
                 "error": None}

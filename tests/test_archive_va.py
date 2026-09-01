@@ -3,7 +3,8 @@ import json
 
 import pytest
 
-from app import archive
+from app import archive, libops
+from app import download as dl
 from app.archive import _VA_ARTIST, _is_compilation, _write_tags
 from app.config import settings
 
@@ -89,6 +90,10 @@ def _read_id3(p):
     return ID3(p)
 
 
+# 最小可解析 MP3：3 个 MPEG-1 Layer III 帧（mutagen.File 需要同步到后续帧才认）
+_FAKE_MP3 = (b"\xff\xfb\x90\x00" + b"\x00" * 413) * 3
+
+
 def test_archive_va_album_to_qunxing(tmp_path, library_root):
     mp = _make_va_manifest(tmp_path)
     res = archive.archive_album(manifest_path=mp)
@@ -140,3 +145,46 @@ def test_archive_normal_album_unaffected(tmp_path, library_root):
     assert not t.getall("TCMP")
     info = (album_dir / "album_info.txt").read_text(encoding="utf-8")
     assert "01. 晴天 - " not in info  # 普通专辑曲目表不附艺人
+
+
+def test_replace_track_preserves_va_tags(tmp_path, monkeypatch):
+    """合集曲目替换：新文件沿用旧文件的逐曲 ARTIST、ALBUMARTIST=群星 与 COMPILATION。"""
+    from app.schemas import Track
+    root = tmp_path / "library"
+    album_dir = root / "群星" / "仙剑奇侠传 电视原声带"
+    album_dir.mkdir(parents=True)
+    old = album_dir / "03 - 六月的雨.mp3"
+    old.write_bytes(_FAKE_MP3)
+    _write_tags(old, "六月的雨", "群星", "仙剑奇侠传 电视原声带",
+                numbers={"TRACKNUMBER": "3/13"}, track_artist="胡歌", compilation=True)
+
+    monkeypatch.setattr(settings, "library_root", str(root))
+    monkeypatch.setattr(settings, "extra_library_roots", {})
+    monkeypatch.setattr(settings, "download_root", str(tmp_path / "downloads"))
+
+    chosen = Track(id="S:1", source="S", title="六月的雨", artists=["胡歌"], album="仙剑奇侠传",
+                   ext="mp3", quality="lossless", raw={"identifier": "x"})
+    monkeypatch.setattr("app.album.match_track",
+                        lambda *a, **kw: {"status": "matched",
+                                          "match": {"score": 0.99, "source": "S", "track_id": "1",
+                                                    "title": "六月的雨", "artists": ["胡歌"],
+                                                    "album": "仙剑奇侠传", "ext": "mp3",
+                                                    "quality": "lossless", "quality_tier": 3,
+                                                    "artist_img_url": None,
+                                                    "candidates": 1, "oversized_filtered": 0,
+                                                    "oversized_relaxed": False},
+                                          "track": chosen})
+
+    def _fake_download(source, songs, save_dir):
+        from pathlib import Path as P
+        (P(save_dir) / "new.mp3").write_bytes(_FAKE_MP3)
+    monkeypatch.setattr(dl, "download_songs", _fake_download)
+    monkeypatch.setattr(dl, "_find_downloaded_file", lambda *a, **kw: "new.mp3")
+
+    res = libops.replace_album_track(None, "群星", "仙剑奇侠传 电视原声带", 3, force=True)
+    assert res["action"] == "replaced"
+    tags = _read_id3(album_dir / "03 - 六月的雨.mp3")
+    assert str(tags["TPE1"].text[0]) == "胡歌"
+    assert str(tags["TPE2"].text[0]) == "群星"
+    assert str(tags["TCMP"].text[0]) == "1"
+    assert str(tags["TRCK"].text[0]) == "3/13"
