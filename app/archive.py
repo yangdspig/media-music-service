@@ -27,6 +27,25 @@ from .schemas import ArchiveResult, ArchiveTrackResult
 
 _TAGGABLE_EXTS = {"flac", "mp3"}
 
+# 合集（Various Artists）判定：归一化（t2s→strip→lower）后比对名单
+_VA_ARTIST = "群星"
+_VA_NAMES = {"various artists", "va", "群星", "华语群星", "合辑"}
+
+
+def _is_compilation(album: dict, display_artist: str, explicit_artist: str | None,
+                    compilation: bool | None) -> bool:
+    """合集判定：compilation 参数 > 显式 artist 参数（视为普通专辑）> VA 名单。
+
+    名单比对两个值：解析后的显示艺人与 manifest 原始艺人（覆盖链可能把
+    "Various Artists" 改成中文显示名，原始值仍是 VA）。
+    """
+    if compilation is not None:
+        return compilation
+    if explicit_artist:
+        return False
+    candidates = [display_artist, (album.get("artists") or [""])[0]]
+    return any(t2s(c).strip().lower() in _VA_NAMES for c in candidates if c)
+
 
 def _resolve_names(album: dict, ok_entries: list[dict],
                    album_title: str | None = None, artist: str | None = None) -> tuple[str, str]:
@@ -70,15 +89,19 @@ def _break_link_if_needed(path: Path) -> None:
 def _write_tags(path: Path, title: str, artist: str, album_title: str, date: str = "",
                 numbers: dict[str, str] | None = None,
                 cover_bytes: bytes | None = None, lyric_text: str | None = None,
-                strip_numbers: bool = False) -> None:
+                strip_numbers: bool = False,
+                track_artist: str | None = None, compilation: bool = False) -> None:
     """按库约定重写 tag 并嵌封面/歌词（仅 flac/mp3）。artist/album_title 为解析后的显示名。
 
     numbers 为序号类 tag（TRACKNUMBER/TRACKTOTAL/DISCNUMBER/DISCTOTAL），专辑归档传入，
     单曲归档传 None（不写序号）；strip_numbers=True 时显式清除已有序号类 tag（单曲迁移用）；
     date 为空则不写 DATE。
+    track_artist 非空时 ARTIST 写逐曲艺人（合集专辑用），否则 ARTIST=artist；
+    compilation=True 时写合集标记（FLAC: COMPILATION=1；MP3: TCMP 文本帧）。
     """
     ext = path.suffix.lstrip(".").lower()
     title = t2s(title or "")
+    track_artist = t2s(track_artist) if track_artist else None
     numbers = numbers or {}
     comment = settings.archive_comment
 
@@ -87,12 +110,15 @@ def _write_tags(path: Path, title: str, artist: str, album_title: str, date: str
         audio = FLAC(path)
         # 白名单重写：清掉平台水印等杂项后统一写入
         keep = {"ARTIST", "ALBUMARTIST", "ALBUM", "TITLE", "DATE",
-                "TRACKNUMBER", "TRACKTOTAL", "DISCNUMBER", "DISCTOTAL", "COMMENT", "LYRICS"}
+                "TRACKNUMBER", "TRACKTOTAL", "DISCNUMBER", "DISCTOTAL", "COMMENT", "LYRICS",
+                "COMPILATION"}
         for key in list(audio.keys()):
             if key.upper() not in keep:
                 del audio[key]
-        audio["ARTIST"] = artist
+        audio["ARTIST"] = track_artist or artist
         audio["ALBUMARTIST"] = artist
+        if compilation:
+            audio["COMPILATION"] = "1"
         if album_title:
             audio["ALBUM"] = album_title
         audio["TITLE"] = title
@@ -117,13 +143,19 @@ def _write_tags(path: Path, title: str, artist: str, album_title: str, date: str
             audio.add_picture(pic)
         audio.save()
     elif ext == "mp3":
-        from mutagen.id3 import APIC, COMM, TALB, TDRC, TIT2, TPE1, TPE2, TPOS, TRCK, USLT, ID3
+        from mutagen.id3 import APIC, COMM, TALB, TDRC, TIT2, TPE1, TPE2, TPOS, TRCK, USLT, ID3, TextFrame, Frames
         try:
             audio = ID3(path)
         except Exception:
             audio = ID3()
-        audio.delall("TPE1"); audio.add(TPE1(encoding=3, text=artist))
+        audio.delall("TPE1"); audio.add(TPE1(encoding=3, text=track_artist or artist))
         audio.delall("TPE2"); audio.add(TPE2(encoding=3, text=artist))
+        if compilation:
+            class TCMP(TextFrame):
+                """iTunes 合集标记帧（Navidrome 识别）；mutagen 无内置，注册后生效。"""
+
+            Frames["TCMP"] = TCMP
+            audio.delall("TCMP"); audio.add(TCMP(encoding=3, text="1"))
         if album_title:
             audio.delall("TALB"); audio.add(TALB(encoding=3, text=album_title))
         audio.delall("TIT2"); audio.add(TIT2(encoding=3, text=title))
