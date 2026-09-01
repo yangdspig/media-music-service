@@ -2,7 +2,7 @@
 import httpx
 import pytest
 
-from app import netease_meta
+from app import netease_meta, qq_meta
 from app.schemas import AlbumInfo
 
 
@@ -71,3 +71,68 @@ def test_netease_get_album_blocked(monkeypatch):
     monkeypatch.setattr(httpx, "get", lambda *a, **kw: FakeResp({"code": -462, "data": {}, "message": "blocked"}))
     with pytest.raises(LookupError):
         netease_meta.get_album("18905")
+
+
+QQ_SEARCH_RESP = {"code": 0, "data": {"album": {"list": [
+    {"albumID": 8217, "albumMID": "000I5jJB3blWeN", "albumName": "范特西",
+     "singerName": "周杰伦", "publicTime": "2001-09-14", "song_count": 10},
+]}}}
+
+QQ_DETAIL_RESP = {"code": 0, "req_1": {"code": 0, "data": {
+    "basicInfo": {"albumMid": "000I5jJB3blWeN", "albumName": "范特西",
+                  "publishDate": "2001-09-14", "desc": "周杰伦第二张专辑"},
+    "singer": {"singerList": [{"name": "周杰伦"}]},
+    "company": {"name": "杰威尔音乐有限公司"},
+}}}
+
+QQ_SONGLIST_RESP = {"code": 0, "req_1": {"code": 0, "data": {
+    "totalNum": 2,
+    "songList": [
+        {"songInfo": {"title": "简单爱", "interval": 270, "index_album": 2, "singer": [{"name": "周杰伦"}]}},
+        {"songInfo": {"title": "爱在西元前", "interval": 234, "index_album": 1, "singer": [{"name": "周杰伦"}]}},
+    ],
+}}}
+
+
+def _qq_fake_post(url, json=None, **kw):
+    module = (json or {}).get("req_1", {}).get("module", "")
+    if module.endswith("AlbumInfoServer"):
+        return FakeResp(QQ_DETAIL_RESP)
+    return FakeResp(QQ_SONGLIST_RESP)
+
+
+def test_qq_search(monkeypatch):
+    monkeypatch.setattr(httpx, "get", lambda *a, **kw: FakeResp(QQ_SEARCH_RESP))
+    out = qq_meta.search_albums("范特西")
+    assert len(out) == 1
+    a = out[0]
+    assert a.collection_id == "qq:000I5jJB3blWeN"
+    assert a.title == "范特西"
+    assert a.artists == ["周杰伦"]
+    assert a.release_date == "2001-09-14"
+    assert a.track_count == 10
+    assert a.cover_url == "https://y.gtimg.cn/music/photo_new/T002R800x800M000000I5jJB3blWeN.jpg"
+    assert a.meta_source == "qq"
+
+
+def test_qq_get_album(monkeypatch):
+    monkeypatch.setattr(httpx, "post", _qq_fake_post)
+    info = qq_meta.get_album("000I5jJB3blWeN")
+    assert info.collection_id == "qq:000I5jJB3blWeN"
+    assert info.title == "范特西"
+    assert info.artists == ["周杰伦"]
+    assert info.release_date == "2001-09-14"
+    assert info.description == "周杰伦第二张专辑"
+    assert info.meta_source == "qq"
+    # 曲目按 index_album 排序，interval 为秒
+    assert [(t.track, t.title, t.disc, t.duration_s) for t in info.tracks] == [
+        (1, "爱在西元前", 1, 234.0),
+        (2, "简单爱", 1, 270.0),
+    ]
+
+
+def test_qq_get_album_not_found(monkeypatch):
+    empty = {"code": 0, "req_1": {"code": 0, "data": {"basicInfo": {}}}}
+    monkeypatch.setattr(httpx, "post", lambda *a, **kw: FakeResp(empty))
+    with pytest.raises(LookupError):
+        qq_meta.get_album("00000000000000")
