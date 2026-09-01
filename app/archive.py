@@ -186,10 +186,11 @@ def _target_relpath(entry: dict, multi_disc: bool) -> str:
 
 
 def _write_album_info(album_dir: Path, album: dict, entries: list[dict],
-                      display_title: str, display_artist: str) -> None:
+                      display_title: str, display_artist: str, compilation: bool = False) -> None:
     """生成 album_info.txt：简介取自 manifest.album.description（网易云/QQ 补充），无则省略简介段。
 
     「iTunes 原名」标注与 storefront 仅在元数据来自 iTunes 系（meta_source 以 itunes 开头）时输出。
+    compilation=True（合集专辑）时艺人行显示「群星（合集）」，曲目表行附逐曲艺人。
     """
     meta_source = album.get("meta_source") or "itunes"
     itunes_based = meta_source.startswith("itunes")
@@ -199,9 +200,11 @@ def _write_album_info(album_dir: Path, album: dict, entries: list[dict],
     if itunes_based and album.get("storefront"):
         source_line += f", storefront {album.get('storefront')}"
     source_line += ")"
+    artist_line = (f"艺人：{_VA_ARTIST}（合集）" if compilation else
+                   f"艺人：{display_artist}" + (f"（iTunes 原名：{orig_artists}）" if itunes_based and orig_artists and orig_artists != display_artist else ""))
     lines = [
         f"专辑：{display_title}" + (f"（iTunes 原名：{orig_title}）" if itunes_based and orig_title != display_title else ""),
-        f"艺人：{display_artist}" + (f"（iTunes 原名：{orig_artists}）" if itunes_based and orig_artists and orig_artists != display_artist else ""),
+        artist_line,
         f"发行日期：{(album.get('release_date') or '')[:10]}",
         f"流派：{album.get('genre') or ''}",
         source_line,
@@ -212,7 +215,10 @@ def _write_album_info(album_dir: Path, album: dict, entries: list[dict],
         dur = e.get("duration_s")
         dur_s = f" ({int(dur // 60)}:{int(dur % 60):02d})" if dur else ""
         prefix = f"CD{e['disc']} " if len({x['disc'] for x in entries}) > 1 else ""
-        lines.append(f"{prefix}{e['track']:02d}. {t2s(e.get('title'))}{dur_s}")
+        va_suffix = ""
+        if compilation and e.get("artists"):
+            va_suffix = " - " + " / ".join(t2s(a) for a in e["artists"] if a)
+        lines.append(f"{prefix}{e['track']:02d}. {t2s(e.get('title'))}{dur_s}{va_suffix}")
     description = (album.get("description") or "").strip()
     if description:
         lines += ["", "简介：", description]
@@ -221,12 +227,15 @@ def _write_album_info(album_dir: Path, album: dict, entries: list[dict],
 
 def archive_album(task_id: str | None = None, manifest_path: str | None = None,
                   overwrite: bool = False, album_title: str | None = None,
-                  artist: str | None = None, library: str | None = None) -> ArchiveResult:
+                  artist: str | None = None, library: str | None = None,
+                  compilation: bool | None = None) -> ArchiveResult:
     """按 manifest 把专辑下载产物归档进媒体库（同步，幂等）。
 
     目录名与 tag 用的专辑名/艺人名按解析链确定：
     显式 album_title/artist 参数 > manifest display_* > 自动推断 > iTunes 原名。
     library 为命名库根（见 libraries 模块），留空用默认库。
+    compilation：合集标记覆盖（None=VA 名单自动判定）；合集归 {库根}/群星/{专辑}/，
+    逐曲艺人写 ARTIST，ALBUMARTIST=群星，COMPILATION=1。
     """
     root = Path(resolve_library_root(library))
     manifest, src_dir = _load_manifest(task_id, manifest_path)
@@ -234,7 +243,9 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None,
     entries = manifest.get("tracks") or []
     ok_entries = [e for e in entries if e.get("status") == "ok" and e.get("file")]
     disp_title, disp_artist = _resolve_names(album, ok_entries, album_title, artist)
-    album_dir = root / _safe_name(disp_artist) / _safe_name(disp_title)
+    is_va = _is_compilation(album, disp_artist, artist, compilation)
+    dir_artist = _VA_ARTIST if is_va else disp_artist
+    album_dir = root / _safe_name(dir_artist) / _safe_name(disp_title)
     multi_disc = len({e["disc"] for e in entries}) > 1
     disc_total = max((e["disc"] for e in entries), default=1)
     cover_bytes: bytes | None = None
@@ -278,9 +289,12 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None,
                     if disc_total > 1:
                         numbers["DISCNUMBER"] = f"{entry['disc']}/{disc_total}"
                         numbers["DISCTOTAL"] = str(disc_total)
-                    _write_tags(target, entry.get("title") or "", disp_artist, disp_title,
+                    track_artist = (" / ".join(t2s(a) for a in entry.get("artists") or [] if a)
+                                    or None) if is_va else None
+                    _write_tags(target, entry.get("title") or "", dir_artist, disp_title,
                                 (album.get("release_date") or "")[:10],
-                                numbers=numbers, cover_bytes=cover_bytes, lyric_text=lyric_text)
+                                numbers=numbers, cover_bytes=cover_bytes, lyric_text=lyric_text,
+                                track_artist=track_artist, compilation=is_va)
                 else:
                     res.action = "tag_unsupported"
         except Exception as e:  # 单曲失败不中断整体
@@ -298,11 +312,13 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None,
                 cd_dir = album_dir / f"CD{d}"
                 if cd_dir.exists():
                     (cd_dir / f"cover{suffix}").write_bytes(cover_bytes)
-    _write_album_info(album_dir, album, entries, disp_title, disp_artist)
+    _write_album_info(album_dir, album, entries, disp_title, dir_artist, compilation=is_va)
     # 艺人头像（幂等）：取首个带头像的成功条目写入艺人目录，已有 artist.* 则跳过
-    img_url = next(((e.get("match") or {}).get("artist_img_url") for e in ok_entries
-                    if (e.get("match") or {}).get("artist_img_url")), None)
-    _save_artist_image(album_dir.parent, img_url)
+    # 合集专辑跳过——「群星」不是具体艺人，不挂头像
+    if not is_va:
+        img_url = next(((e.get("match") or {}).get("artist_img_url") for e in ok_entries
+                        if (e.get("match") or {}).get("artist_img_url")), None)
+        _save_artist_image(album_dir.parent, img_url)
 
     status, summary, errors = _summarize(results)
     # singles 复用迁移：成功入库后删除 singles 源文件与同名 .lrc，并清理空艺人目录

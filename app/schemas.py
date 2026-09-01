@@ -102,6 +102,7 @@ class ArchiveRequest(BaseModel):
     album_title: Optional[str] = Field(default=None, description="显示用专辑名覆盖（最高优先级，影响目录名与 ALBUM tag）")
     artist: Optional[str] = Field(default=None, description="显示用艺人名覆盖（最高优先级，影响目录名与 ARTIST tag）")
     library: Optional[str] = Field(default=None, description="目标库名（命名库根，见 GET /api/v1/libraries）；留空用默认库")
+    compilation: Optional[bool] = Field(default=None, description="合集（Various Artists）标记：None 按 VA 名单自动判定，True/False 强制走/不走合集归档（目录 {库根}/群星/，逐曲艺人写 ARTIST，COMPILATION=1）")
 
 
 class TrackArchiveRequest(BaseModel):

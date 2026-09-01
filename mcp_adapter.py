@@ -239,7 +239,7 @@ def download_album(collection_id: str, sources: str | None = None, subdir: str |
 @mcp.tool()
 def archive_album(task_id: str | None = None, manifest_path: str | None = None, overwrite: bool = False,
                   album_title: str | None = None, artist: str | None = None,
-                  library: str | None = None) -> dict:
+                  library: str | None = None, compilation: bool | None = None) -> dict:
     """把专辑下载产物归档进媒体库（同步）：硬链接/复制入库、写 tag、嵌封面歌词、生成 album_info.txt。
 
     目录名与 tag 的专辑名/艺人名按解析链确定：显式参数 > manifest display_*
@@ -252,9 +252,12 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None, 
         album_title: 显示用专辑名覆盖（可选，最高优先级；自动推断仍不对时用它兜底）
         artist: 显示用艺人名覆盖（可选，最高优先级）
         library: 目标库名（可选，见 list_libraries；留空用默认库）
+        compilation: 合集标记覆盖（可选；None=按 VA 名单自动判定，合集归 {库根}/群星/{专辑}/，
+            逐曲艺人写 ARTIST、COMPILATION=1，Navidrome 按合集分组）
     Returns:
         归档结果：library_dir（库内专辑目录）、逐曲 action（linked/copied/skipped/failed）、
-        summary 计数、errors。目录结构为 {库根}/{艺人}/{专辑}/，多 Disc 用 CD1/CD2 子目录。
+        summary 计数、errors。目录结构为 {库根}/{艺人}/{专辑}/（合集为 {库根}/群星/{专辑}/），
+        多 Disc 用 CD1/CD2 子目录。
     """
     payload: dict[str, Any] = {"overwrite": overwrite}
     if task_id:
@@ -267,6 +270,8 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None, 
         payload["artist"] = artist
     if library:
         payload["library"] = library
+    if compilation is not None:
+        payload["compilation"] = compilation
     with _client() as c:
         r = c.post("/api/v1/albums/archive", json=payload)
         r.raise_for_status()

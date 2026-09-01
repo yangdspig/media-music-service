@@ -92,7 +92,8 @@ def api_album_archive(req: ArchiveRequest) -> ArchiveResult:
     try:
         return archive_svc.archive_album(task_id=req.task_id, manifest_path=req.manifest_path,
                                          overwrite=req.overwrite, album_title=req.album_title,
-                                         artist=req.artist, library=req.library)
+                                         artist=req.artist, library=req.library,
+                                         compilation=req.compilation)
     except (ValueError, LookupError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
