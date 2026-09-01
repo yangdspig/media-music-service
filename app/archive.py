@@ -155,15 +155,24 @@ def _target_relpath(entry: dict, multi_disc: bool) -> str:
 
 def _write_album_info(album_dir: Path, album: dict, entries: list[dict],
                       display_title: str, display_artist: str) -> None:
-    """生成 album_info.txt（简介暂缺：iTunes 无此字段，待网易云/QQ 源补充）。"""
+    """生成 album_info.txt：简介取自 manifest.album.description（网易云/QQ 补充），无则省略简介段。
+
+    「iTunes 原名」标注与 storefront 仅在元数据来自 iTunes 系（meta_source 以 itunes 开头）时输出。
+    """
+    meta_source = album.get("meta_source") or "itunes"
+    itunes_based = meta_source.startswith("itunes")
     orig_title = album.get("title") or ""
     orig_artists = " / ".join(album.get("artists") or [])
+    source_line = f"元数据来源：{meta_source} (collection {album.get('collection_id')}"
+    if itunes_based and album.get("storefront"):
+        source_line += f", storefront {album.get('storefront')}"
+    source_line += ")"
     lines = [
-        f"专辑：{display_title}" + (f"（iTunes 原名：{orig_title}）" if orig_title != display_title else ""),
-        f"艺人：{display_artist}" + (f"（iTunes 原名：{orig_artists}）" if orig_artists and orig_artists != display_artist else ""),
+        f"专辑：{display_title}" + (f"（iTunes 原名：{orig_title}）" if itunes_based and orig_title != display_title else ""),
+        f"艺人：{display_artist}" + (f"（iTunes 原名：{orig_artists}）" if itunes_based and orig_artists and orig_artists != display_artist else ""),
         f"发行日期：{(album.get('release_date') or '')[:10]}",
         f"流派：{album.get('genre') or ''}",
-        f"元数据来源：iTunes (collection {album.get('collection_id')}, storefront {album.get('storefront')})",
+        source_line,
         "",
         "曲目表：",
     ]
@@ -172,7 +181,9 @@ def _write_album_info(album_dir: Path, album: dict, entries: list[dict],
         dur_s = f" ({int(dur // 60)}:{int(dur % 60):02d})" if dur else ""
         prefix = f"CD{e['disc']} " if len({x['disc'] for x in entries}) > 1 else ""
         lines.append(f"{prefix}{e['track']:02d}. {t2s(e.get('title'))}{dur_s}")
-    lines += ["", "（专辑简介暂缺：iTunes 不提供简介字段，待后续网易云/QQ 元数据补充）"]
+    description = (album.get("description") or "").strip()
+    if description:
+        lines += ["", "简介：", description]
     (album_dir / "album_info.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 

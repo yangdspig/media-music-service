@@ -277,3 +277,31 @@ def test_album_dict_keeps_real_meta_source():
     src = inspect.getsource(album_mod._run_album)
     assert '"meta_source": "itunes"' not in src
     assert 'album.model_dump(exclude={"tracks"})' in src
+
+
+def test_write_album_info_with_description(tmp_path):
+    from app.archive import _write_album_info
+    album = {"title": "叶惠美", "artists": ["周杰伦"], "release_date": "2003-07-31",
+             "genre": "Pop", "meta_source": "itunes+netease", "collection_id": "12345",
+             "storefront": "CN", "description": "专辑简介文本"}
+    entries = [{"disc": 1, "track": 1, "title": "以父之名", "duration_s": 342.0}]
+    _write_album_info(tmp_path, album, entries, "叶惠美", "周杰伦")
+    text = (tmp_path / "album_info.txt").read_text(encoding="utf-8")
+    assert "简介：" in text
+    assert "专辑简介文本" in text
+    assert "简介暂缺" not in text
+    assert "元数据来源：itunes+netease" in text
+
+
+def test_write_album_info_cn_source_no_itunes_annotation(tmp_path):
+    from app.archive import _write_album_info
+    # 纯中文源专辑：不出现「iTunes 原名」标注与 storefront；无简介时不写占位行
+    album = {"title": "范特西", "artists": ["周杰伦"], "release_date": "2001-09-14",
+             "genre": None, "meta_source": "qq", "collection_id": "qq:000I5jJB3blWeN"}
+    entries = [{"disc": 1, "track": 1, "title": "爱在西元前", "duration_s": None}]
+    _write_album_info(tmp_path, album, entries, "范特西", "周杰伦")
+    text = (tmp_path / "album_info.txt").read_text(encoding="utf-8")
+    assert "iTunes 原名" not in text
+    assert "storefront" not in text
+    assert "简介暂缺" not in text
+    assert "元数据来源：qq" in text
