@@ -23,6 +23,8 @@ def _startup() -> None:
     storage.init_db()
     from .cleanup import start_periodic_sweep
     start_periodic_sweep()  # 下载目录定期容量清理（按 config.yaml cleanup 段）
+    from . import qqauth
+    qqauth.start_keepalive()  # QQ 音乐登录态自动保活（按 config.yaml auth_refresh 段）
 
 
 async def auth(x_api_key: str | None = Header(default=None)) -> None:
@@ -185,3 +187,10 @@ def api_list(limit: int = 20) -> list[dict]:
 @app.get("/api/v1/history", dependencies=[Depends(auth)])
 def api_history(limit: int = 50) -> list[dict]:
     return storage.list_history(limit)
+
+
+@app.post("/api/v1/auth/qq/refresh", dependencies=[Depends(auth)])
+def api_qq_auth_refresh() -> dict:
+    """手动触发一次 QQ 凭证刷新（强制，不看剩余有效期）。"""
+    from . import qqauth
+    return qqauth.keepalive_once(force=True)

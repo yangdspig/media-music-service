@@ -297,3 +297,21 @@ def keepalive_once(force: bool = False) -> dict:
     _save_state(new_cred, config_createtime, expired=False)
     logger.info("QQ 凭证刷新成功，musickey 有效期 %ds", new_cred.key_expires_in)
     return {"status": "refreshed", "key_expires_in": new_cred.key_expires_in}
+
+
+# ---- 周期任务 ----
+
+def _keepalive_loop() -> None:
+    while True:
+        time.sleep(settings.auth_refresh.interval_s)
+        try:
+            keepalive_once()
+        except Exception:
+            logger.exception("QQ 凭证保活周期任务异常")
+
+
+def start_keepalive() -> None:
+    """服务启动时调用：按配置开启 QQ 凭证保活后台线程。"""
+    if not settings.auth_refresh.enabled:
+        return
+    threading.Thread(target=_keepalive_loop, daemon=True, name="qq-auth-keepalive").start()

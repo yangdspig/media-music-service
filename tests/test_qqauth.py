@@ -292,3 +292,17 @@ def test_list_sources_keepalive_note(state_dir, monkeypatch):
     entry = next(s for s in registry.list_sources() if s["name"] == "QQMusicClient")
     assert entry["available"] is True
     assert "自动保活" in entry["note"]
+
+
+# ---- REST 手动触发 ----
+
+def test_manual_refresh_endpoint(state_dir, monkeypatch):
+    _seed_config(monkeypatch)
+    monkeypatch.setattr(qqauth, "keepalive_once",
+                        lambda force=False: {"status": "refreshed", "forced": force})
+    from fastapi.testclient import TestClient
+    from app.main import app
+    resp = TestClient(app).post("/api/v1/auth/qq/refresh")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "refreshed"
+    assert resp.json()["forced"] is True
