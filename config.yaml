@@ -68,6 +68,14 @@ default_sources:
 #     quark_cookies: "你的夸克网盘cookies"
 sources: {}
 
+# QQ 音乐登录态自动保活：musickey 有效期仅 3 天，剩余 <24h 时自动调用官方刷新接口续期
+# 刷新产物（含新 refresh_key）持久化在 db_path 同目录的 qq_auth_state.json，不回写本文件；
+# 重新粘贴 cookies 后自动以新 cookies 为种子重置。凭证彻底失效（access_token 约 60 天）时
+# QQ 源标记不可用并在 /api/v1/sources 提示重新粘贴
+auth_refresh:
+  enabled: true        # 总开关
+  interval_s: 3600     # 检查周期（秒），默认 1 小时
+
 # MCP 适配器配置（仅供 mcp_adapter.py 读取，核心服务忽略本段）
 # 优先级：环境变量（MUSIC_MCP_TRANSPORT/MUSIC_MCP_HOST/MUSIC_MCP_PORT/MUSIC_SERVICE_URL）> 本配置 > 默认值
 # 鉴权复用顶层 api_key 项，MCP 侧无需单独配置

@@ -141,6 +141,8 @@
 
 **响应 200**：`SourceInfo[]`
 
+> QQ 音乐源（QQMusicClient）配置 cookies 后，`note` 会展示自动保活状态（如"自动保活中，musickey 有效期至 ..."）；凭证彻底失效时 `available=false` 且 note 提示重新粘贴 cookies。
+
 ---
 
 ### GET /api/v1/search
@@ -226,6 +228,20 @@
 ### GET /api/v1/history
 
 历史任务记录（SQLite 持久化）。参数：`limit`（默认 50）。
+
+---
+
+### POST /api/v1/auth/qq/refresh
+
+手动强制刷新 QQ 音乐登录凭证（自动保活见 config.yaml `auth_refresh` 段，默认每 1h 检查、musickey 剩余 <24h 时自动刷新）。
+
+**响应 200**：`{"status": "refreshed"|"fresh"|"skipped"|"expired"|"failed", ...}`
+
+- `refreshed`：刷新成功，新凭证已持久化（`data/qq_auth_state.json`），后续请求自动使用
+- `fresh`：剩余有效期充足，未刷新（自动模式下常见；本端点强制刷新不会出现）
+- `skipped`：未配置 QQ cookies
+- `expired`：凭证彻底失效（code 1000/104401/104400），需重新粘贴 cookies 到 config.yaml
+- `failed`：网络或未知错误，自动模式下周期间隔重试
 
 ---
 

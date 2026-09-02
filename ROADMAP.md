@@ -54,6 +54,11 @@
    - 已实现：VA 名单（various artists/va/群星/华语群星/合辑）自动判定 + `compilation` 显式覆盖参数（REST + MCP）；合集归档到 `{库根}/群星/{专辑}/`，逐曲艺人写 ARTIST、ALBUMARTIST=群星、COMPILATION=1（FLAC/MP3-TCMP，Navidrome 按合集分组），不写艺人头像，`album_info.txt` 曲目表附逐曲艺人；`replace_album_track` 顺带修正为沿用旧文件 ARTIST/ALBUMARTIST/COMPILATION（与其 docstring 对齐）
    - 兼容性：老 manifest 重跑 overwrite 归档即迁入群星目录；显式 artist 参数优先于名单判定
 
+2g. **QQ 音乐 cookie 自动保活** ✅ 已完成（2026-09-02）
+   - 背景：QQ 源 musickey 有效期仅 3 天（keyExpiresIn=259200），过期后 VIP/无损解析失败，需反复手动粘贴 cookies
+   - 已实现：`app/qqauth.py` 调官方刷新接口（music.login.LoginServer/Login，ANDROID 协议栈，复用 musicdl 的 Device/QIMEI/GetSession）自动续期；每 1h 检查（`auth_refresh.interval_s`）、剩余 <24h 刷新；刷新产物（含服务端下发的 refresh_key）持久化 `data/qq_auth_state.json`，优先级高于 config.yaml 且不回写配置，重新粘贴 cookies 自动重置种子；设备指纹/QIMEI 持久化复用（换新设备会触发 20279 设备数超限，实测）；彻底失效（code 1000/104401/104400，access_token 约 60 天）时 QQ 源标记不可用并在 `/api/v1/sources` 提示；`POST /api/v1/auth/qq/refresh` 手动强制刷新
+   - 关键坑：刷新接口的 `expired_in`/`musicid` 必须传 int，str 会被拒为 10006
+
 3. **MoviePilot 薄客户端插件**
    - 目标：在 MoviePilot 内完成"搜索 → 勾选 → 下载 → 入库整理"闭环
    - 要点：继承 `_PluginBase`，只做表单与 REST 调用，不直接依赖 musicdl
