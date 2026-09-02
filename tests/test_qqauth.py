@@ -306,3 +306,42 @@ def test_manual_refresh_endpoint(state_dir, monkeypatch):
     assert resp.status_code == 200
     assert resp.json()["status"] == "refreshed"
     assert resp.json()["forced"] is True
+
+
+# ---- 设备上下文持久化（防 20279 设备数超限） ----
+
+def test_keepalive_persists_device_context(state_dir, monkeypatch, mock_net):
+    _seed_config(monkeypatch)
+    monkeypatch.setattr(time, "time", lambda: 1788258930 + 259200 - 3600.0)
+    _, responder = mock_net
+    responder["post"].extend([{"req_0": {"code": 0, "data": {"session": {"uid": 1, "sid": "s"}}}},
+                              _refresh_ok_payload()])
+    responder["get"].append({"code": 0})
+    assert qqauth.keepalive_once()["status"] == "refreshed"
+    state = json.loads(qqauth._state_path().read_text())
+    assert state["device"]["guid"] == "guid32hex"
+    assert state["device"]["qimei"] == {"q16": "q16v", "q36": "q36v"}
+
+
+def test_device_context_reused_from_state(state_dir, monkeypatch):
+    _seed_config(monkeypatch)
+    qqauth._save_state(qqauth.QQCredential(), config_createtime="1788258930", expired=False,
+                       device={"aid": "aid_saved", "phonetype": "MI 6", "rom": "rom_saved",
+                               "os_ver": "10", "devicelevel": "29", "guid": "guid_saved",
+                               "qimei": {"q16": "q16_saved", "q36": "q36_saved"}})
+    # 已有持久化设备时不得再调 obtainqimei（会产生新设备）
+    monkeypatch.setattr(qqauth.QQMusicClientUtils, "obtainqimei",
+                        lambda *a: pytest.fail("不应重新获取 QIMEI"))
+    device, guid, qimei = qqauth._device_context()
+    assert guid == "guid_saved"
+    assert qimei["q36"] == "q36_saved"
+    assert device.android_id == "aid_saved"
+    assert device.version.release == "10" and device.version.sdk == 29
+
+
+def test_device_context_created_when_no_state(state_dir, monkeypatch):
+    _seed_config(monkeypatch)
+    monkeypatch.setattr(qqauth.QQMusicClientUtils, "obtainqimei",
+                        lambda *a: {"q16": "new_q16", "q36": "new_q36"})
+    device, guid, qimei = qqauth._device_context()
+    assert qimei["q36"] == "new_q36" and len(guid) == 32

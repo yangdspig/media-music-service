@@ -15,6 +15,7 @@ QQ 音乐源（QQMusicClient）依赖用户在 config.yaml 手动粘贴的登录
 - 设备/QIMEI/session 均可用 musicdl 内置工具生成：`Device()` / `QQMusicClientUtils.obtainqimei` / `randomguid`，session 用 `music.getSession.session/GetSession` 获取（uid/sid，24h 内可复用）
 - 响应下发新 `musickey`、`refresh_key`（浏览器 cookie 里没有，必须持久化）、`refresh_token`、`access_token`、`expired_at`、`keyExpiresIn`
 - 空 `refresh_key` 可以刷新成功；后续刷新优先使用服务端下发的 `refresh_key`
+- **设备指纹/QIMEI/guid 必须持久化复用**：每次刷新换新设备会向账号注册新设备，累积触发 `code=20279`（登录设备数超限，实测复现并验证复用旧设备可恢复）
 - access_token 有效期约 60 天，它彻底失效后刷新会失败，需要用户重新粘贴 cookies
 
 过期检测（已实测）：GET `https://c6.y.qq.com/rsc/fcgi-bin/fcg_get_profile_homepage.fcg`，`g_tk=hash33(musickey, 5381)`，code==0 即有效。
@@ -40,7 +41,7 @@ QQ 音乐源（QQMusicClient）依赖用户在 config.yaml 手动粘贴的登录
 - `check_expired(cred) -> bool | None`：WEB profile 接口检测；None 表示网络失败
 - `refresh(cred) -> QQCredential`：ANDROID 协议栈刷新（Device→QIMEI→GetSession→Login），失败抛 `QQAuthRefreshError`（含服务端 code）
 - 状态文件 `data/qq_auth_state.json`：
-  - 内容：完整凭证字段（含 `refresh_key`）、`refreshed_at`、`key_expires_in`、`config_createtime`（播种时 config 里 `psrf_musickey_createtime` 的值）
+  - 内容：完整凭证字段（含 `refresh_key`）、`refreshed_at`、`key_expires_in`、`config_createtime`（播种时 config 里 `psrf_musickey_createtime` 的值）、`device`（持久化的设备指纹/QIMEI/guid，刷新时复用）
   - 优先级：**状态文件 > config.yaml**；config 仅作种子
   - 种子重置：config 的 `psrf_musickey_createtime` ≠ 状态文件的 `config_createtime`（说明用户重新粘贴了 cookies）→ 丢弃状态，以 config 重新播种。不能用 refresh_token 做判定（刷新可能轮换它，而刷新不回写 config，会误判）
 - 刷新后的 `musickey_createtime`：取响应的 `musickeyCreateTime`，缺省用当前时间

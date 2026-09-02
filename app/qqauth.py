@@ -16,7 +16,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import requests
-from musicdl.modules.utils.qqutils import Device, QQMusicClientUtils
+from musicdl.modules.utils.qqutils import Device, OSVersion, QQMusicClientUtils
 
 from .config import settings
 
@@ -124,9 +124,15 @@ def _load_state() -> dict | None:
         return None
 
 
-def _save_state(cred: QQCredential, config_createtime: str, expired: bool) -> None:
+def _save_state(cred: QQCredential, config_createtime: str, expired: bool,
+                device: dict | None = None) -> None:
     payload = {"credential": asdict(cred), "refreshed_at": int(time.time()),
                "config_createtime": config_createtime, "expired": expired}
+    # 设备上下文持久化：未显式传入时沿用旧状态的（避免每次刷新注册新设备 → 20279 设备数超限）
+    old = _load_state() or {}
+    device = device or old.get("device")
+    if device:
+        payload["device"] = device
     p = _state_path()
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -199,11 +205,28 @@ def _get(url: str, params: dict, cookies: dict) -> dict:
 
 
 def _device_context():
-    """生成一次性设备上下文：设备指纹 + guid + QIMEI（复用 musicdl 实现）。"""
+    """设备上下文：优先复用状态文件中已持久化的，否则新建（设备指纹/QIMEI/guid）。
+
+    每次刷新都换新设备会触发服务端设备数超限（code=20279），必须持久化复用。
+    """
+    dev = (_load_state() or {}).get("device")
+    if dev:
+        device = Device()
+        device.android_id = dev["aid"]
+        device.model = dev["phonetype"]
+        device.fingerprint = dev["rom"]
+        device.version = OSVersion(release=dev["os_ver"], sdk=_int(dev["devicelevel"], 29))
+        return device, dev["guid"], dev["qimei"]
     device = Device()
     guid = QQMusicClientUtils.randomguid()
     qimei = QQMusicClientUtils.obtainqimei(_APP_VERSION, device)
     return device, guid, qimei
+
+
+def _serialize_device(device: Device, guid: str, qimei: dict) -> dict:
+    return {"aid": device.android_id, "phonetype": device.model, "rom": device.fingerprint,
+            "os_ver": device.version.release, "devicelevel": str(device.version.sdk),
+            "guid": guid, "qimei": qimei}
 
 
 def check_expired(cred: QQCredential) -> bool | None:
@@ -222,9 +245,12 @@ def check_expired(cred: QQCredential) -> bool | None:
         return None
 
 
-def refresh(cred: QQCredential) -> QQCredential:
-    """ANDROID 协议栈刷新 musickey。彻底失效抛 QQAuthExpiredError，其余失败抛 QQAuthRefreshError。"""
-    device, guid, qimei = _device_context()
+def refresh(cred: QQCredential, ctx=None) -> QQCredential:
+    """ANDROID 协议栈刷新 musickey。彻底失效抛 QQAuthExpiredError，其余失败抛 QQAuthRefreshError。
+
+    ctx 为 (device, guid, qimei)，由调用方传入以便持久化；缺省自行生成。
+    """
+    device, guid, qimei = ctx or _device_context()
     ua = f"QQMusic {_APP_CV}(android {device.version.release})"
     comm = {"ct": 11, "cv": _APP_CV, "v": _APP_CV, "tmeAppID": "qqmusic", "chid": "10003505",
             "qq": str(cred.musicid), "authst": cred.musickey, "tmeLoginType": cred.login_type,
@@ -282,8 +308,9 @@ def keepalive_once(force: bool = False) -> dict:
     if not force and remaining >= _REFRESH_THRESHOLD_S:
         return {"status": "fresh", "remaining_s": remaining}
     config_createtime = str(_int(config.get("psrf_musickey_createtime")))
+    ctx = _device_context()
     try:
-        new_cred = refresh(cred)
+        new_cred = refresh(cred, ctx)
     except QQAuthExpiredError as e:
         _save_state(cred, config_createtime, expired=True)
         logger.error("QQ 凭证彻底失效（code=%s），需重新粘贴 cookies", e.code)
@@ -294,7 +321,7 @@ def keepalive_once(force: bool = False) -> dict:
     if check_expired(new_cred) is not False:
         logger.error("QQ 凭证刷新后复核不通过，保留旧凭证")
         return {"status": "failed", "error": "刷新后复核不通过"}
-    _save_state(new_cred, config_createtime, expired=False)
+    _save_state(new_cred, config_createtime, expired=False, device=_serialize_device(*ctx))
     logger.info("QQ 凭证刷新成功，musickey 有效期 %ds", new_cred.key_expires_in)
     return {"status": "refreshed", "key_expires_in": new_cred.key_expires_in}
 
