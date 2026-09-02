@@ -53,6 +53,12 @@ class CleanupConfig(BaseModel):
     keep_hours: float = 24  # 近 N 小时的任务目录保护期（不删）
 
 
+class AuthRefreshConfig(BaseModel):
+    """QQ 音乐登录态自动保活。状态文件写 db_path 同目录的 qq_auth_state.json。"""
+    enabled: bool = True  # 总开关
+    interval_s: int = 3600  # 检查周期（秒），默认 1 小时；剩余有效期 <24h 才实际刷新
+
+
 class Settings(BaseModel):
     host: str = "0.0.0.0"
     port: int = 8765
@@ -72,6 +78,7 @@ class Settings(BaseModel):
     sources: dict[str, SourceConfig] = {}
     mcp: MCPConfig = MCPConfig()  # MCP 适配器配置（仅 mcp_adapter.py 读取，核心服务不使用）
     cleanup: CleanupConfig = CleanupConfig()  # 下载目录清理规则
+    auth_refresh: AuthRefreshConfig = AuthRefreshConfig()  # QQ cookie 自动保活
 
 
 def _load_yaml(path: Path) -> dict:

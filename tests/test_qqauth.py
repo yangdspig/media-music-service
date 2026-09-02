@@ -251,3 +251,44 @@ def test_keepalive_refresh_check_failed_keeps_old(state_dir, monkeypatch, mock_n
     responder["get"].append({"code": 7})  # 复核：新 key 无效
     assert qqauth.keepalive_once()["status"] == "failed"
     assert qqauth.effective_cookies() is None
+
+
+# ---- registry 集成 ----
+
+def test_registry_uses_state_cookies(state_dir, monkeypatch):
+    _seed_config(monkeypatch)
+    qqauth._save_state(qqauth.QQCredential(musicid=417195563, musickey="Q_H_L_new",
+                                           musickey_createtime=1788300000),
+                       config_createtime="1788258930", expired=False)
+    from app import registry
+    init_cfg = registry._build_init_cfg()
+    qq_cfg = init_cfg["QQMusicClient"]
+    assert "Q_H_L_new" in qq_cfg["default_search_cookies"]
+    assert "Q_H_L_new" in qq_cfg["default_download_cookies"]
+
+
+def test_registry_falls_back_to_config_without_state(state_dir, monkeypatch):
+    _seed_config(monkeypatch)
+    from app import registry
+    init_cfg = registry._build_init_cfg()
+    assert "Q_H_L_old" in init_cfg["QQMusicClient"]["default_search_cookies"]
+
+
+def test_list_sources_expired_marks_unavailable(state_dir, monkeypatch):
+    _seed_config(monkeypatch)
+    qqauth._save_state(qqauth.QQCredential(), config_createtime="1788258930", expired=True)
+    from app import registry
+    entry = next(s for s in registry.list_sources() if s["name"] == "QQMusicClient")
+    assert entry["available"] is False
+    assert "重新粘贴" in entry["note"]
+
+
+def test_list_sources_keepalive_note(state_dir, monkeypatch):
+    _seed_config(monkeypatch)
+    qqauth._save_state(qqauth.QQCredential(musicid=1, musickey="k", musickey_createtime=1788300000,
+                                           key_expires_in=259200),
+                       config_createtime="1788258930", expired=False)
+    from app import registry
+    entry = next(s for s in registry.list_sources() if s["name"] == "QQMusicClient")
+    assert entry["available"] is True
+    assert "自动保活" in entry["note"]

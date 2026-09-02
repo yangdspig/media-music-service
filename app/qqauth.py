@@ -165,6 +165,21 @@ def state_is_expired() -> bool:
                 and _state_matches_config(state, config))
 
 
+def effective_credential_expiry() -> int | None:
+    """当前有效凭证的 musickey 到期时间戳；无凭证/无创建时间返回 None。"""
+    config = _config_cookies()
+    if config is None:
+        return None
+    state = _load_state()
+    if state and not state.get("expired") and _state_matches_config(state, config):
+        cred = QQCredential(**state["credential"])
+    else:
+        cred = parse_credential(config)
+    if not cred.musickey_createtime:
+        return None
+    return cred.musickey_createtime + (cred.key_expires_in or _DEFAULT_KEY_EXPIRES_IN)
+
+
 # ---- 网络层（单独成函数便于测试 monkeypatch） ----
 
 def _post(payload: dict, ua: str) -> dict:

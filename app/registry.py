@@ -7,11 +7,13 @@
 """
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from musicdl.modules import MusicClientBuilder
 from musicdl import musicdl as musicdl_pkg
 
+from . import qqauth
 from .config import settings
 
 # ---- 静态元数据（基于 musicdl v2.13.4 官方文档口径） ----
@@ -62,6 +64,14 @@ def list_sources() -> list[dict[str, Any]]:
             available, note = False, "需要登录 cookies，未配置"
         elif needs_qk and not (cfg and cfg.quark_cookies):
             available, note = False, "无损音质需夸克网盘 cookies，未配置"
+        if name == qqauth.QQ_SOURCE and cfg and (cfg.search_cookies or cfg.download_cookies):
+            if qqauth.state_is_expired():
+                available, note = False, "登录凭证已失效且自动刷新失败，需重新粘贴 cookies"
+            elif settings.auth_refresh.enabled:
+                expiry = qqauth.effective_credential_expiry()
+                if expiry:
+                    note = time.strftime("自动保活中，musickey 有效期至 %Y-%m-%d %H:%M",
+                                         time.localtime(expiry))
         out.append({
             "name": name,
             "category": _CATEGORY_MAP.get(name, "thirdparty"),
@@ -88,6 +98,12 @@ def _build_init_cfg() -> dict[str, Any]:
             c["default_parse_cookies"] = cfg.parse_cookies
         if cfg.quark_cookies:
             c["quark_parser_config"] = {"cookies": cfg.quark_cookies}
+        if name == qqauth.QQ_SOURCE:
+            eff = qqauth.effective_cookies()
+            if eff:
+                merged = "; ".join(f"{k}={v}" for k, v in eff.items())
+                c["default_search_cookies"] = merged
+                c["default_download_cookies"] = merged
         c.update(cfg.extra or {})
         if c:
             init_cfg[name] = c
