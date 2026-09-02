@@ -163,3 +163,122 @@ def state_is_expired() -> bool:
     state = _load_state()
     return bool(config is not None and state and state.get("expired")
                 and _state_matches_config(state, config))
+
+
+# ---- 网络层（单独成函数便于测试 monkeypatch） ----
+
+def _post(payload: dict, ua: str) -> dict:
+    r = requests.post(_ENDPOINT, json=payload, headers={"User-Agent": ua}, timeout=15)
+    r.raise_for_status()
+    return r.json()
+
+
+def _get(url: str, params: dict, cookies: dict) -> dict:
+    r = requests.get(url, params=params, cookies=cookies,
+                     headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                            "Chrome/148.0.0.0 Safari/537.36",
+                              "Referer": "https://y.qq.com/"}, timeout=15)
+    r.raise_for_status()
+    return r.json()
+
+
+def _device_context():
+    """生成一次性设备上下文：设备指纹 + guid + QIMEI（复用 musicdl 实现）。"""
+    device = Device()
+    guid = QQMusicClientUtils.randomguid()
+    qimei = QQMusicClientUtils.obtainqimei(_APP_VERSION, device)
+    return device, guid, qimei
+
+
+def check_expired(cred: QQCredential) -> bool | None:
+    """WEB 端 profile 接口检测 musickey 有效性；None 表示检测请求本身失败。"""
+    params = {"g_tk": str(QQMusicClientUtils.hash33(cred.musickey, 5381)),
+              "format": "json", "inCharset": "utf-8", "outCharset": "utf-8",
+              "notice": "0", "cid": "205360838", "needNewCode": "0",
+              "loginUin": str(cred.musicid), "hostUin": "0",
+              "userid": str(cred.musicid), "reqfrom": "1"}
+    cookies = {"uin": str(cred.musicid), "qqmusic_uin": str(cred.musicid),
+               "qqmusic_key": cred.musickey, "qm_keyst": cred.musickey}
+    try:
+        return _get(_CHECK_URL, params, cookies).get("code") != 0
+    except Exception:
+        logger.warning("QQ 凭证有效性检测请求失败", exc_info=True)
+        return None
+
+
+def refresh(cred: QQCredential) -> QQCredential:
+    """ANDROID 协议栈刷新 musickey。彻底失效抛 QQAuthExpiredError，其余失败抛 QQAuthRefreshError。"""
+    device, guid, qimei = _device_context()
+    ua = f"QQMusic {_APP_CV}(android {device.version.release})"
+    comm = {"ct": 11, "cv": _APP_CV, "v": _APP_CV, "tmeAppID": "qqmusic", "chid": "10003505",
+            "qq": str(cred.musicid), "authst": cred.musickey, "tmeLoginType": cred.login_type,
+            "QIMEI": qimei["q16"], "QIMEI36": qimei["q36"],
+            "OpenUDID": guid, "OpenUDID2": guid, "udid": guid,
+            "aid": device.android_id, "os_ver": device.version.release, "phonetype": device.model,
+            "devicelevel": str(device.version.sdk), "newdevicelevel": str(device.version.sdk),
+            "rom": device.fingerprint}
+    sess = (_post({"comm": comm, "req_0": {"module": "music.getSession.session",
+                                           "method": "GetSession",
+                                           "param": {"uid": "", "vkey": 0, "caller": 0}}}, ua)
+            .get("req_0") or {}).get("data") or {}
+    session = sess.get("session") or {}
+    comm.update(uid=str(session.get("uid", "")), sid=session.get("sid", ""))
+    param = {"openid": cred.openid, "access_token": cred.access_token,
+             "refresh_token": cred.refresh_token, "expired_in": cred.expired_at,  # 必须 int
+             "musicid": cred.musicid, "musickey": cred.musickey,                  # 必须 int
+             "refresh_key": cred.refresh_key, "loginMode": 2}
+    login = _post({"comm": comm, "req_0": {"module": "music.login.LoginServer",
+                                           "method": "Login", "param": param}}, ua).get("req_0") or {}
+    code, data = login.get("code", -1), login.get("data") or {}
+    if code == 0 and data.get("musickey"):
+        return QQCredential(
+            musicid=_int(data.get("musicid"), cred.musicid),
+            musickey=data["musickey"],
+            openid=data.get("openid") or cred.openid,
+            unionid=data.get("unionid") or cred.unionid,
+            access_token=data.get("access_token") or cred.access_token,
+            refresh_token=data.get("refresh_token") or cred.refresh_token,
+            expired_at=_int(data.get("expired_at"), cred.expired_at),
+            refresh_key=data.get("refresh_key") or cred.refresh_key,
+            login_type=cred.login_type,
+            musickey_createtime=_int(data.get("musickeyCreateTime")) or int(time.time()),
+            key_expires_in=_int(data.get("keyExpiresIn"), _DEFAULT_KEY_EXPIRES_IN),
+        )
+    if code in _FATAL_CODES:
+        raise QQAuthExpiredError(code)
+    raise QQAuthRefreshError(code)
+
+
+# ---- 保活决策（周期任务与手动触发共用） ----
+
+def keepalive_once(force: bool = False) -> dict:
+    """单次保活：剩余有效期 <24h（或 force）时刷新；结果落状态文件。"""
+    config = _config_cookies()
+    if config is None:
+        return {"status": "skipped", "reason": "未配置 QQ cookies"}
+    state = _load_state()
+    if state and not state.get("expired") and _state_matches_config(state, config):
+        cred = QQCredential(**state["credential"])
+    else:
+        cred = parse_credential(config)
+    now = int(time.time())
+    remaining = cred.musickey_createtime + (cred.key_expires_in or _DEFAULT_KEY_EXPIRES_IN) - now
+    if not force and remaining >= _REFRESH_THRESHOLD_S:
+        return {"status": "fresh", "remaining_s": remaining}
+    config_createtime = str(_int(config.get("psrf_musickey_createtime")))
+    try:
+        new_cred = refresh(cred)
+    except QQAuthExpiredError as e:
+        _save_state(cred, config_createtime, expired=True)
+        logger.error("QQ 凭证彻底失效（code=%s），需重新粘贴 cookies", e.code)
+        return {"status": "expired", "code": e.code}
+    except Exception as e:
+        logger.warning("QQ 凭证刷新失败，下周期重试: %s", e)
+        return {"status": "failed", "error": str(e)}
+    if check_expired(new_cred) is not False:
+        logger.error("QQ 凭证刷新后复核不通过，保留旧凭证")
+        return {"status": "failed", "error": "刷新后复核不通过"}
+    _save_state(new_cred, config_createtime, expired=False)
+    logger.info("QQ 凭证刷新成功，musickey 有效期 %ds", new_cred.key_expires_in)
+    return {"status": "refreshed", "key_expires_in": new_cred.key_expires_in}

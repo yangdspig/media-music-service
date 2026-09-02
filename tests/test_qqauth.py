@@ -1,6 +1,7 @@
 """QQ 登录态保活单元测试：解析/映射/状态文件（网络全部 mock）。"""
 import json
 import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -112,3 +113,141 @@ def test_corrupt_state_file_falls_back(state_dir, monkeypatch):
     qqauth._state_path().write_text("not json{{{")
     assert qqauth.effective_cookies() is None
     assert qqauth.state_is_expired() is False
+
+
+# ---- 网络层（_post/_get/_device_context 全部 monkeypatch） ----
+
+@pytest.fixture()
+def mock_net(monkeypatch):
+    """拦截网络层，记录调用，返回可编程响应。"""
+    calls = {"post": [], "get": []}
+    responder = {"post": [], "get": []}  # 每次调用弹一个响应
+
+    def fake_post(payload, ua):
+        calls["post"].append(payload)
+        return responder["post"].pop(0)
+
+    def fake_get(url, params, cookies):
+        calls["get"].append((url, params))
+        return responder["get"].pop(0)
+
+    monkeypatch.setattr(qqauth, "_post", fake_post)
+    monkeypatch.setattr(qqauth, "_get", fake_get)
+
+    def fake_device():
+        version = SimpleNamespace(release="10", sdk=29)
+        return SimpleNamespace(version=version, android_id="aid16hex0000abcd",
+                               model="MI 6", fingerprint="xiaomi/iarim/sagit:10/eomam:user/release-keys")
+
+    monkeypatch.setattr(qqauth, "_device_context",
+                        lambda: (fake_device(), "guid32hex", {"q16": "q16v", "q36": "q36v"}))
+    return calls, responder
+
+
+def _refresh_ok_payload():
+    return {"req_0": {"code": 0, "data": {
+        "musickey": "Q_H_L_new", "refresh_key": "rk_new",
+        "refresh_token": "rt_new", "access_token": "at_new",
+        "expired_at": 1793500000, "musicid": 417195563,
+        "musickeyCreateTime": 1788300000, "keyExpiresIn": 259200,
+    }}}
+
+
+def test_check_expired_valid(mock_net):
+    _, responder = mock_net
+    responder["get"].append({"code": 0})
+    assert qqauth.check_expired(qqauth.QQCredential(musicid=1, musickey="k")) is False
+
+
+def test_check_expired_expired(mock_net):
+    _, responder = mock_net
+    responder["get"].append({"code": 7})
+    assert qqauth.check_expired(qqauth.QQCredential(musicid=1, musickey="k")) is True
+
+
+def test_refresh_success_returns_new_credential(mock_net):
+    calls, responder = mock_net
+    responder["post"].extend([{"req_0": {"code": 0, "data": {"session": {"uid": 1, "sid": "s"}}}},
+                              _refresh_ok_payload()])
+    cred = qqauth.QQCredential(musicid=417195563, musickey="Q_H_L_old",
+                               openid="openid123", access_token="at123",
+                               refresh_token="rt123", expired_at=1793442930, login_type=2)
+    new = qqauth.refresh(cred)
+    assert new.musickey == "Q_H_L_new"
+    assert new.refresh_key == "rk_new"            # 服务端下发的新 refresh_key 必须保留
+    assert new.refresh_token == "rt_new"
+    assert new.key_expires_in == 259200
+    assert new.musickey_createtime == 1788300000
+    # 关键回归：expired_in / musicid 必须是 int（str 会被服务端拒为 10006）
+    login_param = calls["post"][1]["req_0"]["param"]
+    assert isinstance(login_param["expired_in"], int)
+    assert isinstance(login_param["musicid"], int)
+    assert login_param["loginMode"] == 2
+
+
+def test_refresh_expired_raises(mock_net):
+    _, responder = mock_net
+    responder["post"].extend([{"req_0": {"code": 0, "data": {"session": {"uid": 1, "sid": "s"}}}},
+                              {"req_0": {"code": 1000, "data": {}}}])
+    with pytest.raises(qqauth.QQAuthExpiredError):
+        qqauth.refresh(qqauth.QQCredential(musicid=1, musickey="k"))
+
+
+def test_refresh_retryable_error(mock_net):
+    _, responder = mock_net
+    responder["post"].extend([{"req_0": {"code": 0, "data": {"session": {"uid": 1, "sid": "s"}}}},
+                              {"req_0": {"code": 10006, "data": {}}}])
+    with pytest.raises(qqauth.QQAuthRefreshError) as exc:
+        qqauth.refresh(qqauth.QQCredential(musicid=1, musickey="k"))
+    assert not isinstance(exc.value, qqauth.QQAuthExpiredError)
+    assert exc.value.code == 10006
+
+
+# ---- keepalive_once 决策 ----
+
+def test_keepalive_skipped_without_cookies(state_dir, monkeypatch):
+    monkeypatch.setattr(settings, "sources", {})
+    assert qqauth.keepalive_once()["status"] == "skipped"
+
+
+def test_keepalive_fresh_no_refresh(state_dir, monkeypatch, mock_net):
+    _seed_config(monkeypatch)  # createtime=1788258930，key_expires_in 未知→默认 3 天
+    monkeypatch.setattr(time, "time", lambda: 1788258930 + 3600.0)  # 刚粘贴 1h，远未到期
+    assert qqauth.keepalive_once()["status"] == "fresh"
+    assert mock_net[0]["post"] == []  # 不应发起任何请求
+
+
+def test_keepalive_refreshes_near_expiry(state_dir, monkeypatch, mock_net):
+    _seed_config(monkeypatch)
+    monkeypatch.setattr(time, "time", lambda: 1788258930 + 259200 - 3600.0)  # 到期前 1h
+    _, responder = mock_net
+    responder["post"].extend([{"req_0": {"code": 0, "data": {"session": {"uid": 1, "sid": "s"}}}},
+                              _refresh_ok_payload()])
+    responder["get"].append({"code": 0})  # 刷新后复核
+    result = qqauth.keepalive_once()
+    assert result["status"] == "refreshed"
+    # 状态文件已写，effective_cookies 返回新 key
+    out = qqauth.effective_cookies()
+    assert out["qqmusic_key"] == "Q_H_L_new" and out["psrf_qqrefresh_token"] == "rt_new"
+
+
+def test_keepalive_expired_marks_state(state_dir, monkeypatch, mock_net):
+    _seed_config(monkeypatch)
+    monkeypatch.setattr(time, "time", lambda: 1788258930 + 259200 - 3600.0)
+    _, responder = mock_net
+    responder["post"].extend([{"req_0": {"code": 0, "data": {"session": {"uid": 1, "sid": "s"}}}},
+                              {"req_0": {"code": 104400, "data": {}}}])
+    assert qqauth.keepalive_once()["status"] == "expired"
+    assert qqauth.state_is_expired() is True
+
+
+def test_keepalive_refresh_check_failed_keeps_old(state_dir, monkeypatch, mock_net):
+    """刷新返回新 key 但复核不通过 → 不落盘，保留旧凭证。"""
+    _seed_config(monkeypatch)
+    monkeypatch.setattr(time, "time", lambda: 1788258930 + 259200 - 3600.0)
+    _, responder = mock_net
+    responder["post"].extend([{"req_0": {"code": 0, "data": {"session": {"uid": 1, "sid": "s"}}}},
+                              _refresh_ok_payload()])
+    responder["get"].append({"code": 7})  # 复核：新 key 无效
+    assert qqauth.keepalive_once()["status"] == "failed"
+    assert qqauth.effective_cookies() is None
