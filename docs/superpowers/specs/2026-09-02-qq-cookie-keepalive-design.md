@@ -52,7 +52,7 @@ QQ 音乐源（QQMusicClient）依赖用户在 config.yaml 手动粘贴的登录
   2. 加载有效凭证（状态文件优先，否则 config 播种）
   3. 本地判断剩余有效期（`musickey_createtime + key_expires_in - now`），**≥ 24h 则不动作**
   4. 剩余 < 24h（或未知）→ 调 `refresh()`：
-     - 成功 → 写状态文件 + 热更新内存中 QQMusicClient 实例的 cookies
+     - 成功 → 写状态文件（build_client 每次操作现建实例，下一请求自动用新 cookies，无需热更新）
      - 失败 code ∈ {1000, 104401, 104400}（凭证彻底失效）→ 标记 QQ 源不可用，note 提示"登录凭证已失效，需重新粘贴 cookies"
      - 其他失败（网络/限流/未知 code）→ 记日志，下个周期重试（1h 周期天然带重试）
 
