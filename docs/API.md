@@ -315,7 +315,7 @@
 
 ### POST /api/v1/albums/archive
 
-把专辑下载产物归档进媒体库（**同步**，秒级返回）。以 `manifest.json` 为输入契约：硬链接（CIFS/跨设备自动回退复制）入库 → 断链后写 tag → 嵌封面/歌词 → 生成 `cover.jpg` 与 `album_info.txt`。
+把专辑下载产物归档进媒体库（**同步**，秒级返回）。以 `manifest.json` 为输入契约：先在下载目录（库外）写好 tag/嵌封面/嵌歌词 → 硬链接（CIFS/跨设备自动回退复制）入库 → 生成 `cover.jpg` 与 `album_info.txt`。
 
 **专辑名/艺人名解析链**（应对 iTunes 罗马音专辑名，如 "Kou Shi Xin Fei"）：显式参数 > manifest 的 `display_title`/`display_artist` > **自动推断** > iTunes 原名（转简体）。自动推断对所有 ok 曲目候选的专辑名/艺人名做多数表决，仅在占比过半、原名不含中文且表决结果含中文时生效（原名已对就不动，防"范特西PLUS"式再版名噪音）。因此**旧 manifest 重跑一次归档即可自动纠正拼音目录名，无需重新下载**。
 
@@ -354,14 +354,14 @@
 
 ```
 {library_root}/{艺人}/{专辑}/
-├── 01 - 曲名.flac          # tag：ARTIST/ALBUMARTIST/ALBUM/TITLE/DATE/TRACKNUMBER n/N/COMMENT，嵌封面歌词
+├── 01 - 曲名.flac          # tag：ARTIST/ALBUMARTIST/ALBUM/TITLE/DATE/TRACKNUMBER（纯数字，总数写 TRACKTOTAL）/COMMENT，嵌封面歌词
+├── 01 - 曲名.lrc           # sidecar 歌词，与音频同目录同名
 ├── cover.jpg               # 多 Disc 时每个 CDx 子目录也有一份
 ├── album_info.txt
-├── lyrics/                 # sidecar .lrc 平铺
-└── CD1/, CD2/ ...          # 仅多 Disc 专辑，内含 NN - 曲名.ext 与 cover.jpg
+└── CD1/, CD2/ ...          # 仅多 Disc 专辑，内含 NN - 曲名.ext（及同名 .lrc）与 cover.jpg
 ```
 
-> 设计约束：归档**不会修改下载目录的源文件**（硬链接文件改 tag 前先断链）；`COMMENT` 统一写为 `archive_comment` 配置值（默认 `yangds整理`），覆盖平台水印；仅 flac/mp3 写 tag，其他格式文件照入库但记 `tag_unsupported`。
+> 设计约束：tag 在入库**之前**写于下载目录（飞牛音乐等 watcher 对已入库文件不再重读 tag，入库后改 tag 会永久失效）；序号写纯数字而非 `n/N`（飞牛音乐不解析 N/M 格式）；`COMMENT` 统一写为 `archive_comment` 配置值（默认 `yangds整理`），覆盖平台水印；仅 flac/mp3 写 tag，其他格式文件照入库但记 `tag_unsupported`。
 
 ---
 
@@ -385,7 +385,7 @@
 
 ### POST /api/v1/library/replace_track
 
-专辑指定曲目重搜替换（**同步**，含一次搜索+下载，耗时数十秒）。在库内专辑目录中定位曲目，沿用专辑匹配打分逻辑重新搜索，新候选音质分档（无损 3 / ≥320k 2 / 其他 1）**高于现有文件**或 `force=true` 时才替换，否则保留原文件。替换后曲目序号/专辑/艺人/日期沿用旧 tag，封面沿用专辑目录 `cover.*`，新下载歌词更新 `lyrics/` 并嵌入 tag；临时下载目录用完即清。
+专辑指定曲目重搜替换（**同步**，含一次搜索+下载，耗时数十秒）。在库内专辑目录中定位曲目，沿用专辑匹配打分逻辑重新搜索，新候选音质分档（无损 3 / ≥320k 2 / 其他 1）**高于现有文件**或 `force=true` 时才替换，否则保留原文件。替换后曲目序号/专辑/艺人/日期沿用旧 tag（旧 `n/N` 序号归一化为纯数字），封面沿用专辑目录 `cover.*`，新下载歌词放音频旁（同目录同名）并嵌入 tag；临时下载目录用完即清。
 
 **请求体**
 

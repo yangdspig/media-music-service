@@ -9,6 +9,8 @@ venv/
 data/
 downloads/
 library/
+singles/
+musicdl_outputs/
 
 # 环境/密钥
 .env

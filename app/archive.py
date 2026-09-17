@@ -1,12 +1,14 @@
 """专辑归档入库：以 manifest.json 为契约，把专辑下载产物整理进媒体库。
 
 设计要点（对应 ROADMAP M4-1 第二期）：
-- 目标结构对齐 music-album-archiver skill 的库约定（Navidrome 兼容）：
+- 目标结构对齐 music-album-archiver skill 的库约定（Navidrome/飞牛音乐兼容）：
   {library_root}/{艺人}/{专辑}/，曲目 `NN - 曲名.ext`；多 Disc 用 CD1/CD2 子目录
   并写 DISCNUMBER/DISCTOTAL tag，每个分碟目录放一份 cover.jpg；
+- 序号类 tag 写纯数字（TRACKNUMBER=3，总数另写 TRACKTOTAL/DISCTOTAL）：
+  飞牛音乐对 "3/13" 这类 N/M 格式会整字段丢弃（实测），Navidrome 两种都认；
+- 先在下载目录（库外）写好 tag 再硬链接/复制入库：飞牛音乐对已入库文件不再
+  重读 tag，入库后原地改 tag 永远不会被重新扫描；
 - 优先硬链接（不占双份空间），CIFS/跨设备失败时回退复制；
-- **改 tag 前必须先断链**（copy + os.replace）：硬链接共享 inode，
-  原地写 tag 会把下载目录的源文件一起改掉（skill 实践教训）；
 - 归档为同步操作（秒级），幂等：目标已存在且未指定 overwrite 时跳过；
 - 输入只看 manifest.json，不解析 musicdl 私有 download_results.pkl。
 """
@@ -76,14 +78,6 @@ def _load_manifest(task_id: str | None, manifest_path: str | None) -> tuple[dict
     if not p.exists():
         raise LookupError(f"manifest 不存在: {path}")
     return json.loads(p.read_text(encoding="utf-8")), p.parent
-
-
-def _break_link_if_needed(path: Path) -> None:
-    """硬链接文件改 tag 前断链：复制副本再原子替换，下载源文件保持不动。"""
-    if os.stat(path).st_nlink > 1:
-        tmp = path.with_name(path.name + ".archtmp")
-        shutil.copy2(path, tmp)
-        os.replace(tmp, path)
 
 
 def _write_tags(path: Path, title: str, artist: str, album_title: str, date: str = "",
@@ -262,40 +256,40 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None,
             if target.exists() and not overwrite:
                 res.action = "skipped"
             else:
+                src = src_dir / entry["file"]
+                ext = target.suffix.lstrip(".").lower()
+                lrc_src = src.with_suffix(".lrc")
+                lyric_text = None
+                if ext in _TAGGABLE_EXTS and lrc_src.exists():
+                    lyric_text = lrc_src.read_text(encoding="utf-8", errors="ignore").strip() or None
+                if ext in _TAGGABLE_EXTS:
+                    # 先在下载目录（库外，watcher 看不到）写好 tag 再入库：
+                    # 飞牛音乐对已入库文件不再重读 tag，原地改会被永久漏掉
+                    disc_track_total = sum(1 for e in ok_entries if e["disc"] == entry["disc"])
+                    numbers = {"TRACKNUMBER": str(entry["track"]),
+                               "TRACKTOTAL": str(disc_track_total)}
+                    if disc_total > 1:
+                        numbers["DISCNUMBER"] = str(entry["disc"])
+                        numbers["DISCTOTAL"] = str(disc_total)
+                    track_artist = (" / ".join(t2s(a) for a in entry.get("artists") or [] if a)
+                                    or None) if is_va else None
+                    _write_tags(src, entry.get("title") or "", dir_artist, disp_title,
+                                (album.get("release_date") or "")[:10],
+                                numbers=numbers, cover_bytes=cover_bytes, lyric_text=lyric_text,
+                                track_artist=track_artist, compilation=is_va)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if target.exists():
                     target.unlink()
-                src = src_dir / entry["file"]
+                # sidecar 歌词（与音频同目录同名）先于音频就位，watcher 扫到音频时歌词已在
+                if lyric_text:
+                    shutil.copy2(lrc_src, target.with_suffix(".lrc"))
                 try:
                     os.link(src, target)
                     res.action = "linked"
                 except OSError:
                     shutil.copy2(src, target)
                     res.action = "copied"
-                ext = target.suffix.lstrip(".").lower()
-                if ext in _TAGGABLE_EXTS:
-                    _break_link_if_needed(target)
-                    # sidecar 歌词（与音频同 stem 的 .lrc）
-                    lrc_src = src.with_suffix(".lrc")
-                    lyric_text = None
-                    if lrc_src.exists():
-                        lyric_text = lrc_src.read_text(encoding="utf-8", errors="ignore").strip() or None
-                        lrc_dir = album_dir / "lyrics"
-                        lrc_dir.mkdir(exist_ok=True)
-                        shutil.copy2(lrc_src, lrc_dir / f"{target.stem}.lrc")
-                    disc_track_total = sum(1 for e in ok_entries if e["disc"] == entry["disc"])
-                    numbers = {"TRACKNUMBER": f"{entry['track']}/{disc_track_total}",
-                               "TRACKTOTAL": str(disc_track_total)}
-                    if disc_total > 1:
-                        numbers["DISCNUMBER"] = f"{entry['disc']}/{disc_total}"
-                        numbers["DISCTOTAL"] = str(disc_total)
-                    track_artist = (" / ".join(t2s(a) for a in entry.get("artists") or [] if a)
-                                    or None) if is_va else None
-                    _write_tags(target, entry.get("title") or "", dir_artist, disp_title,
-                                (album.get("release_date") or "")[:10],
-                                numbers=numbers, cover_bytes=cover_bytes, lyric_text=lyric_text,
-                                track_artist=track_artist, compilation=is_va)
-                else:
+                if ext not in _TAGGABLE_EXTS:
                     res.action = "tag_unsupported"
         except Exception as e:  # 单曲失败不中断整体
             res.action = "failed"
@@ -482,29 +476,31 @@ def archive_tracks(task_id: str, library: str | None = None, overwrite: bool = F
             if target.exists() and not overwrite:
                 res.action = "skipped"
             else:
+                ext = ext.lower()
+                lrc_src = src.with_suffix(".lrc")
+                lyric_text = None
+                if ext in _TAGGABLE_EXTS and lrc_src.exists():
+                    lyric_text = lrc_src.read_text(encoding="utf-8", errors="ignore").strip() or None
+                if ext in _TAGGABLE_EXTS:
+                    # 先在下载目录（库外）写好 tag 再入库，避免 watcher 以旧 tag 入库后不再重读
+                    cover_bytes = (_download_cover_bytes(item.get("cover_url"))
+                                   or _itunes_cover_fallback(title, artist_dir))
+                    _write_tags(src, title, artist_dir, t2s(item.get("album") or ""),
+                                cover_bytes=cover_bytes,
+                                lyric_text=lyric_text)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if target.exists():
                     target.unlink()
+                # sidecar 歌词先于音频就位（与音频同目录同名）
+                if lyric_text:
+                    shutil.copy2(lrc_src, target.with_suffix(".lrc"))
                 try:
                     os.link(src, target)
                     res.action = "linked"
                 except OSError:
                     shutil.copy2(src, target)
                     res.action = "copied"
-                if target.suffix.lstrip(".").lower() in _TAGGABLE_EXTS:
-                    _break_link_if_needed(target)
-                    # sidecar 歌词：嵌入 tag 并复制到目标旁
-                    lyric_text = None
-                    lrc_src = src.with_suffix(".lrc")
-                    if lrc_src.exists():
-                        lyric_text = lrc_src.read_text(encoding="utf-8", errors="ignore").strip() or None
-                        shutil.copy2(lrc_src, target.with_suffix(".lrc"))
-                    cover_bytes = (_download_cover_bytes(item.get("cover_url"))
-                                   or _itunes_cover_fallback(title, artist_dir))
-                    _write_tags(target, title, artist_dir, t2s(item.get("album") or ""),
-                                cover_bytes=cover_bytes,
-                                lyric_text=lyric_text)
-                else:
+                if ext not in _TAGGABLE_EXTS:
                     res.action = "tag_unsupported"
         except Exception as e:  # 单曲失败不中断整体
             res.action = "failed"

@@ -142,6 +142,7 @@ def test_archive_normal_album_unaffected(tmp_path, library_root):
     assert res.library_dir == str(album_dir)
     t = _read_id3(album_dir / "01 - 晴天.mp3")
     assert str(t["TPE1"].text[0]) == "周杰伦"
+    assert str(t["TRCK"].text[0]) == "1"  # 纯数字序号（飞牛音乐不解析 N/M 格式）
     assert not t.getall("TCMP")
     info = (album_dir / "album_info.txt").read_text(encoding="utf-8")
     assert "01. 晴天 - " not in info  # 普通专辑曲目表不附艺人
@@ -187,4 +188,4 @@ def test_replace_track_preserves_va_tags(tmp_path, monkeypatch):
     assert str(tags["TPE1"].text[0]) == "胡歌"
     assert str(tags["TPE2"].text[0]) == "群星"
     assert str(tags["TCMP"].text[0]) == "1"
-    assert str(tags["TRCK"].text[0]) == "3/13"
+    assert str(tags["TRCK"].text[0]) == "3"  # 旧 N/M 序号归一化为纯数字（飞牛音乐兼容）

@@ -16,7 +16,8 @@
 1. **专辑级闭环：MCP 专辑维度能力**（源自 music-album-archiver 实践复盘）
    - 背景：实测"给一个专辑名 → 自动搜索资料/下载/整理入库"场景，现有 MCP 只有单曲级工具，专辑元数据确认、逐曲消歧、批量编排全靠 Agent 手工绕路，出错率最高的恰是专辑元数据环节
    - **第一期已完成**（2026-08-10）：`search_albums` / `get_album_info`（iTunes Search/Lookup API 主干，storefront 链 CN→HK→TW→US→JP 兜底，繁体曲目表自动转简体匹配）；`download_album`（服务端编排逐曲搜索 → 打分消歧（阈值 0.6，低于阈值记 unmatched）→ 按序号命名落盘 → `cover.jpg` + `manifest.json`（含逐曲 score/candidates/失败原因），替代解析私有 `download_results.pkl`）；REST 三端点 + MCP 三工具，E2E 验证通过
-   - **第二期已完成**（2026-08-10）：`archive_album` 服务端归档（REST + MCP）：以 manifest.json 为契约，硬链接（CIFS/跨设备回退复制）入库 `{library_root}/{艺人}/{专辑}/`，断链后写 tag（TRACKNUMBER n/N、多 Disc CD1/CD2 + DISCNUMBER d/D）、嵌封面/歌词、`lyrics/`、`cover.jpg`、`album_info.txt`，幂等跳过；新增 `library_root`/`archive_comment` 配置与 compose 媒体库卷挂载示例
+   - **第二期已完成**（2026-08-10）：`archive_album` 服务端归档（REST + MCP）：以 manifest.json 为契约，硬链接（CIFS/跨设备回退复制）入库 `{library_root}/{艺人}/{专辑}/`，写 tag（多 Disc CD1/CD2 + DISCNUMBER/DISCTOTAL）、嵌封面/歌词、sidecar `.lrc`、`cover.jpg`、`album_info.txt`，幂等跳过；新增 `library_root`/`archive_comment` 配置与 compose 媒体库卷挂载示例
+   - **已完成补充**（2026-09-17）：归档 tag 适配飞牛音乐——序号改纯数字（TRACKNUMBER=3，总数写 TRACKTOTAL/DISCTOTAL；飞牛对 `3/13` 格式整字段丢弃）；tag 改为入库前在下载目录写好再链接/复制落位（飞牛对已入库文件不再重读 tag，入库后原地改会永久失效），`migrate_singles`/`replace_album_track` 同步改造并归一化旧 N/M tag；专辑 sidecar 歌词从 `lyrics/` 子目录改到与音频同目录同名（飞牛只认同目录 sidecar）
    - **后续待做**：`get_artist_info` + 艺人 `artist.jpg` 头像；WAV→FLAC 转换
    - **已完成补充**（2026-09-01）：中文专辑元数据补充——新增 `meta.py` 编排层 + 网易云/QQ 网页接口客户端（免登录公开 API）；iTunes 无结果/覆盖不足时自动回退，`collection_id` 支持 `netease:`/`qq:` 前缀路由；iTunes 各 storefront 无曲目时中文源整体接管；命中时合并中文简介与中文显示名（罗马音场景按发行日期+曲目数放宽匹配），`AlbumSummary` 新增 `description`/`meta_source`，`album_info.txt` 正式写入简介
    - **已完成补充**（2026-08-10）：匹配音质偏好——同分段（与最高分差 ≤0.1）候选优先无损（`quality_tier`：无损 3 / 320k 2 / 其他 1），没有合格无损才选 MP3；manifest 的 match 增加 `ext`/`quality`/`quality_tier` 字段

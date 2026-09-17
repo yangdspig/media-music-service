@@ -360,24 +360,38 @@ def migrate_singles(library: str | None = None, target_library: str = "singles",
                 migrated.append(item)
                 continue
             lrc_candidates = [album_dir / "lyrics" / f"{src.stem}.lrc", src.with_suffix(".lrc")]
+            staging = None
             try:
                 dst.parent.mkdir(parents=True, exist_ok=True)
+                if dst.suffix.lstrip(".").lower() in _TAGGABLE_EXTS:
+                    # 先在库外暂存区写好 tag 再落位：飞牛音乐对已入库文件不再重读 tag，
+                    # 入库后原地改 tag 永远不会被重新扫描
+                    from .archive import _write_tags
+                    lyric_text = None
+                    for lrc in lrc_candidates:
+                        if lrc.is_file():
+                            lyric_text = lrc.read_text(encoding="utf-8", errors="ignore").strip() or None
+                            break
+                    staging = Path(settings.download_root) / f".migrate_{uuid.uuid4().hex[:8]}"
+                    staging.mkdir(parents=True, exist_ok=True)
+                    staged = staging / dst.name
+                    shutil.copy2(src, staged)
+                    _write_tags(staged, title, adir.name, tags.get("album") or t2s(album_dir.name),
+                                tags.get("date") or "", strip_numbers=True, lyric_text=lyric_text)
+                    src_to_place, place_done_unlink = staged, src
+                else:
+                    src_to_place, place_done_unlink = src, None
                 try:
-                    os.rename(src, dst)
+                    os.rename(src_to_place, dst)
                 except OSError:  # 跨设备
-                    shutil.copy2(src, dst)
-                    src.unlink()
-                lyric_text = None
+                    shutil.copy2(src_to_place, dst)
+                    src_to_place.unlink()
+                if place_done_unlink is not None:
+                    place_done_unlink.unlink()
                 for lrc in lrc_candidates:
                     if lrc.is_file():
-                        lyric_text = lrc.read_text(encoding="utf-8", errors="ignore").strip() or None
                         shutil.move(str(lrc), str(dst.with_suffix(".lrc")))
                         break
-                if dst.suffix.lstrip(".").lower() in _TAGGABLE_EXTS:
-                    from .archive import _break_link_if_needed, _write_tags
-                    _break_link_if_needed(dst)  # 防硬链接回改下载目录源文件
-                    _write_tags(dst, title, adir.name, tags.get("album") or t2s(album_dir.name),
-                                tags.get("date") or "", strip_numbers=True, lyric_text=lyric_text)
                 shutil.rmtree(album_dir, ignore_errors=True)
                 # 艺人头像同步：源艺人目录已无专辑、只剩 artist.* 时头像直接搬到目标
                 # （目标已有则源侧去重）；仍有其他专辑时复制一份（目标已有不动）
@@ -397,6 +411,9 @@ def migrate_singles(library: str | None = None, target_library: str = "singles",
                 migrated.append(item)
             except Exception as e:
                 errors.append(f"{src}: {type(e).__name__}: {e}")
+            finally:
+                if staging is not None:
+                    shutil.rmtree(staging, ignore_errors=True)
     status = "success" if not errors else ("failed" if not migrated and not skipped else "partial")
     return {"status": status, "dry_run": dry_run, "migrated": migrated,
             "skipped": skipped, "errors": errors}
@@ -408,7 +425,8 @@ def replace_album_track(library: str | None, artist: str, album: str, track: Any
     """重新搜索专辑中指定曲目，用更高音质版本替换（同步）。
 
     新候选 quality_tier 高于现有文件（无损 3 / ≥320k 2 / 其他 1）或 force=True 时才替换；
-    序号/专辑/艺人/日期沿用旧 tag，封面用专辑目录 cover.*，歌词用新下载 .lrc 并更新 lyrics/。
+    序号/专辑/艺人/日期沿用旧 tag（旧 tag 的 N/M 序号归一化为纯数字，总数写 TRACKTOTAL/
+    DISCTOTAL），封面用专辑目录 cover.*，歌词用新下载 .lrc 放在音频旁（同目录同名）。
     """
     from . import download as dl
     from .album import match_track
@@ -471,36 +489,21 @@ def replace_album_track(library: str | None, artist: str, album: str, track: Any
         m = re.match(r"^(\d+\s*-\s*)", old.name)
         prefix = m.group(1) if m else ""
         new_file = old.with_name(f"{prefix}{_safe_name(t2s(title))}.{new_ext}")
-        if new_file.exists():
-            new_file.unlink()
-        shutil.move(str(new_src), str(new_file))
-        if old.exists() and old != new_file:
-            old.unlink()
-        # 歌词：新下载的 .lrc 嵌入 tag 并更新 lyrics/（旧 stem 不同名的 .lrc 清掉）
+        # 歌词：新下载的 .lrc 嵌入 tag，sidecar 放到音频旁（同目录同名）
         lyric_text = None
         new_lrc = new_src.with_suffix(".lrc")
-        lyrics_dir = album_dir / "lyrics"
         if new_lrc.is_file():
             lyric_text = new_lrc.read_text(encoding="utf-8", errors="ignore").strip() or None
-            lyrics_dir.mkdir(exist_ok=True)
-            shutil.move(str(new_lrc), str(lyrics_dir / f"{new_file.stem}.lrc"))
-        old_lrc = lyrics_dir / f"{old.stem}.lrc"
-        if old_lrc.is_file() and old_lrc.name != f"{new_file.stem}.lrc":
-            old_lrc.unlink()
-        # 旧文件旁同名 .lrc 一并清理（old 可能已 unlink，with_suffix 只是路径运算）
-        side_lrc = old.with_suffix(".lrc")
-        if side_lrc.is_file():
-            side_lrc.unlink()
         if new_ext in _TAGGABLE_EXTS:
             numbers: dict[str, str] = {}
             tn = old_tags.get("tracknumber") or ""
             if tn:
-                numbers["TRACKNUMBER"] = tn
+                numbers["TRACKNUMBER"] = tn.split("/")[0]
                 if "/" in tn:
                     numbers["TRACKTOTAL"] = tn.split("/")[1]
             dn = old_tags.get("discnumber") or ""
             if dn:
-                numbers["DISCNUMBER"] = dn
+                numbers["DISCNUMBER"] = dn.split("/")[0]
                 if "/" in dn:
                     numbers["DISCTOTAL"] = dn.split("/")[1]
             cover_bytes = None
@@ -509,12 +512,28 @@ def replace_album_track(library: str | None, artist: str, album: str, track: Any
                 if c.is_file():
                     cover_bytes = c.read_bytes()
                     break
-            _write_tags(new_file, title,
+            # 先在库外临时目录写好 tag 再落位：飞牛音乐对已入库文件不再重读 tag
+            _write_tags(new_src, title,
                         t2s(old_tags.get("albumartist") or artist), t2s(album),
                         old_tags.get("date") or "",
                         numbers=numbers, cover_bytes=cover_bytes, lyric_text=lyric_text,
                         track_artist=old_tags.get("artist") or None,
                         compilation="1" in (old_tags.get("compilation") or ""))
+        if new_file.exists():
+            new_file.unlink()
+        # sidecar 歌词先于音频就位
+        if lyric_text:
+            shutil.move(str(new_lrc), str(new_file.with_suffix(".lrc")))
+        shutil.move(str(new_src), str(new_file))
+        if old.exists() and old != new_file:
+            old.unlink()
+        # 旧 lyrics/ 目录产物与旧同名 sidecar 清理（old 可能已 unlink，with_suffix 只是路径运算）
+        old_lrc = album_dir / "lyrics" / f"{old.stem}.lrc"
+        if old_lrc.is_file():
+            old_lrc.unlink()
+        side_lrc = old.with_suffix(".lrc")
+        if side_lrc.is_file() and side_lrc != new_file.with_suffix(".lrc"):
+            side_lrc.unlink()
         new_info["file"] = str(new_file.relative_to(root))
         return {"status": "success", "action": "replaced", "old": old_info, "new": new_info,
                 "error": None}
