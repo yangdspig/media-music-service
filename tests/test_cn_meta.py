@@ -250,6 +250,26 @@ def test_get_album_takeover_when_itunes_has_no_tracks(monkeypatch):
     assert info.meta_source == "netease"
 
 
+def test_get_album_takeover_preserves_itunes_genre(monkeypatch):
+    """中文源不提供 genre：接管结果保留 iTunes 摘要的流派（归档写 GENRE/TCON 用）。"""
+    def _raise(cid):
+        raise LookupError("no tracks")
+    monkeypatch.setattr(meta.itunes, "get_album", _raise)
+    monkeypatch.setattr(meta, "_itunes_summary",
+                        lambda cid: _summary("12345", "Ye Hui Mei", ["Jay Chou"],
+                                             release_date="2003-07-31T07:00:00Z",
+                                             track_count=1, genre="Mandopop"))
+    cn_album = _itunes_album(collection_id="netease:18905", title="叶惠美", artists=["周杰伦"],
+                             meta_source="netease")
+    assert cn_album.genre is None  # 中文源结果本身无 genre
+    monkeypatch.setattr(meta.netease_meta, "search_albums",
+                        lambda *a, **kw: [_summary("netease:18905", "叶惠美", ["周杰伦"],
+                                                   release_date="2003-07-31", track_count=1)])
+    monkeypatch.setattr(meta.netease_meta, "get_album", lambda aid: cn_album)
+    info = meta.get_album("12345")
+    assert info.genre == "Mandopop"
+
+
 def test_get_album_takeover_all_fail_keeps_lookup_error(monkeypatch):
     def _raise(cid):
         raise LookupError("no tracks")

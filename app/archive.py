@@ -24,6 +24,7 @@ from typing import Any, Optional
 from . import download as dl
 from .album import _safe_name, infer_display_names, t2s
 from .config import settings
+from .genre import normalize_genre
 from .libraries import resolve_library_root
 from .schemas import ArchiveResult, ArchiveTrackResult
 
@@ -84,26 +85,30 @@ def _write_tags(path: Path, title: str, artist: str, album_title: str, date: str
                 numbers: dict[str, str] | None = None,
                 cover_bytes: bytes | None = None, lyric_text: str | None = None,
                 strip_numbers: bool = False,
-                track_artist: str | None = None, compilation: bool = False) -> None:
+                track_artist: str | None = None, compilation: bool = False,
+                genre: str | None = None) -> None:
     """按库约定重写 tag 并嵌封面/歌词（仅 flac/mp3）。artist/album_title 为解析后的显示名。
 
     numbers 为序号类 tag（TRACKNUMBER/TRACKTOTAL/DISCNUMBER/DISCTOTAL），专辑归档传入，
     单曲归档传 None（不写序号）；strip_numbers=True 时显式清除已有序号类 tag（单曲迁移用）；
     date 为空则不写 DATE。
     track_artist 非空时 ARTIST 写逐曲艺人（合集专辑用），否则 ARTIST=artist；
-    compilation=True 时写合集标记（FLAC: COMPILATION=1；MP3: TCMP 文本帧）。
+    compilation=True 时写合集标记（FLAC: COMPILATION=1；MP3: TCMP 文本帧）；
+    genre 非空时写流派（FLAC: GENRE；MP3: TCON），为空时保留文件已有流派；
+    genre 写入前统一过 normalize_genre 归一化（见 genre 模块）。
     """
     ext = path.suffix.lstrip(".").lower()
     title = t2s(title or "")
     track_artist = t2s(track_artist) if track_artist else None
+    genre = normalize_genre(t2s(genre)) if genre else None
     numbers = numbers or {}
     comment = settings.archive_comment
 
     if ext == "flac":
         from mutagen.flac import FLAC, Picture
         audio = FLAC(path)
-        # 白名单重写：清掉平台水印等杂项后统一写入
-        keep = {"ARTIST", "ALBUMARTIST", "ALBUM", "TITLE", "DATE",
+        # 白名单重写：清掉平台水印等杂项后统一写入（GENRE 在白名单内，已有流派不被清掉）
+        keep = {"ARTIST", "ALBUMARTIST", "ALBUM", "TITLE", "DATE", "GENRE",
                 "TRACKNUMBER", "TRACKTOTAL", "DISCNUMBER", "DISCTOTAL", "COMMENT", "LYRICS",
                 "COMPILATION"}
         for key in list(audio.keys()):
@@ -118,6 +123,8 @@ def _write_tags(path: Path, title: str, artist: str, album_title: str, date: str
         audio["TITLE"] = title
         if date:
             audio["DATE"] = date
+        if genre:
+            audio["GENRE"] = genre
         if strip_numbers:
             for k in ("TRACKNUMBER", "TRACKTOTAL", "DISCNUMBER", "DISCTOTAL"):
                 if k in audio:
@@ -137,7 +144,7 @@ def _write_tags(path: Path, title: str, artist: str, album_title: str, date: str
             audio.add_picture(pic)
         audio.save()
     elif ext == "mp3":
-        from mutagen.id3 import APIC, COMM, TALB, TDRC, TIT2, TPE1, TPE2, TPOS, TRCK, USLT, ID3, TextFrame, Frames
+        from mutagen.id3 import APIC, COMM, TALB, TCON, TDRC, TIT2, TPE1, TPE2, TPOS, TRCK, USLT, ID3, TextFrame, Frames
         try:
             audio = ID3(path)
         except Exception:
@@ -155,6 +162,9 @@ def _write_tags(path: Path, title: str, artist: str, album_title: str, date: str
         audio.delall("TIT2"); audio.add(TIT2(encoding=3, text=title))
         if date:
             audio.delall("TDRC"); audio.add(TDRC(encoding=3, text=date))
+        # MP3 不做白名单清理，genre 为空时已有 TCON 自然保留
+        if genre:
+            audio.delall("TCON"); audio.add(TCON(encoding=3, text=genre))
         if strip_numbers:
             audio.delall("TRCK"); audio.delall("TPOS")
         if numbers.get("TRACKNUMBER"):
@@ -238,6 +248,12 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None,
     ok_entries = [e for e in entries if e.get("status") == "ok" and e.get("file")]
     disp_title, disp_artist = _resolve_names(album, ok_entries, album_title, artist)
     is_va = _is_compilation(album, disp_artist, artist, compilation)
+    # 中文源接管时 manifest 无 genre：按艺人查 iTunes 流派兜底（查不到静默跳过；
+    # 合集专辑艺人显示名是「群星」，无兜底意义）
+    album_genre = album.get("genre") or None
+    if not album_genre and not is_va:
+        from .itunes import get_artist_genre
+        album_genre = get_artist_genre(disp_artist)
     dir_artist = _VA_ARTIST if is_va else disp_artist
     album_dir = root / _safe_name(dir_artist) / _safe_name(disp_title)
     multi_disc = len({e["disc"] for e in entries}) > 1
@@ -260,8 +276,11 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None,
                 ext = target.suffix.lstrip(".").lower()
                 lrc_src = src.with_suffix(".lrc")
                 lyric_text = None
-                if ext in _TAGGABLE_EXTS and lrc_src.exists():
+                # 所有格式都读 sidecar 歌词：不可写 tag 的格式（m4a/ape/wav 等）不入库时歌词会随
+                # 下载目录清理永久丢失，sidecar 必须照迁入库（仅 taggable 格式额外嵌入 tag）
+                if lrc_src.exists():
                     lyric_text = lrc_src.read_text(encoding="utf-8", errors="ignore").strip() or None
+                res.lyric = "ok" if lyric_text else "missing"
                 if ext in _TAGGABLE_EXTS:
                     # 先在下载目录（库外，watcher 看不到）写好 tag 再入库：
                     # 飞牛音乐对已入库文件不再重读 tag，原地改会被永久漏掉
@@ -276,7 +295,8 @@ def archive_album(task_id: str | None = None, manifest_path: str | None = None,
                     _write_tags(src, entry.get("title") or "", dir_artist, disp_title,
                                 (album.get("release_date") or "")[:10],
                                 numbers=numbers, cover_bytes=cover_bytes, lyric_text=lyric_text,
-                                track_artist=track_artist, compilation=is_va)
+                                track_artist=track_artist, compilation=is_va,
+                                genre=album_genre)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if target.exists():
                     target.unlink()
@@ -444,8 +464,9 @@ def _summarize(results: list[ArchiveTrackResult]) -> tuple[str, dict[str, int], 
 def archive_tracks(task_id: str, library: str | None = None, overwrite: bool = False) -> ArchiveResult:
     """把单曲下载任务的产物归档进媒体库（同步，幂等）。
 
-    目标结构：{库根}/{艺人}/{曲名.ext}；同名 .lrc 放旁边并嵌入 tag；
-    不写序号类 tag，ALBUM 用候选专辑名，DATE 跳过；封面按 候选 cover_url（酷我源搜索时已拼接兜底）
+    目标结构：{库根}/{艺人}/{曲名.ext}；同名 .lrc 放旁边（所有格式），flac/mp3 另嵌入 tag；
+    不写序号类 tag，ALBUM 用候选专辑名，DATE 跳过；流派按艺人查 iTunes 兜底（GENRE/TCON，
+    查不到跳过）；封面按 候选 cover_url（酷我源搜索时已拼接兜底）
     → 酷我节点/尺寸降级 → iTunes 单曲封面 的顺序获取，均失败则不嵌图（不阻塞归档）。
     另按候选 artist_img_url 在艺人目录写 artist.*（Navidrome 艺人头像，幂等，已有则跳过）。
     library 为命名库根（见 libraries 模块），留空用默认库。
@@ -479,15 +500,20 @@ def archive_tracks(task_id: str, library: str | None = None, overwrite: bool = F
                 ext = ext.lower()
                 lrc_src = src.with_suffix(".lrc")
                 lyric_text = None
-                if ext in _TAGGABLE_EXTS and lrc_src.exists():
+                # 所有格式都读 sidecar 歌词（同专辑路径）：不可写 tag 的格式也要把 .lrc 迁入库
+                if lrc_src.exists():
                     lyric_text = lrc_src.read_text(encoding="utf-8", errors="ignore").strip() or None
+                res.lyric = "ok" if lyric_text else "missing"
                 if ext in _TAGGABLE_EXTS:
                     # 先在下载目录（库外）写好 tag 再入库，避免 watcher 以旧 tag 入库后不再重读
                     cover_bytes = (_download_cover_bytes(item.get("cover_url"))
                                    or _itunes_cover_fallback(title, artist_dir))
+                    # 单曲无专辑 genre 来源：按艺人查 iTunes 流派兜底（查不到静默跳过）
+                    from .itunes import get_artist_genre
                     _write_tags(src, title, artist_dir, t2s(item.get("album") or ""),
                                 cover_bytes=cover_bytes,
-                                lyric_text=lyric_text)
+                                lyric_text=lyric_text,
+                                genre=get_artist_genre(artist_dir))
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if target.exists():
                     target.unlink()

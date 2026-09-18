@@ -263,7 +263,7 @@
 
 ### GET /api/v1/albums/{collection_id}
 
-获取专辑详情与官方曲目表。`collection_id` 按前缀路由：无前缀走 iTunes（storefront 链 CN→HK→TW→US→JP 兜底取首个有曲目的），`netease:`/`qq:` 前缀直接取对应中文源。iTunes 各 storefront 均无曲目时，自动用「专辑名+艺人」在网易云/QQ 找同专辑整体接管（含曲目表）；iTunes 命中时也会尽量合并中文源的专辑简介（`description`）与中文显示名（罗马音名按 CJK 规则替换），命中后 `meta_source` 为 `itunes+netease`/`itunes+qq`。
+获取专辑详情与官方曲目表。`collection_id` 按前缀路由：无前缀走 iTunes（storefront 链 CN→HK→TW→US→JP 兜底取首个有曲目的），`netease:`/`qq:` 前缀直接取对应中文源。iTunes 各 storefront 均无曲目时，自动用「专辑名+艺人」在网易云/QQ 找同专辑整体接管（含曲目表，接管结果保留 iTunes 的 `genre`——中文源不提供流派）；iTunes 命中时也会尽量合并中文源的专辑简介（`description`）与中文显示名（罗马音名按 CJK 规则替换），命中后 `meta_source` 为 `itunes+netease`/`itunes+qq`。
 
 **响应 200**：`AlbumInfo`；**404**：各来源均无该专辑曲目；**502**：元数据接口异常
 
@@ -344,24 +344,27 @@
   "summary": {"linked": 3},
   "tracks": [
     {"disc": 1, "track": 1, "title": "蜗牛", "target": "01 - 蜗牛.flac",
-     "action": "linked | copied | skipped | failed | tag_unsupported", "error": null}
+     "action": "linked | copied | skipped | failed | tag_unsupported",
+     "lyric": "ok | missing | null", "error": null}
   ],
   "errors": []
 }
 ```
 
+> 逐曲 `lyric` 字段记录歌词状态：`ok`（sidecar `.lrc` 已随音频入库）、`missing`（下载产物无歌词）、`null`（skipped/failed 未处理）。已有歌词缺失的专辑可用 `POST /api/v1/library/backfill_lyrics` 回填。
+
 **库内目录结构**（对齐 Navidrome 约定）：
 
 ```
 {library_root}/{艺人}/{专辑}/
-├── 01 - 曲名.flac          # tag：ARTIST/ALBUMARTIST/ALBUM/TITLE/DATE/TRACKNUMBER（纯数字，总数写 TRACKTOTAL）/COMMENT，嵌封面歌词
-├── 01 - 曲名.lrc           # sidecar 歌词，与音频同目录同名
+├── 01 - 曲名.flac          # tag：ARTIST/ALBUMARTIST/ALBUM/TITLE/DATE/GENRE/TRACKNUMBER（纯数字，总数写 TRACKTOTAL）/COMMENT，嵌封面歌词
+├── 01 - 曲名.lrc           # sidecar 歌词，与音频同目录同名（所有格式都迁，不只 flac/mp3）
 ├── cover.jpg               # 多 Disc 时每个 CDx 子目录也有一份
 ├── album_info.txt
 └── CD1/, CD2/ ...          # 仅多 Disc 专辑，内含 NN - 曲名.ext（及同名 .lrc）与 cover.jpg
 ```
 
-> 设计约束：tag 在入库**之前**写于下载目录（飞牛音乐等 watcher 对已入库文件不再重读 tag，入库后改 tag 会永久失效）；序号写纯数字而非 `n/N`（飞牛音乐不解析 N/M 格式）；`COMMENT` 统一写为 `archive_comment` 配置值（默认 `yangds整理`），覆盖平台水印；仅 flac/mp3 写 tag，其他格式文件照入库但记 `tag_unsupported`。
+> 设计约束：tag 在入库**之前**写于下载目录（飞牛音乐等 watcher 对已入库文件不再重读 tag，入库后改 tag 会永久失效）；序号写纯数字而非 `n/N`（飞牛音乐不解析 N/M 格式）；`COMMENT` 统一写为 `archive_comment` 配置值（默认 `yangds整理`），覆盖平台水印；`GENRE`/`TCON` 取自 manifest 的 `album.genre`（iTunes 提供），中文源接管导致为空时按艺人查 iTunes `entity=musicArtist` 兜底（相似度拦截 + 429 退避，查不到静默跳过，合集不兜底），写入前统一过流派归一化（`Mandopop`/`國語流行樂`→`国语流行`、`Cantopop`/`HK-Pop`→`粤语流行`、`Pop`→`流行`，映射表见 `app/genre.py`；归一化只影响新入库，存量库择期另行处理），不传时保留文件已有流派；仅 flac/mp3 写 tag，其他格式文件照入库但记 `tag_unsupported`（其 sidecar 歌词照常入库）。
 
 ---
 
@@ -379,7 +382,7 @@
 
 **响应 200**：`ArchiveResult`（同专辑归档）；**400**：任务不存在 / 未知库名
 
-**单曲库内结构**：`{库根}/{艺人}/{曲名.ext}`，同名 `.lrc` 放旁边并嵌入 tag；不写曲目序号（无 TRACKNUMBER/DISCNUMBER），`ALBUM` 用候选专辑名，`DATE` 跳过；封面从候选 `cover_url` 下载嵌入。
+**单曲库内结构**：`{库根}/{艺人}/{曲名.ext}`，同名 `.lrc` 放旁边（所有格式），flac/mp3 另嵌入 tag；不写曲目序号（无 TRACKNUMBER/DISCNUMBER），`ALBUM` 用候选专辑名，`DATE` 跳过；流派无专辑来源，按艺人查 iTunes 兜底写 `GENRE`/`TCON`（归一化同专辑归档，查不到静默跳过）；封面从候选 `cover_url` 下载嵌入。
 
 ---
 

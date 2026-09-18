@@ -5,7 +5,8 @@
 - search_albums：iTunes 无结果，或关键词含 CJK 而结果全不含 CJK（覆盖不足）时，
   依次回退网易云→QQ 补齐至 limit（首个非空来源即停）；
 - get_album（iTunes id）：各 storefront 均无曲目时用「专辑名+艺人」在中文源找同专辑
-  整体接管（含曲目表）；iTunes 命中曲目表时 best-effort 合并中文源的简介与中文显示名；
+  整体接管（含曲目表，接管结果保留 iTunes 流派——中文源不提供 genre）；iTunes 命中曲目表时
+  best-effort 合并中文源的简介与中文显示名；
 - 同专辑判定：标题与艺人归一化相似度均 ≥0.6；罗马音场景（标题无 CJK，相似度天然低）
   放宽为发行日期前 10 位 + 曲目数精确一致（中文源搜索已带艺人关键词收敛结果集）；
 - 中文源一切失败仅记 warning 降级，主链路行为与纯 iTunes 时一致。
@@ -121,6 +122,9 @@ def _cn_takeover(collection_id: str) -> AlbumInfo | None:
                                  release_date=summary.release_date,
                                  track_count=summary.track_count)
         if album is not None and album.tracks:
+            if album.genre is None and summary.genre:
+                # 中文源不提供流派：接管结果保留 iTunes 摘要的 genre（归档写 GENRE/TCON tag 用）
+                album.genre = summary.genre
             return album
     return None
 

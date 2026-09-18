@@ -10,9 +10,12 @@
 from __future__ import annotations
 
 import re
+import time
 
 import httpx
 
+from .album import _normalize, _sim, t2s
+from .genre import normalize_genre
 from .schemas import AlbumInfo, AlbumSummary, AlbumTrack
 
 SEARCH_URL = "https://itunes.apple.com/search"
@@ -84,3 +87,71 @@ def get_album(collection_id: str) -> AlbumInfo:
         key=lambda t: (t.disc, t.track),
     )
     return AlbumInfo(**summary.model_dump(), tracks=tracks, storefront=country)
+
+
+# ---- 艺人流派兜底：单曲归档与中文源专辑无 genre 时按艺人查 iTunes ----
+# storefront 链（同 COUNTRY_CHAIN 思路，JP 对中文艺人意义小故省略）
+_ARTIST_GENRE_CHAIN = ["CN", "HK", "TW", "US"]
+_ARTIST_SIM_THRESHOLD = 0.6  # 艺人名相似度下限（实测：搜"阿杜"会命中"野狗阿杜"）
+_ARTIST_GENRE_CACHE: dict[str, str | None] = {}  # 进程内缓存（含未命中的 None）
+
+
+def _get_json_429_backoff(url: str, params: dict) -> dict:
+    """GET + JSON；429 退避重试最多 2 次（25s 递增），其余错误直接抛。"""
+    delay = 25.0
+    for attempt in range(3):
+        r = httpx.get(url, params=params, timeout=_TIMEOUT)
+        if r.status_code != 429:
+            r.raise_for_status()
+            return r.json()
+        if attempt == 2:
+            r.raise_for_status()
+        time.sleep(delay)
+        delay += 25.0
+    raise AssertionError("unreachable")
+
+
+def _artist_name_acceptable(query: str, name: str | None) -> bool:
+    """艺人名采纳判定：归一化相等直接采纳；纯包含关系拒绝（实测：_sim 的包含规则给
+    "阿杜" vs "野狗阿杜" 打 0.9 虚高分，会错挂无关艺人流派）；其余要求 _sim ≥ 0.6。"""
+    na, nb = _normalize(query), _normalize(name)
+    if not na or not nb:
+        return False
+    if na == nb:
+        return True
+    if na in nb or nb in na:
+        return False
+    return _sim(query, name) >= _ARTIST_SIM_THRESHOLD
+
+
+def get_artist_genre(artist: str) -> str | None:
+    """按艺人名查 iTunes 流派（单曲/中文源专辑无 genre 时的兜底）。
+
+    /search?entity=musicArtist 按 storefront 链 CN→HK→TW→US 逐个尝试；优先取归一化
+    相等的结果，其次相似度 ≥0.6（排除包含关系，见 _artist_name_acceptable）且带
+    primaryGenreName 的结果；结果 t2s 后过 normalize_genre。
+    带进程内缓存；任何异常返回 None（绝不影响归档主流程）。
+    """
+    key = t2s(artist or "").strip()
+    if not key:
+        return None
+    if key in _ARTIST_GENRE_CACHE:
+        return _ARTIST_GENRE_CACHE[key]
+    genre: str | None = None
+    try:
+        for country in _ARTIST_GENRE_CHAIN:
+            data = _get_json_429_backoff(
+                SEARCH_URL, params={"term": key, "entity": "musicArtist",
+                                    "country": country, "limit": 5})
+            results = [i for i in data.get("results", [])
+                       if i.get("wrapperType") == "artist" and i.get("primaryGenreName")]
+            hit = (next((i for i in results if _normalize(key) == _normalize(i.get("artistName"))), None)
+                   or next((i for i in results
+                            if _artist_name_acceptable(key, i.get("artistName"))), None))
+            if hit:
+                genre = normalize_genre(t2s(hit["primaryGenreName"]))
+                break
+    except Exception:
+        genre = None
+    _ARTIST_GENRE_CACHE[key] = genre
+    return genre

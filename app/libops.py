@@ -117,6 +117,7 @@ def _read_tags(path: Path) -> dict[str, Any]:
         out["albumartist"] = _get("ALBUMARTIST", "TPE2")
         out["album"] = _get("ALBUM", "TALB")
         out["date"] = _get("DATE", "TDRC")
+        out["genre"] = _get("GENRE", "TCON")
         out["tracknumber"] = _get("TRACKNUMBER", "TRCK")
         out["discnumber"] = _get("DISCNUMBER", "TPOS")
         out["compilation"] = _get("COMPILATION", "TCMP")
@@ -313,7 +314,7 @@ def migrate_singles(library: str | None = None, target_library: str = "singles",
     """扫描专辑库中只有一个音频文件的专辑目录，迁移到 singles 库 {目标根}/{艺人}/{曲名.ext}。
 
     迁移后重写 tag：清除序号类（TRACKNUMBER/TRACKTOTAL/DISCNUMBER/DISCTOTAL），
-    保留 ALBUM/ARTIST/DATE/封面/歌词；lyrics/ 中同名 .lrc 移到目标旁；
+    保留 ALBUM/ARTIST/DATE/GENRE/封面/歌词；lyrics/ 中同名 .lrc 移到目标旁；
     原专辑目录整目录删除，空艺人目录一并清理；目标已存在同名文件则跳过。
     """
     src_root = Path(resolve_library_root(library))
@@ -425,7 +426,7 @@ def replace_album_track(library: str | None, artist: str, album: str, track: Any
     """重新搜索专辑中指定曲目，用更高音质版本替换（同步）。
 
     新候选 quality_tier 高于现有文件（无损 3 / ≥320k 2 / 其他 1）或 force=True 时才替换；
-    序号/专辑/艺人/日期沿用旧 tag（旧 tag 的 N/M 序号归一化为纯数字，总数写 TRACKTOTAL/
+    序号/专辑/艺人/日期/流派沿用旧 tag（旧 tag 的 N/M 序号归一化为纯数字，总数写 TRACKTOTAL/
     DISCTOTAL），封面用专辑目录 cover.*，歌词用新下载 .lrc 放在音频旁（同目录同名）。
     """
     from . import download as dl
@@ -518,7 +519,8 @@ def replace_album_track(library: str | None, artist: str, album: str, track: Any
                         old_tags.get("date") or "",
                         numbers=numbers, cover_bytes=cover_bytes, lyric_text=lyric_text,
                         track_artist=old_tags.get("artist") or None,
-                        compilation="1" in (old_tags.get("compilation") or ""))
+                        compilation="1" in (old_tags.get("compilation") or ""),
+                        genre=old_tags.get("genre") or None)
         if new_file.exists():
             new_file.unlink()
         # sidecar 歌词先于音频就位

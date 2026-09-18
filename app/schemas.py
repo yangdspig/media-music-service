@@ -118,6 +118,7 @@ class ArchiveTrackResult(BaseModel):
     title: str = ""
     target: Optional[str] = Field(default=None, description="库内相对路径（相对 library_root）")
     action: str = Field(description="linked / copied / skipped / failed / tag_unsupported")
+    lyric: Optional[str] = Field(default=None, description="歌词状态：ok（sidecar 已入库）/ missing（下载产物无歌词）；skipped/failed 时为 None")
     error: Optional[str] = None
 
 
