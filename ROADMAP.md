@@ -60,6 +60,16 @@
    - 已实现：`app/qqauth.py` 调官方刷新接口（music.login.LoginServer/Login，ANDROID 协议栈，复用 musicdl 的 Device/QIMEI/GetSession）自动续期；每 1h 检查（`auth_refresh.interval_s`）、剩余 <24h 刷新；刷新产物（含服务端下发的 refresh_key）持久化 `data/qq_auth_state.json`，优先级高于 config.yaml 且不回写配置，重新粘贴 cookies 自动重置种子；设备指纹/QIMEI 持久化复用（换新设备会触发 20279 设备数超限，实测）；彻底失效（code 1000/104401/104400，access_token 约 60 天）时 QQ 源标记不可用并在 `/api/v1/sources` 提示；`POST /api/v1/auth/qq/refresh` 手动强制刷新
    - 关键坑：刷新接口的 `expired_in`/`musicid` 必须传 int，str 会被拒为 10006
 
+2h. **流派 tag 与歌词回填** ✅ 已完成（2026-09-18）
+   - 流派：归档写 GENRE（flac）/TCON（mp3）tag，取自 manifest 的 `album.genre`（iTunes 提供，繁转简）；中文源整体接管时保留 iTunes 流派（中文源不提供 genre）；不传 genre 时保留文件已有流派（flac 白名单含 GENRE）；`replace_album_track` 沿用旧文件流派
+   - 归档歌词修复：sidecar `.lrc` 对所有音频格式都迁入库（此前仅 flac/mp3，m4a/ape/wav 的歌词随下载目录清理永久丢失）；归档结果逐曲新增 `lyric` 字段（ok/missing）
+   - 歌词回填：`POST /api/v1/library/backfill_lyrics` + MCP `backfill_lyrics`——扫描库内无歌词音轨（sidecar 与内嵌歌词都算已有），按 tag/文件名搜索匹配（复用专辑消歧打分，阈值 0.6，只在带歌词候选中择优），写同名 `.lrc` sidecar；绝不改音频文件、不覆盖已有 `.lrc`；`dry_run` 默认 true，`limit` 控制单次批量
+   - 实测补充（2026-09-18）：飞牛 watcher 对单独 `.lrc` 事件跳过（skip non-audio file）、UI 重扫为增量，回填后需把专辑目录移出库根再移回触发重刮（OnDirMovedIn → AfterRescrape，曲目 ID 与收藏/播放记录不变）；新归档曲目不受影响
+   - 流派兜底与归一化（2026-09-18）：单曲归档无 genre 来源、中文源专辑接管 manifest genre 为空时，按艺人查 iTunes `entity=musicArtist` 兜底（storefront 链 CN→HK→TW→US，艺人名归一化相等优先、排除包含关系防"阿杜"错挂"野狗阿杜"、429 退避 25s 递增重试 2 次、进程内缓存、异常静默返回 None）；新增 `app/genre.py` 归一化映射（Mandopop/國語流行樂→国语流行、Cantopop/HK-Pop→粤语流行、Pop→流行，其余透传），`_write_tags` 出口统一过归一化——只影响新入库，存量库未归一化，择期另行处理
+   - 依赖升级（2026-09-18）：musicdl 最低版本提到 2.13.11（上游 client 重构回归验证通过：build_client/normalize_song/下载链路 + 联网冒烟），uvicorn>=0.53、pydantic>=2.13.5
+   - cleanup 防误删（2026-09-18）：`cleanup_library` 的 `tracks` 可不传 `album`（艺人目录内直接匹配曲目，适配 singles 无专辑层级结构——修复旧实现忽略 tracks 直接 rmtree 整个艺人目录的事故）；整艺人/整专辑删除（rmtree 整目录）新增 `confirm=true` 显式确认门槛（REST/MCP 同步，dry_run 与曲目级删除不需要）
+   - **后续待做**：① 合唱艺人名流派兜底落空（实测 2026-09-18：《现代爱情故事》艺人"张智霖&许秋怡"在 iTunes 四个 storefront 均无艺人条目，genre 未写入）——方案：`get_artist_genre` 直接查不到时按 `&`/`feat.`/`vs`/`/`、`、` 拆分逐个查，取第一个命中；② 归一化映射补 `广东歌/香港流行乐`→`粤语流行`；③ 修复后对该单曲补写 GENRE tag；④ 存量库流派归一化重写（择期）
+
 3. **MoviePilot 薄客户端插件**
    - 目标：在 MoviePilot 内完成"搜索 → 勾选 → 下载 → 入库整理"闭环
    - 要点：继承 `_PluginBase`，只做表单与 REST 调用，不直接依赖 musicdl
