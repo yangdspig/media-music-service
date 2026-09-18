@@ -116,7 +116,7 @@ def api_tracks_archive(req: TrackArchiveRequest) -> ArchiveResult:
 def api_library_cleanup(req: CleanupLibraryRequest) -> dict:
     try:
         return libops.cleanup_library(library=req.library, artist=req.artist, album=req.album,
-                                      tracks=req.tracks, dry_run=req.dry_run)
+                                      tracks=req.tracks, dry_run=req.dry_run, confirm=req.confirm)
     except (ValueError, LookupError, RuntimeError, OSError) as e:
         raise HTTPException(status_code=400, detail=str(e))
 

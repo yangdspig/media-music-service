@@ -131,12 +131,14 @@ class ArchiveResult(BaseModel):
 
 
 class CleanupLibraryRequest(BaseModel):
-    """库内清理请求：tracks 指定曲目 > album 整专辑 > artist 整艺人；空目录一并清理。"""
+    """库内清理请求：tracks 指定曲目（可不传 album，直接在艺人目录内匹配，适配 singles 等
+    无专辑层级的库）> album 整专辑 > artist 整艺人；空目录一并清理。"""
     library: Optional[str] = Field(default=None, description="库名（见 GET /api/v1/libraries）；留空用默认库")
     artist: str = Field(description="艺人名（对应库内一级目录）")
-    album: Optional[str] = Field(default=None, description="专辑名（对应库内二级目录）；留空则清理整个艺人目录")
-    tracks: Optional[list[Any]] = Field(default=None, description="要清理的曲目：序号（如 3）或曲名；留空则清理整个专辑")
+    album: Optional[str] = Field(default=None, description="专辑名（对应库内二级目录）；与 tracks 同时留空则清理整个艺人目录")
+    tracks: Optional[list[Any]] = Field(default=None, description="要清理的曲目：序号（如 3）或曲名；不传 album 时在艺人目录内匹配（singles 结构）；留空则清理整个专辑")
     dry_run: bool = Field(default=False, description="只报告将删除的项，不实际删除")
+    confirm: bool = Field(default=False, description="整艺人/整专辑删除（rmtree 整目录）需显式传 true 确认；曲目级删除与 dry_run 不需要")
 
 
 class MigrateSinglesRequest(BaseModel):

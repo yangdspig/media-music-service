@@ -301,15 +301,18 @@ def archive_tracks(task_id: str, library: str | None = None, overwrite: bool = F
 
 @mcp.tool()
 def cleanup_library(artist: str, album: str | None = None, tracks: list[str] | None = None,
-                    library: str | None = None, dry_run: bool = False) -> dict:
+                    library: str | None = None, dry_run: bool = False, confirm: bool = False) -> dict:
     """清理媒体库中的专辑或曲目文件；存放文件的目录变空时一并清理（不留空目录）。
 
     Args:
         artist: 艺人名（库内一级目录）
-        album: 专辑名（可选；留空则删除整个艺人目录）
-        tracks: 要删除的曲目（可选，序号如 "3" 或曲名；留空则删除整个专辑）
+        album: 专辑名（可选；与 tracks 同时留空则删除整个艺人目录——高危，需 confirm=True）
+        tracks: 要删除的曲目（可选，序号如 "3" 或曲名；**可不传 album**：此时在艺人目录内
+            直接匹配，适配 singles 等无专辑层级的库；匹配不到报 400，不动任何文件）
         library: 库名（可选，见 list_libraries；留空用默认库）
-        dry_run: True 时只报告将删除的项，不实际删除（建议先跑一遍确认范围）
+        dry_run: True 时只报告将删除的项，不实际删除（建议先跑一遍确认范围；无需 confirm）
+        confirm: 整艺人/整专辑删除（rmtree 整目录，不可恢复）必须显式传 True，
+            否则报 400；曲目级删除不需要
     Returns:
         deleted_files（已删文件）、removed_dirs（已清目录）、errors。
     """
@@ -320,6 +323,8 @@ def cleanup_library(artist: str, album: str | None = None, tracks: list[str] | N
         payload["tracks"] = tracks
     if library:
         payload["library"] = library
+    if confirm:
+        payload["confirm"] = confirm
     with _client() as c:
         r = c.post("/api/v1/library/cleanup", json=payload)
         r.raise_for_status()

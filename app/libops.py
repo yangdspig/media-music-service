@@ -227,12 +227,17 @@ def find_album_track_files(album_dir: Path, tracks: list[Any]) -> list[Path]:
 
 
 def cleanup_library(library: str | None, artist: str, album: str | None = None,
-                    tracks: list[Any] | None = None, dry_run: bool = False) -> dict:
+                    tracks: list[Any] | None = None, dry_run: bool = False,
+                    confirm: bool = False) -> dict:
     """清理媒体库中的专辑/曲目文件，空目录一并清理（不留空目录）。
 
     粒度：tracks 指定曲目 > album 整专辑 > artist 整艺人。
+    tracks 可不传 album：此时以艺人目录本身为搜索基准（适配 singles 等无专辑层级的库，
+    递归匹配艺人目录下的音频文件）；匹配不到抛 LookupError，不动任何文件。
+    整艺人（无 album 无 tracks）/整专辑（有 album 无 tracks）删除为高危操作，
+    非 dry_run 时必须 confirm=True 显式确认，否则抛 ValueError。
     删除曲目后自底向上：空 CDx/ → 无音频残留的专辑目录（连同 cover/album_info/lyrics）→ 空艺人目录。
-    dry_run=True 只报告不删除。
+    dry_run=True 只报告不删除（无需 confirm）。
     """
     root = Path(resolve_library_root(library))
     artist_dir = root / _safe_name(t2s(artist))
@@ -245,29 +250,37 @@ def cleanup_library(library: str | None, artist: str, album: str | None = None,
     result = {"status": "success", "dry_run": dry_run,
               "deleted_files": deleted_files, "removed_dirs": removed_dirs, "errors": []}
 
-    if not album:
+    if not album and not tracks:
+        # 整艺人删除（高危）：需 confirm=True 显式确认
+        if not dry_run and not confirm:
+            raise ValueError("这是整艺人目录删除（含全部专辑/单曲），需 confirm=true 显式确认")
         if not dry_run:
             shutil.rmtree(artist_dir)
         removed_dirs.append(str(artist_dir))
         return result
 
-    album_dir = artist_dir / _safe_name(t2s(album))
-    if not _under_root(album_dir, root):
-        raise ValueError(f"非法目录名（越界）: {album}")
-    if not album_dir.is_dir():
-        raise LookupError(f"专辑目录不存在: {album_dir}")
+    # 曲目/专辑操作基准：album 给定则为专辑目录；否则艺人目录本身（singles 等无专辑层级库）
+    base_dir = artist_dir / _safe_name(t2s(album)) if album else artist_dir
+    if album:
+        if not _under_root(base_dir, root):
+            raise ValueError(f"非法目录名（越界）: {album}")
+        if not base_dir.is_dir():
+            raise LookupError(f"专辑目录不存在: {base_dir}")
 
     if not tracks:
+        # 整专辑删除（高危）：需 confirm=True 显式确认
+        if not dry_run and not confirm:
+            raise ValueError("这是整专辑目录删除，需 confirm=true 显式确认")
         if not dry_run:
-            shutil.rmtree(album_dir)
+            shutil.rmtree(base_dir)
             if _rmdir_if_empty(artist_dir, root):
                 removed_dirs.append(str(artist_dir))
-        removed_dirs.insert(0, str(album_dir))
+        removed_dirs.insert(0, str(base_dir))
         return result
 
-    targets = find_album_track_files(album_dir, tracks)
+    targets = find_album_track_files(base_dir, tracks)
     if not targets:
-        raise LookupError(f"专辑内未找到匹配曲目: {tracks}")
+        raise LookupError(f"未找到匹配曲目: {tracks}")
     errors: list[str] = result["errors"]
     deleted_targets: list[Path] = []
     if dry_run:
@@ -275,7 +288,7 @@ def cleanup_library(library: str | None, artist: str, album: str | None = None,
         for f in targets:
             deleted_files.append(str(f))
             deleted_targets.append(f)
-            for lrc in (album_dir / "lyrics" / f"{f.stem}.lrc", f.with_suffix(".lrc")):
+            for lrc in (base_dir / "lyrics" / f"{f.stem}.lrc", f.with_suffix(".lrc")):
                 if lrc.is_file() and str(lrc) not in deleted_files:
                     deleted_files.append(str(lrc))
     else:
@@ -286,7 +299,7 @@ def cleanup_library(library: str | None, artist: str, album: str | None = None,
                 deleted_targets.append(f)
             except Exception as e:
                 errors.append(f"{f}: {e}")
-            for lrc in (album_dir / "lyrics" / f"{f.stem}.lrc", f.with_suffix(".lrc")):
+            for lrc in (base_dir / "lyrics" / f"{f.stem}.lrc", f.with_suffix(".lrc")):
                 try:
                     if lrc.is_file():
                         lrc.unlink()
@@ -294,18 +307,18 @@ def cleanup_library(library: str | None, artist: str, album: str | None = None,
                             deleted_files.append(str(lrc))
                 except Exception as e:
                     errors.append(f"{lrc}: {e}")
-        for cd in sorted(album_dir.iterdir()):
+        for cd in sorted(base_dir.iterdir()):
             if cd.is_dir() and re.fullmatch(r"CD\d+", cd.name, re.IGNORECASE):
                 _rmdir_if_empty(cd, root)
     if errors:
         result["status"] = "partial"
-    if not [f for f in _audio_files(album_dir) if f not in deleted_targets]:
-        # 专辑已无音频残留：整目录删（含 cover/album_info/lyrics），再清空艺人目录
+    if not [f for f in _audio_files(base_dir) if f not in deleted_targets]:
+        # 已无音频残留：整目录删（含 cover/album_info/lyrics），再清空艺人目录
         if not dry_run:
-            shutil.rmtree(album_dir, ignore_errors=True)
-            if _rmdir_if_empty(artist_dir, root):
+            shutil.rmtree(base_dir, ignore_errors=True)
+            if base_dir != artist_dir and _rmdir_if_empty(artist_dir, root):
                 removed_dirs.append(str(artist_dir))
-        removed_dirs.insert(0, str(album_dir))
+        removed_dirs.insert(0, str(base_dir))
     return result
 
 

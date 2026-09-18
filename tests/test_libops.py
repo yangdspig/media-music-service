@@ -183,7 +183,7 @@ def test_cleanup_library_whole_album_and_artist(tmp_path, monkeypatch):
     root = tmp_path / "lib"
     monkeypatch.setattr(settings, "extra_library_roots", {"t": str(root)})
     album_dir = _make_album(root)
-    libops.cleanup_library("t", "艺人", "专辑")
+    libops.cleanup_library("t", "艺人", "专辑", confirm=True)  # 整目录删除需显式确认
     assert not album_dir.exists()
     assert not (root / "艺人").exists()
 
@@ -423,3 +423,95 @@ def test_migrate_singles_artist_image_dedup_when_target_has_one(tmp_path, monkey
     assert r["status"] == "success"
     assert target_img.read_bytes() == b"target-version"  # 目标头像不被覆盖
     assert not (src / "陈奕迅").exists()
+
+
+def test_cleanup_library_tracks_without_album_singles(tmp_path, monkeypatch):
+    """singles 结构（艺人目录直接放曲目）：tracks 无 album 只删指定曲目及其 sidecar。
+
+    事故回归：旧实现未传 album 时忽略 tracks，直接 rmtree 整个艺人目录。
+    """
+    root = tmp_path / "singles"
+    monkeypatch.setattr(settings, "extra_library_roots", {"singles": str(root)})
+    target = _touch(root / "林志颖" / "十七岁的雨季.wav")
+    _touch(root / "林志颖" / "十七岁的雨季.lrc")
+    _touch(root / "林志颖" / "戏梦.wav")     # 同目录其他曲目必须保留
+    _touch(root / "林志颖" / "artist.jpg")   # 艺人头像必须保留
+    r = libops.cleanup_library("singles", "林志颖", tracks=["十七岁的雨季"])
+    assert not target.exists()
+    assert not (root / "林志颖" / "十七岁的雨季.lrc").exists()  # sidecar 连带删
+    assert (root / "林志颖" / "戏梦.wav").exists()
+    assert (root / "林志颖" / "artist.jpg").exists()
+    assert (root / "林志颖").exists()          # 还有音频残留，艺人目录保留
+    assert str(target) in r["deleted_files"]
+
+
+def test_cleanup_library_tracks_without_album_no_match(tmp_path, monkeypatch):
+    """tracks 无 album 匹配不到：抛 LookupError，任何东西都不删。"""
+    root = tmp_path / "singles"
+    monkeypatch.setattr(settings, "extra_library_roots", {"singles": str(root)})
+    keep = _touch(root / "林志颖" / "戏梦.wav")
+    with pytest.raises(LookupError):
+        libops.cleanup_library("singles", "林志颖", tracks=["不存在的歌xyz"])
+    assert keep.exists()
+    assert (root / "林志颖").exists()
+
+
+def test_cleanup_library_whole_artist_requires_confirm(tmp_path, monkeypatch):
+    """整艺人删除（无 album 无 tracks）未传 confirm：抛 ValueError 且不删。"""
+    root = tmp_path / "lib"
+    monkeypatch.setattr(settings, "extra_library_roots", {"t": str(root)})
+    album_dir = _make_album(root)
+    with pytest.raises(ValueError):
+        libops.cleanup_library("t", "艺人")
+    assert album_dir.exists()
+    assert (root / "艺人").exists()
+
+
+def test_cleanup_library_whole_artist_with_confirm(tmp_path, monkeypatch):
+    """整艺人删除 confirm=True：正常删除。"""
+    root = tmp_path / "lib"
+    monkeypatch.setattr(settings, "extra_library_roots", {"t": str(root)})
+    _make_album(root)
+    r = libops.cleanup_library("t", "艺人", confirm=True)
+    assert not (root / "艺人").exists()
+    assert r["status"] == "success"
+
+
+def test_cleanup_library_whole_album_requires_confirm(tmp_path, monkeypatch):
+    """整专辑删除（有 album 无 tracks）未传 confirm：抛 ValueError 且不删。"""
+    root = tmp_path / "lib"
+    monkeypatch.setattr(settings, "extra_library_roots", {"t": str(root)})
+    album_dir = _make_album(root)
+    with pytest.raises(ValueError):
+        libops.cleanup_library("t", "艺人", "专辑")
+    assert album_dir.exists()
+
+
+def test_cleanup_library_dry_run_no_confirm_needed(tmp_path, monkeypatch):
+    """dry_run 只报告不删除，整艺人/整专辑均无需 confirm。"""
+    root = tmp_path / "lib"
+    monkeypatch.setattr(settings, "extra_library_roots", {"t": str(root)})
+    album_dir = _make_album(root)
+    r = libops.cleanup_library("t", "艺人", dry_run=True)
+    assert r["removed_dirs"]                      # 报告了将删的目录
+    assert (root / "艺人").exists()               # 但实际未删
+    r = libops.cleanup_library("t", "艺人", "专辑", dry_run=True)
+    assert album_dir.exists()
+
+
+def test_cleanup_endpoint_confirm_enforced(tmp_path, monkeypatch):
+    """REST 层：整艺人删除未传 confirm 返回 400 且不删，confirm=true 正常执行。"""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    root = tmp_path / "lib"
+    monkeypatch.setattr(settings, "extra_library_roots", {"t": str(root)})
+    album_dir = _make_album(root)
+    client = TestClient(app)
+    resp = client.post("/api/v1/library/cleanup", json={"library": "t", "artist": "艺人"})
+    assert resp.status_code == 400
+    assert "confirm" in resp.json()["detail"]
+    assert album_dir.exists()  # 未确认前任何东西都不删
+    resp = client.post("/api/v1/library/cleanup",
+                       json={"library": "t", "artist": "艺人", "confirm": True})
+    assert resp.status_code == 200
+    assert not (root / "艺人").exists()

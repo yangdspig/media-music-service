@@ -122,8 +122,8 @@ mcp:
 ### replace_album_track(artist, album, track, library?, sources?, force?, max_size_mb?)
 重新搜索专辑中指定曲目，用更高音质版本替换（同步，含一次搜索+下载）。新候选音质分档（无损 > 320k > 其他）高于现有文件才替换，否则返回 `action=kept` 不动文件；`force=True` 强制替换。`track` 传序号（如 `"3"`）或曲名，多 Disc 专辑可用 `"D-NN"` 消歧（如 `"2-03"` 指 CD2 第 3 首）。替换后序号/专辑/艺人/日期沿用旧 tag（旧 `n/N` 序号归一化为纯数字），封面沿用专辑 `cover.*`，歌词放音频旁（同目录同名）并嵌入 tag。返回 `action`（replaced/kept/unmatched/failed）与新旧版本信息。
 
-### cleanup_library(artist, album?, tracks?, library?, dry_run?)
-清理媒体库中的专辑或曲目文件（同步）。粒度：`tracks` 指定曲目 > `album` 整专辑 > `artist` 整艺人；存放文件的目录变空时自底向上一并清理（空 CDx/ → 无音频残留的专辑目录 → 空艺人目录）。`tracks` 元素为序号（如 `"3"`）、`"D-NN"` 或曲名。**强烈建议先 `dry_run=True` 跑一遍确认将删除的项**（返回 `deleted_files`/`removed_dirs`），确认后再正式执行；部分删除失败时返回 `status=partial` 且 `errors` 非空。
+### cleanup_library(artist, album?, tracks?, library?, dry_run?, confirm?)
+清理媒体库中的专辑或曲目文件（同步）。粒度：`tracks` 指定曲目 > `album` 整专辑 > `artist` 整艺人；`tracks` 可单独配合 `artist`（不传 `album`），在艺人目录内直接匹配曲目（适配 singles 等无专辑层级的库），匹配不到报错且不动任何文件。存放文件的目录变空时自底向上一并清理（空 CDx/ → 无音频残留的专辑目录 → 空艺人目录）。`tracks` 元素为序号（如 `"3"`）、`"D-NN"` 或曲名。**强烈建议先 `dry_run=True` 跑一遍确认将删除的项**（返回 `deleted_files`/`removed_dirs`），确认后再正式执行；部分删除失败时返回 `status=partial` 且 `errors` 非空。**高危确认**：整艺人/整专辑删除（rmtree 整目录、不可恢复）必须显式传 `confirm=True`，否则报 400；曲目级删除与 `dry_run` 不需要。
 
 ### migrate_singles(library?, target_library?, artist?, dry_run?)
 扫描专辑库中只有一个音频文件的专辑目录（单曲专辑），迁移到 singles 库 `{目标根}/{艺人}/{曲名.ext}`（同步）。迁移后清除序号类 tag（保留专辑名/流派/封面/歌词），同名 `.lrc` 一并移动，原专辑目录与空艺人目录自动清理；目标已存在同名文件则跳过。`artist` 可限定单个艺人；**建议先 `dry_run=True` 确认迁移范围**（返回 `migrated` 的 from/to 列表），再正式执行。
