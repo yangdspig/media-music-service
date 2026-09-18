@@ -75,7 +75,7 @@ curl 'http://127.0.0.1:8765/api/v1/search?keyword=周杰伦&limit=3' | jq '.tota
 - 配置：宿主机 `./config.yaml` 挂载进两个容器，是**唯一配置源**（核心服务 + MCP 适配器共用），改完 `docker compose restart` 生效
 - **【常见坑】`config.yaml` 里的所有路径（`download_root`/`db_path`/`library_root` 等）必须填容器内路径**——即 compose volumes 冒号**右侧**的挂载点（如 `/app/downloads`、`/app/data/...`、`/library`）。填宿主机路径不会报错，服务会静默在容器临时层建目录：下载显示"成功"但宿主机上看不到文件、数据库重启即丢失
 - **媒体库（可选，archive_album 归档目标）**：在 `docker-compose.yml` 的 volumes 里取消注释媒体库挂载行（如 `/vol02/1000-0-ba5fad3f/Music:/library:rw`），并把 `config.yaml` 的 `library_root` 设为 `/library`，重启生效。归档目录结构为 `{library_root}/{艺人}/{专辑}/`，多 Disc 专辑用 `CD1/CD2` 子目录
-- **MCP HTTP 适配器（可选）**：启用前在 `config.yaml` 把 `mcp.transport` 改为 `http`、`mcp.service_url` 改为 `http://music-service:8765`，再 `docker compose --profile mcp up -d`。适配器配置全部来自 `config.yaml` 的 `mcp` 段，compose 里无需再设环境变量
+- **MCP HTTP 适配器（可选）**：启用前在 `config.yaml` 把 `mcp.transport` 改为 `http`、`mcp.service_url` 改为 `http://music-service:8765`，再 `docker compose --profile mcp up -d`。适配器配置全部来自 `config.yaml` 的 `mcp` 段，compose 里无需再设环境变量。**注意：`music-service` 服务名依赖 compose 默认 bridge 网络的 Docker DNS；若两个容器改用 `network_mode: host`，`mcp.service_url` 必须改为 `http://127.0.0.1:8765`，否则报 `Name or service not known`**
 
 ## 六、常见问题
 
@@ -84,6 +84,8 @@ curl 'http://127.0.0.1:8765/api/v1/search?keyword=周杰伦&limit=3' | jq '.tota
 3. **海外源（Spotify/YouTube Music 等）超时**：属网络环境限制，与镜像无关；可通过 musicdl 的代理配置或在宿主机/网关层解决。
 4. **HLS/Apple Music 下载报错**：确认容器内 `N_m3u8DL-RE` 可用：`docker exec media-music-service N_m3u8DL-RE --version`。
 5. **防火墙**：只需开放 `8765`（REST）；只有启用 MCP HTTP 适配器时才需 `8766`。
+6. **搜索/下载整体卡死或极慢（NAS 常见）**：若机器通过路由广播拿到了 IPv6 地址但 IPv6 出口不通，DNS 返回的 AAAA 记录会让 Python 网络库串行尝试 IPv6 并卡到内核 TCP 超时（约 2 分钟/次），表现为多源搜索超时、封面下载极慢。镜像已内置 IPv4-only 补丁（`app/__init__.py`，DNS 解析层过滤 IPv6 结果）；确认环境 IPv6 正常后可用环境变量 `MUSIC_SERVICE_ENABLE_IPV6=1` 关闭补丁。治本请在路由器/NAS 网络设置里关闭或修复 IPv6。
+7. **MCP 适配器报 `Name or service not known`**：`network_mode: host` 下没有 Docker 内嵌 DNS，服务名 `music-service` 无法解析，把 `config.yaml` 的 `mcp.service_url`（或环境变量 `MUSIC_SERVICE_URL`）改为 `http://127.0.0.1:8765`。
 
 ## 七、升级 musicdl
 

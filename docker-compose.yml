@@ -49,6 +49,8 @@ services:
       TZ: Asia/Shanghai
       # 覆盖 config.yaml 的 mcp 段：容器内强制 http 传输、指向核心服务
       MUSIC_MCP_TRANSPORT: "http"
+      # 服务名解析依赖 compose 默认 bridge 网络；若改用 network_mode: host，
+      # 必须改成 http://127.0.0.1:8765，否则报 "Name or service not known"
       MUSIC_SERVICE_URL: "http://music-service:8765"
     ports:
       - "8766:8766"

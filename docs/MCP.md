@@ -39,7 +39,7 @@ mcp:
   transport: "stdio"  # stdio：本地 Agent 直接拉起；http：远程 Agent
   host: "0.0.0.0"     # http 模式监听地址
   port: 8766          # http 模式监听端口
-  service_url: "http://127.0.0.1:8765"  # 核心 REST 服务地址；docker 部署改为 http://music-service:8765
+  service_url: "http://127.0.0.1:8765"  # 核心 REST 服务地址；docker 默认 bridge 网络部署改为 http://music-service:8765，network_mode: host 时保持 127.0.0.1
 ```
 
 鉴权复用 `config.yaml` 顶层 `api_key`：核心服务开了鉴权时，适配器自动带同一 key，无需单独配置。
@@ -73,7 +73,7 @@ mcp:
 
 ### 方式 B：http（远程 Agent）
 
-先在部署机的 `config.yaml` 中把 `mcp.transport` 改为 `http`、`mcp.service_url` 改为 `http://music-service:8765`（docker 容器间通信），然后启动 MCP HTTP 服务：`docker compose --profile mcp up -d`（监听 8766），接着：
+先在部署机的 `config.yaml` 中把 `mcp.transport` 改为 `http`、`mcp.service_url` 改为 `http://music-service:8765`（docker 默认 bridge 网络下容器间通信；若用 `network_mode: host` 部署则改为 `http://127.0.0.1:8765`），然后启动 MCP HTTP 服务：`docker compose --profile mcp up -d`（监听 8766），接着：
 
 ```json
 {
@@ -153,4 +153,5 @@ mcp:
 - **Agent 看不到工具**：检查 `command`/`args` 路径、`fastmcp` 是否已装进对应 Python 环境；
 - **调用报连接错误**：确认 `MUSIC_SERVICE_URL` 指向的核心 REST 服务已启动（`curl …/api/v1/health`）；
 - **提交下载报 400 提示缓存未命中**：仅传 `id` 时依赖服务端搜索缓存（1 小时有效，重启失效），重新 `search_tracks` 再提交即可；
-- **http 模式连不上**：检查 `8766` 端口是否放行、`mcp.service_url` 指向的核心 REST 服务是否可达（docker 部署应为 `http://music-service:8765`）。
+- **http 模式连不上**：检查 `8766` 端口是否放行、`mcp.service_url` 指向的核心 REST 服务是否可达（docker 默认 bridge 网络应为 `http://music-service:8765`；`network_mode: host` 时必须用 `http://127.0.0.1:8765`，否则报 `Name or service not known`）；
+- **搜索超时 / 归档特别慢**：若部署机 IPv6 出口不通但 DNS 返回 AAAA 记录，Python 库会串行尝试 IPv6 卡到内核超时。镜像已内置 IPv4-only 补丁；环境 IPv6 正常时可设 `MUSIC_SERVICE_ENABLE_IPV6=1` 关闭。
