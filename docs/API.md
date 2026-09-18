@@ -487,6 +487,47 @@
 
 ---
 
+### POST /api/v1/library/backfill_lyrics
+
+扫描库内**无歌词**的音频文件（flac/mp3/m4a/ogg/wma/wav/ape 等），搜索匹配后写同名 `.lrc` sidecar（**同步**，网络密集型）。背景：老专辑（如自建 CD 抓轨入库）没有歌词，而飞牛音乐只在扫描音频文件时摄取歌词、不重读已入库文件的 tag——故回填只写同名 sidecar 文件，**绝不修改音频文件、不覆盖已有 `.lrc`**。已有 sidecar 或内嵌歌词（flac `LYRICS` / mp3 `USLT` / m4a `©lyr`；wav/ape 只看 sidecar）的曲目跳过。曲名/艺人优先取文件 tag，缺失时回退文件名（去 `NN - ` 前缀）与艺人目录名；匹配复用专辑消歧打分（标题 0.6 / 艺人 0.4，阈值 0.6；另加艺人相似度下限 0.5，防标题完全相同的同名歌错配无关艺人），只在带歌词的候选中择优。
+
+> **回填后需手动触发飞牛重刮**：飞牛 watcher 对单独的 `.lrc` 文件事件记 `skip non-audio file` 跳过，UI「重扫」是增量扫描也不处理未变化的音频文件。实测有效的做法：把对应专辑目录移出媒体库根目录再移回（`mv` 出库回库，触发 OnDirMovedIn → AfterRescrape），曲目 ID 不变，收藏/播放记录保留。新下载归档的曲目不受影响（音频是新文件，扫描时自然带上歌词）。
+
+**请求体**
+
+| 字段 | 必填 | 默认 | 说明 |
+|---|---|---|---|
+| `library` | 否 | 默认库 | 库名（见 `/api/v1/libraries`） |
+| `artist` | 否 | — | 限定单个艺人；留空扫描整个库 |
+| `album` | 否 | — | 限定单个专辑（需配合 `artist`） |
+| `sources` | 否 | 默认五源 | 参与搜索的源名列表 |
+| `limit` | 否 | 50 | 单次处理曲目数上限；超出时 `has_more=true`，分批调用 |
+| `dry_run` | 否 | **true** | 只扫描与匹配并报告，不写文件（**默认安全，建议先跑一遍看匹配质量**）；`false` 才实际写 `.lrc` |
+
+**响应 200**
+
+```json
+{
+  "status": "success | partial",
+  "dry_run": true,
+  "library_dir": "/library",
+  "scanned": 50,
+  "has_more": true,
+  "summary": {"already_has_lyrics": 30, "matched": 12, "unmatched": 8},
+  "tracks": [
+    {"path": "林志颖/戏梦/01 - 戏梦.flac", "status": "matched", "score": 0.95,
+     "title": "戏梦", "artist": "林志颖",
+     "matched": {"source": "NeteaseMusicClient", "title": "戏梦", "artists": ["林志颖"]}}
+  ]
+}
+```
+
+> 逐曲 `status`：`already_has_lyrics`（已有 sidecar/内嵌歌词，跳过）、`matched`（dry_run 下命中可回填）、`unmatched`（无合格带歌词候选）、`written`（已写 `.lrc`）、`error`（写文件失败，整体 `status=partial`）。
+
+**400**：未知库名 / 艺人目录不存在 / `limit` < 1
+
+---
+
 ## 错误码
 
 | 状态码 | 场景 |

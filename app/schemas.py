@@ -158,6 +158,16 @@ class ReplaceTrackRequest(BaseModel):
     max_size_mb: Optional[float] = Field(default=None, description="单文件体积上限（MB），>0 优先于配置，0/空不限")
 
 
+class BackfillLyricsRequest(BaseModel):
+    """歌词回填请求：扫描库内无歌词的音频文件，搜索匹配后写同名 .lrc sidecar。"""
+    library: Optional[str] = Field(default=None, description="库名（见 GET /api/v1/libraries）；留空用默认库")
+    artist: Optional[str] = Field(default=None, description="限定单个艺人；留空扫描整个库")
+    album: Optional[str] = Field(default=None, description="限定单个专辑（需配合 artist）；留空不限")
+    sources: Optional[list[str]] = Field(default=None, description="参与搜索的源，留空用默认五源")
+    limit: int = Field(default=50, description="单次处理的曲目数上限（网络密集型，分批调用）")
+    dry_run: bool = Field(default=True, description="只扫描与匹配并报告，不写文件；False 才实际写 .lrc")
+
+
 class TaskStatus:
     PENDING = "pending"
     RUNNING = "running"

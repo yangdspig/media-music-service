@@ -386,6 +386,41 @@ def replace_album_track(artist: str, album: str, track: str, library: str | None
         return r.json()
 
 
+@mcp.tool()
+def backfill_lyrics(library: str | None = None, artist: str | None = None,
+                    album: str | None = None, sources: str | None = None,
+                    limit: int = 50, dry_run: bool = True) -> dict:
+    """扫描库内无歌词的音轨，搜索匹配后写同名 .lrc sidecar（同步，网络密集型）。
+
+    只写新的 sidecar 文件（飞牛音乐 watcher 能扫到新文件，但不重读已入库文件的 tag），
+    绝不修改音频文件、不覆盖已有 .lrc；已有 sidecar 或内嵌歌词（flac/mp3/m4a）的曲目跳过。
+
+    Args:
+        library: 库名（可选，见 list_libraries；留空用默认库）
+        artist: 限定单个艺人（可选；留空扫描整个库）
+        album: 限定单个专辑（可选，需配合 artist）
+        sources: 逗号分隔的源名（可选，留空用默认五源）
+        limit: 单次处理曲目数上限（默认 50；网络密集型，超出时返回 has_more=true，分批调用）
+        dry_run: 默认 True 只扫描与匹配并报告（建议先跑一遍确认匹配质量），False 才实际写 .lrc
+    Returns:
+        逐曲报告：path、status（already_has_lyrics/matched/unmatched/written/error）、
+        score 与 matched（source/title/artists）；summary 计数、has_more 标记。
+    """
+    payload: dict[str, Any] = {"limit": limit, "dry_run": dry_run}
+    if library:
+        payload["library"] = library
+    if artist:
+        payload["artist"] = artist
+    if album:
+        payload["album"] = album
+    if sources:
+        payload["sources"] = [s.strip() for s in sources.split(",") if s.strip()]
+    with _client() as c:
+        r = c.post("/api/v1/library/backfill_lyrics", json=payload, timeout=600)
+        r.raise_for_status()
+        return r.json()
+
+
 if __name__ == "__main__":
     transport = os.environ.get("MUSIC_MCP_TRANSPORT") or _CFG.get("transport") or "stdio"
     if transport == "stdio":

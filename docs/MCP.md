@@ -6,7 +6,7 @@
 
 - 服务名：`media-music`
 - 实现：基于 FastMCP 的**薄客户端**，不直接依赖 musicdl，所有能力通过 HTTP 调用核心 REST 服务
-- 工具数：14 个
+- 工具数：15 个
 - 传输方式：**stdio**（默认，本地 Agent 直接拉起，推荐）/ **http**（远程 Agent）
 
 ### 与 REST API 的关系
@@ -27,6 +27,7 @@
 | `replace_album_track` | `POST /api/v1/library/replace_track` |
 | `cleanup_library` | `POST /api/v1/library/cleanup` |
 | `migrate_singles` | `POST /api/v1/library/migrate_singles` |
+| `backfill_lyrics` | `POST /api/v1/library/backfill_lyrics` |
 
 > 核心 REST 服务必须先启动并可达（默认 `http://127.0.0.1:8765`），MCP 适配器只是它的客户端。
 
@@ -113,7 +114,7 @@ mcp:
 专辑整单下载（异步）。服务端逐曲搜索匹配消歧（打分含标题/歌手/专辑/时长，低于阈值记 `unmatched` 不强行下载；同分段候选优先无损音质，没有合格无损才选 MP3），按曲目序号命名落盘（`01 曲名.flac`，多 Disc 为 `1-01 曲名.flac`），附 `cover.jpg` 与 `manifest.json`。**singles 库复用**：服务端配置了 `singles` 命名库时，逐曲匹配前先在 singles 库查找同专辑曲目，命中则不搜索不下载（manifest 的 `match.source` 为 `"singles"` 且带 `reused_from` 原路径），归档成功后该曲目自动从 singles 库迁移删除。返回 `task_id`，用 `get_download_status` 轮询。`album_title`/`artist` 用于 iTunes 专辑名是罗马音/拼音时显式指定中文显示名（写入 manifest 供归档使用）。`max_size_mb` 为单文件体积上限（MB）：超限不是硬剔除，优先选不超限且达阈值的候选，无合格不超限候选时才放宽限制选超限最高分（优先保专辑完整与版本正确），并在 manifest 标注 `oversized_relaxed: true` 供复核。
 
 ### archive_album(task_id?, manifest_path?, overwrite?, album_title?, artist?, library?, compilation?)
-把专辑下载产物归档进媒体库（同步，秒级）：先在下载目录（库外）写好 tag/嵌封面歌词 → 硬链接（失败回退复制）入库 → `cover.jpg` + `album_info.txt`。库内结构 `{库根}/{艺人}/{专辑}/`，多 Disc 用 `CD1/CD2` 子目录；序号 tag 写纯数字（总数另写 TRACKTOTAL/DISCTOTAL），流派写 GENRE/TCON（取自 manifest 的 `album.genre`，中文源接管为空时按艺人查 iTunes 兜底，写入前统一归一化，不传时保留文件已有流派），sidecar `.lrc` 与音频同目录同名（所有格式都迁，不只 flac/mp3）。归档结果逐曲带 `lyric` 字段（ok/missing）标记歌词是否随曲入库。`task_id`（服务未重启时）与 `manifest_path` 二选一；默认幂等跳过已存在文件。前置：服务端已配置 `library_root` 并挂载媒体库卷；`library` 选择目标库（见 `list_libraries`），留空用默认库。专辑名/艺人名按解析链确定：显式参数 > manifest display_* > 自动推断（国内源多数表决，仅在原名为罗马音时生效）> iTunes 原名——**罗马音专辑名一般无需手动传参，归档会自动纠正为中文**。合集专辑（Various Artists/群星）自动归档到 `{库根}/群星/{专辑}/`，逐曲艺人写 ARTIST、COMPILATION=1；`compilation` 参数可强制覆盖自动判定。
+把专辑下载产物归档进媒体库（同步，秒级）：先在下载目录（库外）写好 tag/嵌封面歌词 → 硬链接（失败回退复制）入库 → `cover.jpg` + `album_info.txt`。库内结构 `{库根}/{艺人}/{专辑}/`，多 Disc 用 `CD1/CD2` 子目录；序号 tag 写纯数字（总数另写 TRACKTOTAL/DISCTOTAL），流派写 GENRE/TCON（取自 manifest 的 `album.genre`，中文源接管为空时按艺人查 iTunes 兜底，写入前统一归一化，不传时保留文件已有流派），sidecar `.lrc` 与音频同目录同名（所有格式都迁，不只 flac/mp3）。归档结果逐曲带 `lyric` 字段（ok/missing）标记歌词是否随曲入库；有 missing 时可用 `backfill_lyrics` 事后回填。`task_id`（服务未重启时）与 `manifest_path` 二选一；默认幂等跳过已存在文件。前置：服务端已配置 `library_root` 并挂载媒体库卷；`library` 选择目标库（见 `list_libraries`），留空用默认库。专辑名/艺人名按解析链确定：显式参数 > manifest display_* > 自动推断（国内源多数表决，仅在原名为罗马音时生效）> iTunes 原名——**罗马音专辑名一般无需手动传参，归档会自动纠正为中文**。合集专辑（Various Artists/群星）自动归档到 `{库根}/群星/{专辑}/`，逐曲艺人写 ARTIST、COMPILATION=1；`compilation` 参数可强制覆盖自动判定。
 
 ### archive_tracks(task_id, library?, overwrite?)
 把单曲下载任务的产物归档进媒体库（同步）：先在下载目录写好 tag/嵌封面歌词（封面从候选 `cover_url` 下载）→ 硬链接/复制入库。结构 `{库根}/{艺人}/{曲名.ext}`，同名 `.lrc` 放旁边；不写曲目序号；流派按艺人查 iTunes 兜底写 GENRE/TCON（归一化，查不到跳过）。艺人目录无 `artist.*` 时按候选 `artist_img_url` 补一份艺人头像（Navidrome 本地头像约定，幂等，已有不覆盖）。`submit_download` 传了 `library` 时已自动归档，本工具用于事后补归档或换库重归档；默认幂等跳过。任务在内存中才可用（服务重启后需重新下载）。
@@ -126,6 +127,9 @@ mcp:
 
 ### migrate_singles(library?, target_library?, artist?, dry_run?)
 扫描专辑库中只有一个音频文件的专辑目录（单曲专辑），迁移到 singles 库 `{目标根}/{艺人}/{曲名.ext}`（同步）。迁移后清除序号类 tag（保留专辑名/流派/封面/歌词），同名 `.lrc` 一并移动，原专辑目录与空艺人目录自动清理；目标已存在同名文件则跳过。`artist` 可限定单个艺人；**建议先 `dry_run=True` 确认迁移范围**（返回 `migrated` 的 from/to 列表），再正式执行。
+
+### backfill_lyrics(library?, artist?, album?, sources?, limit?, dry_run?)
+扫描库内**无歌词**的音轨（flac/mp3/m4a/ogg/wma/wav/ape 等），按 tag（缺失时回退文件名/艺人目录名）搜索匹配，写同名 `.lrc` sidecar（同步，网络密集型）。**绝不修改音频、不覆盖已有 `.lrc`**；已有 sidecar 或内嵌歌词的曲目跳过。**注意：已入库曲目回填后飞牛不会自动识别歌词**——watcher 对单独的 `.lrc` 文件事件跳过（skip non-audio file），UI 重扫是增量扫描不处理未变化的音频；需把对应专辑目录移出媒体库根再移回触发飞牛重刮（曲目 ID 不变，收藏/播放记录保留）。新下载归档的曲目不受影响（音频是新文件，扫描时自然带上歌词）。匹配复用专辑消歧打分（阈值 0.6，另加艺人相似度下限 0.5 防同名歌错配无关艺人），只在带歌词的候选中择优。`limit`（默认 50）限制单次处理曲目数，超出时返回 `has_more=true` 分批调用；`dry_run` **默认 True** 只报告不写文件（先看 `matched` 的 score/来源确认质量），确认后传 `False` 实际写入。返回逐曲 `status`（already_has_lyrics/matched/unmatched/written/error）与匹配信息。
 
 ## 五、典型调用流程
 

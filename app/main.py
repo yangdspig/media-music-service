@@ -7,11 +7,11 @@ from __future__ import annotations
 from fastapi import Depends, FastAPI, Header, HTTPException
 
 from .config import settings
-from .schemas import AlbumDownloadRequest, AlbumInfo, AlbumSummary, ArchiveRequest, ArchiveResult, CleanupLibraryRequest, DownloadRequest, DownloadTask, MigrateSinglesRequest, ReplaceTrackRequest, SearchResponse, SourceInfo, Track, TrackArchiveRequest
+from .schemas import AlbumDownloadRequest, AlbumInfo, AlbumSummary, ArchiveRequest, ArchiveResult, BackfillLyricsRequest, CleanupLibraryRequest, DownloadRequest, DownloadTask, MigrateSinglesRequest, ReplaceTrackRequest, SearchResponse, SourceInfo, Track, TrackArchiveRequest
 from . import album as album_svc
 from . import archive as archive_svc
 from . import download as dl
-from . import libraries, libops, meta, registry, storage
+from . import backfill, libraries, libops, meta, registry, storage
 from .playlist import parse_playlist
 from .search import search
 
@@ -136,6 +136,15 @@ def api_replace_track(req: ReplaceTrackRequest) -> dict:
         return libops.replace_album_track(library=req.library, artist=req.artist, album=req.album,
                                           track=req.track, sources=req.sources, force=req.force,
                                           max_size_mb=req.max_size_mb)
+    except (ValueError, LookupError, RuntimeError, OSError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/v1/library/backfill_lyrics", dependencies=[Depends(auth)])
+def api_backfill_lyrics(req: BackfillLyricsRequest) -> dict:
+    try:
+        return backfill.backfill_lyrics(library=req.library, artist=req.artist, album=req.album,
+                                        sources=req.sources, limit=req.limit, dry_run=req.dry_run)
     except (ValueError, LookupError, RuntimeError, OSError) as e:
         raise HTTPException(status_code=400, detail=str(e))
 
