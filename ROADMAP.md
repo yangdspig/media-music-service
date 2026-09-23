@@ -70,6 +70,13 @@
    - cleanup 防误删（2026-09-18）：`cleanup_library` 的 `tracks` 可不传 `album`（艺人目录内直接匹配曲目，适配 singles 无专辑层级结构——修复旧实现忽略 tracks 直接 rmtree 整个艺人目录的事故）；整艺人/整专辑删除（rmtree 整目录）新增 `confirm=true` 显式确认门槛（REST/MCP 同步，dry_run 与曲目级删除不需要）
    - **后续待做**：① 合唱艺人名流派兜底落空（实测 2026-09-18：《现代爱情故事》艺人"张智霖&许秋怡"在 iTunes 四个 storefront 均无艺人条目，genre 未写入）——方案：`get_artist_genre` 直接查不到时按 `&`/`feat.`/`vs`/`/`、`、` 拆分逐个查，取第一个命中；② 归一化映射补 `广东歌/香港流行乐`→`粤语流行`；③ 修复后对该单曲补写 GENRE tag；④ 存量库流派归一化重写（择期）
 
+2i. **榜单目录（排行榜浏览 + 全量/挑选下载）** ⬜ 待启动（2026-09-23 设计文档已落档，待评审）
+   - 背景：现有链路必须从平台 App 复制歌单 URL 才能解析下载，缺少"浏览排行榜 → 选曲 → 下载"的目录层入口
+   - 设计文档：[docs/superpowers/specs/2026-09-23-charts-catalog-design.md](docs/superpowers/specs/2026-09-23-charts-catalog-design.md)（接口已 2026-09-23 实测可用）
+   - 第一期：新增 `app/charts.py` + `GET /api/v1/charts`（榜单目录）+ `GET /api/v1/charts/{source}/{chart_id}`（榜单曲目，落缓存可直接提交下载）+ MCP `list_charts`/`get_chart_tracks`；网易榜单本质是歌单（`/api/toplist` 的 id 即 playlist id，详情复用 parse_playlist）；QQ 走 `fcg_myqq_toplist.fcg`（目录）+ `fcg_v8_toplist_cp.fcg`（详情，song_begin/song_num 可分页），逐曲解析复用 musicdl QQMusicClient 的 `_parsewithofficialapiv1` + thirdpart 回退模式；下载管线零改动（全量=整表提交，挑选=子集提交）
+   - 第二期（另行立项）：歌单关键词搜索 `GET /api/v1/playlists/search`（网易 `/api/search/get` type=1000，QQ `client_search_cp` 歌单类型）
+   - 第三期（候选）：榜单/歌单解析异步化，与下方"歌单批量下载"条目是同一个问题，届时合并解决
+
 3. **MoviePilot 薄客户端插件**
    - 目标：在 MoviePilot 内完成"搜索 → 勾选 → 下载 → 入库整理"闭环
    - 要点：继承 `_PluginBase`，只做表单与 REST 调用，不直接依赖 musicdl
