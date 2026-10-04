@@ -59,6 +59,21 @@ class AuthRefreshConfig(BaseModel):
     interval_s: int = 3600  # 检查周期（秒），默认 1 小时；剩余有效期 <24h 才实际刷新
 
 
+class FnosMusicConfig(BaseModel):
+    """飞牛音乐歌单同步：纯 API 客户端（不挂载不读取 music.db）。
+
+    凭证为飞牛音乐应用内独立账号（非 fnOS 系统账号）；password 仅用于登录时 sha256
+    后请求 password-login，不回写本文件；token 持久化在 db_path 同目录的
+    fnos_music_state.json，失效自动重登。
+    """
+    base_url: str                       # 飞牛 nginx 入口，如 "https://192.168.254.112:5667"
+    username: str                       # 飞牛音乐应用账号
+    password: str                       # 飞牛音乐应用密码（内网明文，与 cookies 同级）
+    verify_tls: bool = False            # 自签证书默认关校验
+    scan_wait_s: int = 120              # 等飞牛扫描新入库文件的最长秒数
+    path_map: dict[str, str] = {}       # 容器内库根 → 宿主路径（飞牛 audioSpec.path 前缀）
+
+
 class Settings(BaseModel):
     host: str = "0.0.0.0"
     port: int = 8765
@@ -79,6 +94,7 @@ class Settings(BaseModel):
     mcp: MCPConfig = MCPConfig()  # MCP 适配器配置（仅 mcp_adapter.py 读取，核心服务不使用）
     cleanup: CleanupConfig = CleanupConfig()  # 下载目录清理规则
     auth_refresh: AuthRefreshConfig = AuthRefreshConfig()  # QQ cookie 自动保活
+    fnos_music: FnosMusicConfig | None = None  # 飞牛音乐歌单同步；未配置则功能整体禁用
 
 
 def _load_yaml(path: Path) -> dict:

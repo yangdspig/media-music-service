@@ -84,3 +84,17 @@ mcp:
   host: "0.0.0.0"     # http 模式监听地址
   port: 8766          # http 模式监听端口
   service_url: "http://127.0.0.1:8765"  # 核心 REST 服务地址；docker 部署时改为 http://music-service:8765
+
+# 飞牛音乐歌单同步（可选）：配置后启用「下载入库 → 自动同步飞牛歌单」及歌单管理端点
+# 纯 API 客户端（不挂载不读取 music.db）；凭证为飞牛音乐应用内账号（非 fnOS 系统账号）；
+# password 仅用于登录获取 token（sha256 传输），token 持久化在 data/fnos_music_state.json，不回写本文件
+# 注意：path_map 的键为本服务【容器内】库根，值为【飞牛宿主机】路径（飞牛 audioSpec.path 前缀）
+# fnos_music:
+#   base_url: "https://192.168.254.112:5667"
+#   username: "音乐应用账号"
+#   password: "音乐应用密码"
+#   verify_tls: false
+#   scan_wait_s: 120
+#   path_map:
+#     "/library": "/vol1/1000/Media/Music"
+#     "/singles": "/vol1/1000/Media/Singles"
