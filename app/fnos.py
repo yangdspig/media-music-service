@@ -79,6 +79,38 @@ def _save_state(state: dict) -> None:
     os.replace(tmp, p)
 
 
+# ---- 字段裁剪（搜索/详情出参，避免把飞牛完整对象塞给调用方） ----
+
+def _trim_track(t: dict) -> dict:
+    return {"guid": t.get("guid"), "title": t.get("title"),
+            "artists": [a.get("name") for a in (t.get("artists") or []) if a.get("name")],
+            "album": (t.get("album") or {}).get("name"),
+            "duration": t.get("duration"),
+            "path": (t.get("audioSpec") or {}).get("path")}
+
+
+def _trim_album(a: dict) -> dict:
+    return {"guid": a.get("guid"), "name": a.get("name"),
+            "artists": [x.get("name") for x in (a.get("artists") or []) if x.get("name")],
+            "track_count": a.get("trackCount")}
+
+
+def _trim_artist(a: dict) -> dict:
+    return {"guid": a.get("guid"), "name": a.get("name"),
+            "track_count": a.get("trackCount"), "album_count": a.get("albumCount")}
+
+
+def _trim_playlist(p: dict) -> dict:
+    return {"guid": p.get("guid"), "name": p.get("name"),
+            "track_count": p.get("trackCount")}
+
+
+def _trim_group(group: dict | None, trim) -> dict:
+    group = group or {}
+    return {"total": group.get("total") or 0,
+            "items": [trim(x) for x in (group.get("items") or [])]}
+
+
 class FnosClient:
     def __init__(self, base_url: str, username: str, password: str,
                  path_map: dict[str, str] | None = None, scan_wait_s: int = 120,
@@ -232,6 +264,74 @@ class FnosClient:
             page += 1
         return found
 
+    # —— 搜索 ——
+
+    def search_suggest(self, q: str) -> dict:
+        """模糊搜索 suggest：track/album/artist/playlist 四组各 top-5（字段裁剪）。"""
+        data = self.request("GET", "/search/suggest", params={"q": q}) or {}
+        return {"track": _trim_group(data.get("track"), _trim_track),
+                "album": _trim_group(data.get("album"), _trim_album),
+                "artist": _trim_group(data.get("artist"), _trim_artist),
+                "playlist": _trim_group(data.get("playlist"), _trim_playlist)}
+
+    def search_tracks(self, q: str, limit: int = 50) -> dict:
+        """曲目全量搜索（fnos 侧无分页一次返全量）：字段裁剪 + limit 截断（1..200）。"""
+        limit = min(max(int(limit or 50), 1), 200)
+        data = self.request("GET", "/search/track", params={"q": q}) or {}
+        items = [_trim_track(t) for t in (data.get("list") or [])[:limit]]
+        return {"total": data.get("total") or 0, "returned": len(items), "items": items}
+
+    # —— 编排 ——
+
+    def _find_playlist(self, name: str) -> dict | None:
+        return next((p for p in self.list_playlists() if p.get("name") == name), None)
+
+    def _dedupe_add(self, playlist_guid: str, guids: list[str]) -> tuple[int, int]:
+        """按歌单现有曲目去重后追加，返回 (added, already)。"""
+        existing = {t.get("guid") for t in self.playlist_tracks(playlist_guid)}
+        unique = list(dict.fromkeys(guids))
+        to_add = [g for g in unique if g not in existing]
+        if to_add:
+            self.add_tracks(playlist_guid, to_add)
+        return len(to_add), len(unique) - len(to_add)
+
+    def sync_playlist(self, name: str, container_paths: list[str]) -> dict:
+        """ensure 语义：歌单不存在则建；容器路径解析 guid 后去重追加（幂等）。"""
+        resolved = self.resolve_guids(container_paths)
+        guids = [g for g in resolved.values() if g]
+        unresolved = [p for p, g in resolved.items() if not g]
+        pl = self._find_playlist(name)
+        pguid = pl["guid"] if pl else self.create_playlist(name)
+        added, already = self._dedupe_add(pguid, guids)
+        return {"status": "partial" if unresolved else "ok",
+                "playlist_guid": pguid, "playlist_name": name,
+                "added": added, "already": already,
+                "unresolved": unresolved, "error": None}
+
+    def append_tracks(self, name: str, container_paths: list[str] | None = None,
+                      guids: list[str] | None = None) -> dict:
+        """严格语义：歌单必须已存在（否则 FnosPlaylistNotFound，防打错字静默建新单）；
+        guids 免路径解析直达。"""
+        pl = self._find_playlist(name)
+        if not pl:
+            raise FnosPlaylistNotFound(f"飞牛歌单不存在: {name}")
+        resolved = self.resolve_guids(container_paths or [])
+        unresolved = [p for p, g in resolved.items() if not g]
+        all_guids = [g for g in resolved.values() if g] + list(guids or [])
+        added, already = self._dedupe_add(pl["guid"], all_guids)
+        return {"status": "partial" if unresolved else "ok",
+                "playlist_guid": pl["guid"], "playlist_name": name,
+                "added": added, "already": already,
+                "unresolved": unresolved, "error": None}
+
+    def playlist_detail(self, name: str) -> dict:
+        pl = self._find_playlist(name)
+        if not pl:
+            raise FnosPlaylistNotFound(f"飞牛歌单不存在: {name}")
+        tracks = [_trim_track(t) for t in self.playlist_tracks(pl["guid"])]
+        return {"playlist_guid": pl["guid"], "playlist_name": name,
+                "count": len(tracks), "tracks": tracks}
+
 
 # ---- 单例门面（端点与下载钩子共用） ----
 
@@ -261,3 +361,30 @@ def reset_client() -> None:
     global _CLIENT
     with _CLIENT_LOCK:
         _CLIENT = None
+
+
+# ---- 模块门面（端点与下载钩子调用；测试 monkeypatch 入口） ----
+
+def list_playlists() -> list[dict]:
+    return get_client().list_playlists()
+
+
+def playlist_detail(name: str) -> dict:
+    return get_client().playlist_detail(name)
+
+
+def sync_playlist(name: str, container_paths: list[str]) -> dict:
+    return get_client().sync_playlist(name, container_paths)
+
+
+def append_tracks(name: str, container_paths: list[str] | None = None,
+                  guids: list[str] | None = None) -> dict:
+    return get_client().append_tracks(name, container_paths, guids)
+
+
+def search_suggest(q: str) -> dict:
+    return get_client().search_suggest(q)
+
+
+def search_tracks(q: str, limit: int = 50) -> dict:
+    return get_client().search_tracks(q, limit)
