@@ -94,7 +94,7 @@ def _netease_list_charts() -> list[ChartSummary]:
 def get_chart_tracks(source: str, chart_id: str, limit: int | None = None) -> list[Track]:
     """取榜单曲目（标准化 Track，含下载地址，已落缓存可直接 submit_download）。
 
-    QQ 侧 song_num 单页上限 100，limit 缺省/超出均按 100；网易云为全量解析后截断（Task 4）。
+    QQ 侧 song_num 单页上限 100，limit 缺省/超出均按 100；网易云为全量解析后截断。
     逐曲解析失败的条目跳过，不阻断整榜。
     """
     if source == "qq":
