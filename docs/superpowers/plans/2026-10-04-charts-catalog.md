@@ -116,7 +116,7 @@ def test_list_charts_bad_source():
 
 - [ ] **Step 2: 跑测试确认失败**
 
-Run: `.venv/bin/pytest tests/test_charts.py -v`
+Run: `.venv/bin/python -m pytest tests/test_charts.py -v`
 Expected: FAIL（`ModuleNotFoundError: No module named 'app.charts'`）
 
 - [ ] **Step 3: 实现 ChartSummary 与 charts 骨架**
@@ -224,7 +224,7 @@ def get_chart_tracks(source: str, chart_id: str, limit: int | None = None) -> li
 
 - [ ] **Step 4: 跑测试确认通过**
 
-Run: `.venv/bin/pytest tests/test_charts.py -v`
+Run: `.venv/bin/python -m pytest tests/test_charts.py -v`
 Expected: 3 passed
 
 - [ ] **Step 5: Commit**
@@ -278,7 +278,7 @@ def test_netease_list_charts_blocked(monkeypatch):
 
 - [ ] **Step 2: 跑测试确认失败**
 
-Run: `.venv/bin/pytest tests/test_charts.py -k netease -v`
+Run: `.venv/bin/python -m pytest tests/test_charts.py -k netease -v`
 Expected: FAIL（`NotImplementedError`）
 
 - [ ] **Step 3: 实现 `_netease_list_charts`**
@@ -310,7 +310,7 @@ def _netease_list_charts() -> list[ChartSummary]:
 
 - [ ] **Step 4: 跑测试确认通过**
 
-Run: `.venv/bin/pytest tests/test_charts.py -v`
+Run: `.venv/bin/python -m pytest tests/test_charts.py -v`
 Expected: 5 passed
 
 - [ ] **Step 5: Commit**
@@ -467,7 +467,7 @@ def test_qq_chart_tracks_client_unavailable(monkeypatch):
 
 - [ ] **Step 2: 跑测试确认失败**
 
-Run: `.venv/bin/pytest tests/test_charts.py -k "qq_chart or resolve" -v`
+Run: `.venv/bin/python -m pytest tests/test_charts.py -k "qq_chart or resolve" -v`
 Expected: FAIL（`NotImplementedError` / `AttributeError`）
 
 - [ ] **Step 3: 实现 QQ 榜单曲目**
@@ -542,7 +542,7 @@ def _netease_chart_tracks(chart_id: str, limit: int | None) -> list[Track]:
 
 - [ ] **Step 4: 跑测试确认通过**
 
-Run: `.venv/bin/pytest tests/test_charts.py -v`
+Run: `.venv/bin/python -m pytest tests/test_charts.py -v`
 Expected: 12 passed
 
 - [ ] **Step 5: Commit**
@@ -595,7 +595,7 @@ def test_netease_chart_tracks_no_limit(monkeypatch):
 
 - [ ] **Step 2: 跑测试确认失败**
 
-Run: `.venv/bin/pytest tests/test_charts.py -k netease_chart -v`
+Run: `.venv/bin/python -m pytest tests/test_charts.py -k netease_chart -v`
 Expected: FAIL（`NotImplementedError`）
 
 - [ ] **Step 3: 实现 `_netease_chart_tracks`**
@@ -613,12 +613,12 @@ def _netease_chart_tracks(chart_id: str, limit: int | None) -> list[Track]:
 
 - [ ] **Step 4: 跑测试确认通过**
 
-Run: `.venv/bin/pytest tests/test_charts.py -v`
+Run: `.venv/bin/python -m pytest tests/test_charts.py -v`
 Expected: 14 passed
 
 - [ ] **Step 5: 全量回归**
 
-Run: `.venv/bin/pytest -v`
+Run: `.venv/bin/python -m pytest -v`
 Expected: 全部通过（既有用例不受影响）
 
 - [ ] **Step 6: Commit**
@@ -686,7 +686,7 @@ def api_chart_tracks(source: str, chart_id: str, limit: int | None = None) -> li
 Run: `.venv/bin/python -c "from app.main import app; print([r.path for r in app.routes if 'charts' in r.path])"`
 Expected: `['/api/v1/charts', '/api/v1/charts/{source}/{chart_id}']`
 
-Run: `.venv/bin/pytest -v`
+Run: `.venv/bin/python -m pytest -v`
 Expected: 全部通过
 
 - [ ] **Step 4: Commit**
