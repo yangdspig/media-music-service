@@ -46,7 +46,8 @@ def list_charts(source: str) -> list[ChartSummary]:
 
 
 def _qq_list_charts() -> list[ChartSummary]:
-    r = httpx.get(QQ_LIST_URL, headers=_QQ_HEADERS, timeout=_TIMEOUT)
+    # format=json 必须显式传：缺省时 fcg 接口返回 JSONP（MusicJsonCallback 包裹）无法直接解析
+    r = httpx.get(QQ_LIST_URL, params={"format": "json"}, headers=_QQ_HEADERS, timeout=_TIMEOUT)
     r.raise_for_status()
     data = r.json()
     if data.get("code") != 0:
@@ -107,7 +108,8 @@ def get_chart_tracks(source: str, chart_id: str, limit: int | None = None) -> li
 def _qq_chart_tracks(chart_id: str, limit: int | None) -> list[Track]:
     song_num = min(limit, _QQ_PAGE_CAP) if limit else _QQ_PAGE_CAP
     r = httpx.get(QQ_DETAIL_URL, params={"topid": chart_id, "tpl": 3, "page": "detail",
-                                         "type": "top", "song_begin": 0, "song_num": song_num},
+                                         "type": "top", "song_begin": 0, "song_num": song_num,
+                                         "format": "json"},
                   headers=_QQ_HEADERS, timeout=_TIMEOUT)
     r.raise_for_status()
     data = r.json()
@@ -151,7 +153,9 @@ def _resolve_qq_track(client, search_result: dict):
 
 def _netease_chart_tracks(chart_id: str, limit: int | None) -> list[Track]:
     # 网易云榜单 id 即 playlist id，详情复用歌单解析（全量逐曲，无法分页，大榜单较慢）；
-    # parse_playlist 内部已 cache_tracks
-    tracks = parse_playlist(url=f"https://music.163.com/playlist?id={chart_id}",
+    # parse_playlist 内部已 cache_tracks。
+    # 必须用 #/playlist?id= 片段形式：musicdl 从 URL fragment/path 提取 playlist id，
+    # ?id= 查询串形式会误取为字面量 "playlist" 导致解析 0 首（2026-10-04 E2E 实测）。
+    tracks = parse_playlist(url=f"https://music.163.com/#/playlist?id={chart_id}",
                             source="NeteaseMusicClient")
     return tracks[:limit] if limit else tracks

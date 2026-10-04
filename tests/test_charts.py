@@ -49,6 +49,19 @@ def test_qq_list_charts_error_code(monkeypatch):
         charts.list_charts("qq")
 
 
+def test_qq_list_charts_requests_json_format(monkeypatch):
+    # fcg 接口缺省返回 JSONP（MusicJsonCallback 包裹），必须显式传 format=json（2026-10-04 E2E 实测）
+    captured = {}
+
+    def _fake_get(url, **kw):
+        captured["params"] = kw.get("params")
+        return FakeResp(QQ_LIST_RESP)
+
+    monkeypatch.setattr(httpx, "get", _fake_get)
+    charts.list_charts("qq")
+    assert (captured["params"] or {}).get("format") == "json"
+
+
 def test_list_charts_bad_source():
     with pytest.raises(ValueError):
         charts.list_charts("spotify")
@@ -213,7 +226,7 @@ def test_netease_chart_tracks(monkeypatch):
 
     monkeypatch.setattr(charts, "parse_playlist", _fake_parse)
     out = charts.get_chart_tracks("netease", "19723756", limit=2)
-    assert calls["url"] == "https://music.163.com/playlist?id=19723756"  # 榜单 id 即 playlist id
+    assert calls["url"] == "https://music.163.com/#/playlist?id=19723756"  # 榜单 id 即 playlist id（片段形式，musicdl 从 fragment 提取 id）
     assert calls["source"] == "NeteaseMusicClient"
     assert len(out) == 2  # limit 返回后截断（网易侧全量解析，无法分页）
 
