@@ -539,3 +539,117 @@ def test_archived_container_paths():
                                 ArchiveTrackResult(title="b", action="failed", target=None),
                                 ArchiveTrackResult(title="c", action="skipped", target="A/c.flac")])
     assert archived_container_paths(res) == ["/singles/A/a.flac", "/singles/A/c.flac"]
+
+
+# ---- REST 端点（fnos 编排层 mock） ----
+
+def test_api_list_playlists(monkeypatch):
+    monkeypatch.setattr("app.fnos.list_playlists",
+                        lambda: [{"guid": "g", "name": "单", "track_count": 1}])
+    r = _api_client().get("/api/v1/fnos/playlists")
+    assert r.status_code == 200 and r.json()[0]["name"] == "单"
+
+
+def test_api_not_configured_400(monkeypatch):
+    def _raise():
+        raise fnos.FnosNotConfiguredError("未配置 fnos_music（config.yaml），飞牛歌单功能不可用")
+
+    monkeypatch.setattr("app.fnos.list_playlists", _raise)
+    r = _api_client().get("/api/v1/fnos/playlists")
+    assert r.status_code == 400 and "fnos_music" in r.json()["detail"]
+
+
+def test_api_fnos_failure_502(monkeypatch):
+    def _raise():
+        raise fnos.FnosApiError(40001, "bad")
+
+    monkeypatch.setattr("app.fnos.list_playlists", _raise)
+    r = _api_client().get("/api/v1/fnos/playlists")
+    assert r.status_code == 502
+
+
+def test_api_playlist_detail_404(monkeypatch):
+    def _raise(name):
+        raise fnos.FnosPlaylistNotFound(f"飞牛歌单不存在: {name}")
+
+    monkeypatch.setattr("app.fnos.playlist_detail", _raise)
+    r = _api_client().get("/api/v1/fnos/playlists/没有/tracks")
+    assert r.status_code == 404
+
+
+def test_api_playlist_detail_ok(monkeypatch):
+    monkeypatch.setattr("app.fnos.playlist_detail",
+                        lambda name: {"playlist_guid": "g", "playlist_name": name,
+                                      "count": 0, "tracks": []})
+    r = _api_client().get("/api/v1/fnos/playlists/单/tracks")
+    assert r.status_code == 200 and r.json()["playlist_name"] == "单"
+
+
+def test_api_sync_by_paths(monkeypatch):
+    captured = {}
+
+    def _fake(name, paths):
+        captured.update(name=name, paths=paths)
+        return {"status": "ok", "added": 1, "already": 0, "unresolved": []}
+
+    monkeypatch.setattr("app.fnos.sync_playlist", _fake)
+    r = _api_client().post("/api/v1/fnos/playlists",
+                           json={"name": "单", "paths": ["/singles/A/t.flac"]})
+    assert r.status_code == 200
+    assert captured == {"name": "单", "paths": ["/singles/A/t.flac"]}
+
+
+def test_api_sync_empty_creates_playlist(monkeypatch):
+    monkeypatch.setattr("app.fnos.sync_playlist",
+                        lambda name, paths: {"status": "ok", "added": 0} if paths == [] else None)
+    r = _api_client().post("/api/v1/fnos/playlists", json={"name": "空单"})
+    assert r.status_code == 200
+
+
+def test_api_sync_task_not_found_400(monkeypatch):
+    monkeypatch.setattr("app.fnos.sync_playlist", lambda n, p: {"status": "ok"})
+    r = _api_client().post("/api/v1/fnos/playlists", json={"name": "单", "task_id": "不存在"})
+    assert r.status_code == 400 and "不在内存中" in r.json()["detail"]
+
+
+def test_api_append_requires_paths_or_guids():
+    r = _api_client().post("/api/v1/fnos/playlists/单/tracks", json={})
+    assert r.status_code == 400
+
+
+def test_api_append_success(monkeypatch):
+    captured = {}
+
+    def _fake(name, container_paths=None, guids=None):
+        captured.update(name=name, paths=container_paths, guids=guids)
+        return {"status": "ok", "added": 1, "already": 0, "unresolved": []}
+
+    monkeypatch.setattr("app.fnos.append_tracks", _fake)
+    r = _api_client().post("/api/v1/fnos/playlists/单/tracks", json={"guids": ["g1"]})
+    assert r.status_code == 200 and r.json()["added"] == 1
+    assert captured == {"name": "单", "paths": None, "guids": ["g1"]}
+
+
+def test_api_search_blank_400():
+    r = _api_client().get("/api/v1/fnos/search", params={"q": "  "})
+    assert r.status_code == 400
+
+
+def test_api_search_suggest(monkeypatch):
+    monkeypatch.setattr("app.fnos.search_suggest",
+                        lambda q: {"track": {"total": 0, "items": []}})
+    r = _api_client().get("/api/v1/fnos/search", params={"q": "王菲"})
+    assert r.status_code == 200 and "track" in r.json()
+
+
+def test_api_search_tracks(monkeypatch):
+    captured = {}
+
+    def _fake(q, limit=50):
+        captured.update(q=q, limit=limit)
+        return {"total": 0, "returned": 0, "items": []}
+
+    monkeypatch.setattr("app.fnos.search_tracks", _fake)
+    r = _api_client().get("/api/v1/fnos/search/tracks", params={"q": "王菲", "limit": 20})
+    assert r.status_code == 200
+    assert captured == {"q": "王菲", "limit": 20}

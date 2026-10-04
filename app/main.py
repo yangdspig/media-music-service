@@ -7,10 +7,11 @@ from __future__ import annotations
 from fastapi import Depends, FastAPI, Header, HTTPException
 
 from .config import settings
-from .schemas import AlbumDownloadRequest, AlbumInfo, AlbumSummary, ArchiveRequest, ArchiveResult, BackfillLyricsRequest, ChartSummary, CleanupLibraryRequest, DownloadRequest, DownloadTask, MigrateSinglesRequest, ReplaceTrackRequest, SearchResponse, SourceInfo, Track, TrackArchiveRequest
+from .schemas import AlbumDownloadRequest, AlbumInfo, AlbumSummary, ArchiveRequest, ArchiveResult, BackfillLyricsRequest, ChartSummary, CleanupLibraryRequest, DownloadRequest, DownloadTask, FnosPlaylistAppendRequest, FnosPlaylistRequest, MigrateSinglesRequest, ReplaceTrackRequest, SearchResponse, SourceInfo, Track, TrackArchiveRequest
 from . import album as album_svc
 from . import archive as archive_svc
 from . import download as dl
+from . import fnos as fnos_svc
 from . import backfill, charts as charts_svc, libraries, libops, meta, registry, storage
 from .playlist import parse_playlist
 from .search import search
@@ -236,3 +237,84 @@ def api_qq_auth_refresh() -> dict:
     """手动触发一次 QQ 凭证刷新（强制，不看剩余有效期）。"""
     from . import qqauth
     return qqauth.keepalive_once(force=True)
+
+
+# ---- 飞牛音乐歌单（原子管理 + 搜索；未配置 fnos_music → 400） ----
+
+def _fnos_http(e: Exception) -> HTTPException:
+    """fnos 异常 → HTTP：未配置 400 / 歌单不存在 404 / 其余（认证/API/网络）502。"""
+    if isinstance(e, fnos_svc.FnosNotConfiguredError):
+        return HTTPException(status_code=400, detail=str(e))
+    if isinstance(e, fnos_svc.FnosPlaylistNotFound):
+        return HTTPException(status_code=404, detail=str(e))
+    return HTTPException(status_code=502, detail=f"飞牛音乐接口调用失败: {e}")
+
+
+def _fnos_task_paths(task_id: str) -> list[str]:
+    """取单曲任务成功入库曲目的容器路径：幂等重跑 archive_tracks 拿 target（任务须在内存）。"""
+    task = dl.get(task_id)
+    if not task:
+        raise LookupError(f"任务 {task_id} 不在内存中（服务重启后请改用 paths 入参）")
+    if not task.library:
+        raise ValueError(f"任务 {task_id} 下载时未指定 library，无入库曲目，请改用 paths 入参")
+    from .archive import archive_tracks, archived_container_paths
+    return archived_container_paths(archive_tracks(task_id, library=task.library))
+
+
+@app.get("/api/v1/fnos/playlists", dependencies=[Depends(auth)])
+def api_fnos_playlists() -> list[dict]:
+    try:
+        return fnos_svc.list_playlists()
+    except Exception as e:
+        raise _fnos_http(e)
+
+
+@app.get("/api/v1/fnos/playlists/{name}/tracks", dependencies=[Depends(auth)])
+def api_fnos_playlist_tracks(name: str) -> dict:
+    try:
+        return fnos_svc.playlist_detail(name)
+    except Exception as e:
+        raise _fnos_http(e)
+
+
+@app.post("/api/v1/fnos/playlists", dependencies=[Depends(auth)])
+def api_fnos_sync_playlist(req: FnosPlaylistRequest) -> dict:
+    try:
+        paths = list(req.paths or [])
+        if req.task_id:
+            paths.extend(_fnos_task_paths(req.task_id))
+        return fnos_svc.sync_playlist(req.name, paths)
+    except (ValueError, LookupError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise _fnos_http(e)
+
+
+@app.post("/api/v1/fnos/playlists/{name}/tracks", dependencies=[Depends(auth)])
+def api_fnos_append_tracks(name: str, req: FnosPlaylistAppendRequest) -> dict:
+    if not req.paths and not req.guids:
+        raise HTTPException(status_code=400, detail="paths 与 guids 至少传其一")
+    try:
+        return fnos_svc.append_tracks(name, container_paths=req.paths, guids=req.guids)
+    except Exception as e:
+        raise _fnos_http(e)
+
+
+@app.get("/api/v1/fnos/search", dependencies=[Depends(auth)])
+def api_fnos_search(q: str = "") -> dict:  # q 缺省/空白统一 400（规格口径，不走 FastAPI 422）
+    if not q.strip():
+        raise HTTPException(status_code=400, detail="q 不能为空")
+    try:
+        return fnos_svc.search_suggest(q)
+    except Exception as e:
+        raise _fnos_http(e)
+
+
+@app.get("/api/v1/fnos/search/tracks", dependencies=[Depends(auth)])
+def api_fnos_search_tracks(q: str = "", limit: int = 50) -> dict:
+    if not q.strip():
+        raise HTTPException(status_code=400, detail="q 不能为空")
+    try:
+        return fnos_svc.search_tracks(q, limit=limit)
+    except Exception as e:
+        raise _fnos_http(e)
