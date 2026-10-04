@@ -200,3 +200,27 @@ def test_qq_chart_tracks_client_unavailable(monkeypatch):
     monkeypatch.setattr(charts, "build_client", lambda sources: _Empty())
     with pytest.raises(LookupError):
         charts.get_chart_tracks("qq", "4")
+
+
+def test_netease_chart_tracks(monkeypatch):
+    calls = {}
+
+    def _fake_parse(url, source=None):
+        calls["url"] = url
+        calls["source"] = source
+        return [Track(id=f"NeteaseMusicClient:{i}", source="NeteaseMusicClient", title=f"歌{i}")
+                for i in range(3)]
+
+    monkeypatch.setattr(charts, "parse_playlist", _fake_parse)
+    out = charts.get_chart_tracks("netease", "19723756", limit=2)
+    assert calls["url"] == "https://music.163.com/playlist?id=19723756"  # 榜单 id 即 playlist id
+    assert calls["source"] == "NeteaseMusicClient"
+    assert len(out) == 2  # limit 返回后截断（网易侧全量解析，无法分页）
+
+
+def test_netease_chart_tracks_no_limit(monkeypatch):
+    monkeypatch.setattr(charts, "parse_playlist",
+                        lambda url, source=None: [Track(id=f"NeteaseMusicClient:{i}",
+                                                        source="NeteaseMusicClient", title=f"歌{i}")
+                                                  for i in range(3)])
+    assert len(charts.get_chart_tracks("netease", "19723756")) == 3

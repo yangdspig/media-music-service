@@ -150,4 +150,8 @@ def _resolve_qq_track(client, search_result: dict):
 
 
 def _netease_chart_tracks(chart_id: str, limit: int | None) -> list[Track]:
-    raise NotImplementedError  # Task 4 实现
+    # 网易云榜单 id 即 playlist id，详情复用歌单解析（全量逐曲，无法分页，大榜单较慢）；
+    # parse_playlist 内部已 cache_tracks
+    tracks = parse_playlist(url=f"https://music.163.com/playlist?id={chart_id}",
+                            source="NeteaseMusicClient")
+    return tracks[:limit] if limit else tracks
