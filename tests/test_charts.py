@@ -145,6 +145,7 @@ def test_qq_chart_tracks(monkeypatch):
     assert captured["params"]["topid"] == "4"
     assert captured["params"]["song_num"] == 2  # limit 映射为 song_num
     assert captured["params"]["song_begin"] == 0
+    assert captured["params"]["format"] == "json"
     assert [t.id for t in out] == ["QQMusicClient:midAAA", "QQMusicClient:midBBB"]
     assert out[0].title == "歌曲A"
     assert out[0].source == "QQMusicClient"
@@ -158,6 +159,7 @@ def test_qq_chart_tracks_page_cap(monkeypatch):
     monkeypatch.setattr(charts, "build_client", lambda sources: _FakeMusicClient())
     charts.get_chart_tracks("qq", "4")
     assert captured["params"]["song_num"] == 100  # limit 缺省取单页上限
+    assert captured["params"]["format"] == "json"
     charts.get_chart_tracks("qq", "4", limit=150)
     assert captured["params"]["song_num"] == 100  # 超出按 100 截断
 
