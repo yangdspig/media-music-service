@@ -414,3 +414,128 @@ def test_search_tracks_limit_truncates(tmp_path, monkeypatch):
     assert out["total"] == 60 and out["returned"] == 50 and len(out["items"]) == 50
     out2 = _client(tmp_path, monkeypatch).search_tracks("x", limit=500)  # 上限 200 截断
     assert out2["returned"] == 60
+
+
+# ---- submit_download playlist 参数与归档后同步钩子 ----
+
+def _api_client():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    return TestClient(app)
+
+
+def test_submit_playlist_without_library_400():
+    r = _api_client().post("/api/v1/downloads", json={
+        "tracks": [{"id": "s:1", "raw": {"a": 1}}], "playlist": "榜"})
+    assert r.status_code == 400
+    assert "library" in r.json()["detail"]
+
+
+def test_submit_playlist_without_fnos_config_400(monkeypatch):
+    monkeypatch.setattr("app.main.settings.fnos_music", None)
+    r = _api_client().post("/api/v1/downloads", json={
+        "tracks": [{"id": "s:1", "raw": {"a": 1}}], "library": "singles", "playlist": "榜"})
+    assert r.status_code == 400
+    assert "fnos_music" in r.json()["detail"]
+
+
+def test_submit_playlist_param_passed(monkeypatch):
+    from app.config import FnosMusicConfig
+    monkeypatch.setattr("app.main.settings.fnos_music", FnosMusicConfig(
+        base_url="https://fnos.test:5667", username="u", password="p"))
+    captured = {}
+
+    def _fake_submit(tracks, **kw):
+        captured.update(kw)
+        from app.schemas import DownloadTask
+        return DownloadTask(task_id="t1", total=1)
+
+    monkeypatch.setattr("app.download.submit", _fake_submit)
+    r = _api_client().post("/api/v1/downloads", json={
+        "tracks": [{"id": "s:1", "raw": {"a": 1}}], "library": "singles", "playlist": "榜"})
+    assert r.status_code == 200
+    assert captured["playlist"] == "榜"
+
+
+def _hermetic_run_env(monkeypatch):
+    """_run 的 DB 副作用全部 mock 掉（不写本地 data/music_service.db）。"""
+    from app import download as dl
+    monkeypatch.setattr(dl, "save_task", lambda t: None)
+    monkeypatch.setattr("app.storage.record_file", lambda *a, **kw: None)
+    return dl
+
+
+def test_run_hook_syncs_playlist_after_archive(tmp_path, monkeypatch):
+    dl = _hermetic_run_env(monkeypatch)
+    from app.schemas import ArchiveResult, ArchiveTrackResult, DownloadTask, Track
+
+    def _fake_download(source, song_dicts, save_dir):
+        from pathlib import Path
+        (Path(save_dir) / "song_abc123.flac").write_bytes(b"x")
+        return 1
+
+    monkeypatch.setattr(dl, "download_songs", _fake_download)
+    fake_res = ArchiveResult(status="success", library_dir="/singles",
+                             summary={"linked": 1},
+                             tracks=[ArchiveTrackResult(title="T", action="linked",
+                                                        target="A/T.flac")])
+    monkeypatch.setattr("app.archive.archive_tracks",
+                        lambda task_id, library=None: fake_res)
+    captured = {}
+
+    def _fake_sync(name, paths):
+        captured.update(name=name, paths=paths)
+        return {"status": "ok", "playlist_guid": "pg", "playlist_name": name,
+                "added": 1, "already": 0, "unresolved": [], "error": None}
+
+    monkeypatch.setattr("app.fnos.sync_playlist", _fake_sync)
+    task = DownloadTask(task_id="t1", total=1, save_dir=str(tmp_path),
+                        library="singles", playlist="榜")
+    track = Track(id="s:abc123", source="s", title="T", artists=["A"],
+                  raw={"identifier": "abc123"})
+    dl._run(task, [track])
+    assert captured == {"name": "榜", "paths": ["/singles/A/T.flac"]}
+    assert task.playlist_result["status"] == "ok"
+    assert "歌单同步" in task.message
+
+
+def test_run_hook_failure_isolated(tmp_path, monkeypatch):
+    dl = _hermetic_run_env(monkeypatch)
+    from app.schemas import ArchiveResult, ArchiveTrackResult, DownloadTask, Track
+
+    def _fake_download(source, song_dicts, save_dir):
+        from pathlib import Path
+        (Path(save_dir) / "song_abc123.flac").write_bytes(b"x")
+        return 1
+
+    monkeypatch.setattr(dl, "download_songs", _fake_download)
+    fake_res = ArchiveResult(status="success", library_dir="/singles",
+                             summary={"linked": 1},
+                             tracks=[ArchiveTrackResult(title="T", action="linked",
+                                                        target="A/T.flac")])
+    monkeypatch.setattr("app.archive.archive_tracks",
+                        lambda task_id, library=None: fake_res)
+
+    def _raise(name, paths):
+        raise fnos.FnosAuthError("重登失败")
+
+    monkeypatch.setattr("app.fnos.sync_playlist", _raise)
+    task = DownloadTask(task_id="t1", total=1, save_dir=str(tmp_path),
+                        library="singles", playlist="榜")
+    track = Track(id="s:abc123", source="s", title="T", artists=["A"],
+                  raw={"identifier": "abc123"})
+    dl._run(task, [track])
+    assert task.status == "success"  # 歌单失败不影响主链路
+    assert task.playlist_result["status"] == "failed"
+    assert "重登失败" in task.playlist_result["error"]
+    assert any("歌单同步失败" in e for e in task.errors)
+
+
+def test_archived_container_paths():
+    from app.archive import archived_container_paths
+    from app.schemas import ArchiveResult, ArchiveTrackResult
+    res = ArchiveResult(status="partial", library_dir="/singles", summary={},
+                        tracks=[ArchiveTrackResult(title="a", action="linked", target="A/a.flac"),
+                                ArchiveTrackResult(title="b", action="failed", target=None),
+                                ArchiveTrackResult(title="c", action="skipped", target="A/c.flac")])
+    assert archived_container_paths(res) == ["/singles/A/a.flac", "/singles/A/c.flac"]

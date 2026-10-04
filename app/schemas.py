@@ -66,6 +66,7 @@ class DownloadRequest(BaseModel):
     subdir: Optional[str] = Field(default=None, description="下载根目录下的子目录，默认按规则自动组织")
     library: Optional[str] = Field(default=None, description="目标库名（见 GET /api/v1/libraries）；传入则下载完成后自动归档到该库")
     max_size_mb: Optional[float] = Field(default=None, description="单文件体积上限（MB），超限曲目跳过；>0 才生效且优先于配置，0/空不限")
+    playlist: Optional[str] = Field(default=None, description="飞牛音乐歌单名（可选，必须搭配 library）：下载+自动归档完成后把成功入库曲目同步进该歌单（不存在则新建，已有曲目按 guid 去重）；需配置 fnos_music")
 
 
 class AlbumSummary(BaseModel):
@@ -201,3 +202,18 @@ class DownloadTask(BaseModel):
     errors: list[str] = Field(default_factory=list)
     manifest_path: Optional[str] = Field(default=None, description="专辑下载产出的 manifest.json 路径（仅专辑任务）")
     library: Optional[str] = Field(default=None, description="目标库名；单曲任务传入时下载完成后自动归档到该库")
+    playlist: Optional[str] = Field(default=None, description="目标飞牛歌单名（传入时下载+归档完成后自动同步）")
+    playlist_result: Optional[dict[str, Any]] = Field(default=None, description="飞牛歌单同步结果（status/added/already/unresolved/error）；未同步为 None")
+
+
+class FnosPlaylistRequest(BaseModel):
+    """飞牛歌单建/补请求（ensure 语义）：task_id 与 paths 可单用或叠加，均缺只建空歌单。"""
+    name: str = Field(description="歌单名（不存在则新建）")
+    task_id: Optional[str] = Field(default=None, description="单曲下载任务 ID：取其成功入库曲目（任务须在内存中且下载时指定了 library）")
+    paths: Optional[list[str]] = Field(default=None, description="容器内库文件绝对路径清单（如 /singles/阿桑/叶子.flac）")
+
+
+class FnosPlaylistAppendRequest(BaseModel):
+    """严格追加到既有飞牛歌单：paths/guids 至少其一；歌单不存在返回 404。"""
+    paths: Optional[list[str]] = Field(default=None, description="容器内库文件绝对路径清单")
+    guids: Optional[list[str]] = Field(default=None, description="飞牛曲目 guid 清单（免路径解析直达）")

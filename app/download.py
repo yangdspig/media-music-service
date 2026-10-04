@@ -93,7 +93,7 @@ def _resolve_tracks(inputs: list[DownloadTrackInput]) -> list[Track]:
 
 
 def submit(tracks: list[DownloadTrackInput], subdir: str | None = None, library: str | None = None,
-           max_size_mb: float | None = None) -> DownloadTask:
+           max_size_mb: float | None = None, playlist: str | None = None) -> DownloadTask:
     if library:
         # 提前校验库名（白名单），避免下载完成后才发现归档目标不存在
         from .libraries import resolve_library_root
@@ -119,7 +119,8 @@ def submit(tracks: list[DownloadTrackInput], subdir: str | None = None, library:
     save_dir = str(Path(settings.download_root) / subdir)
     Path(save_dir).mkdir(parents=True, exist_ok=True)
 
-    task = DownloadTask(task_id=task_id, total=len(tracks), save_dir=save_dir, library=library)
+    task = DownloadTask(task_id=task_id, total=len(tracks), save_dir=save_dir,
+                        library=library, playlist=playlist)
     for t in rejected:
         task.errors.append(f"体积超限跳过: {t.title}（{(t.size_bytes or 0) / 1024 / 1024:.1f}MB > {limit_mb:g}MB）")
     register_task(task)
@@ -194,15 +195,42 @@ def _run(task: DownloadTask, tracks: list[Track]) -> None:
     task.message = f"完成 {task.completed}/{task.total}，失败 {task.failed}"
     # 指定了目标库时，下载完成后自动归档（单曲一步到位）
     if task.library:
+        archive_res = None
         try:
             from .archive import archive_tracks  # 晚期 import 防循环（archive 依赖 download）
-            res = archive_tracks(task.task_id, library=task.library)
-            task.message += f"；自动归档[{task.library}] {res.status} {res.summary}"
-            task.errors.extend(res.errors)
+            archive_res = archive_tracks(task.task_id, library=task.library)
+            task.message += f"；自动归档[{task.library}] {archive_res.status} {archive_res.summary}"
+            task.errors.extend(archive_res.errors)
         except Exception as e:
             task.errors.append(f"自动归档失败: {e}")
             task.message += f"；自动归档失败: {e}"
+        # 指定了飞牛歌单时，归档完成后同步（失败隔离：只记 playlist_result/errors，不动主链路）
+        if task.playlist:
+            _sync_fnos_playlist(task, archive_res)
     save_task(task)
+
+
+def _sync_fnos_playlist(task: DownloadTask, archive_res) -> None:
+    """归档完成后把成功入库曲目同步进飞牛歌单；任何失败只记任务字段，不影响下载与归档。"""
+    from . import fnos  # 晚期 import 防循环
+    try:
+        if archive_res is None:
+            raise RuntimeError("归档未完成，无法确定入库曲目")
+        from .archive import archived_container_paths
+        paths = archived_container_paths(archive_res)
+        if not paths:
+            raise RuntimeError("无成功入库曲目")
+        result = fnos.sync_playlist(task.playlist, paths)
+    except Exception as e:
+        logger.exception("飞牛歌单同步失败 task=%s playlist=%s", task.task_id, task.playlist)
+        result = {"status": "failed", "playlist_guid": None, "playlist_name": task.playlist,
+                  "added": 0, "already": 0, "unresolved": [], "error": str(e)}
+    task.playlist_result = result
+    task.message += (f"；歌单同步[{task.playlist}] {result['status']}"
+                     f"（新增 {result['added']}，已存在 {result['already']}，"
+                     f"未解析 {len(result['unresolved'])}）")
+    if result.get("error"):
+        task.errors.append(f"歌单同步失败: {result['error']}")
 
 
 def get(task_id: str) -> DownloadTask | None:

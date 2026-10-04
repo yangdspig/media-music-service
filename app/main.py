@@ -195,9 +195,15 @@ def api_album_download(collection_id: str, req: AlbumDownloadRequest) -> Downloa
 def api_submit(req: DownloadRequest) -> DownloadTask:
     if not req.tracks:
         raise HTTPException(status_code=400, detail="tracks 不能为空")
+    if req.playlist and not req.library:
+        raise HTTPException(status_code=400,
+                            detail="playlist 必须搭配 library 使用（不入库的曲目飞牛音乐管不到）")
+    if req.playlist and not settings.fnos_music:
+        raise HTTPException(status_code=400,
+                            detail="传了 playlist 但未配置 fnos_music（config.yaml）")
     try:
         return dl.submit(req.tracks, subdir=req.subdir, library=req.library,
-                         max_size_mb=req.max_size_mb)
+                         max_size_mb=req.max_size_mb, playlist=req.playlist)
     except (ValueError, LookupError, RuntimeError) as e:  # 全部超限 / 未知库名 / 未配置默认库
         raise HTTPException(status_code=400, detail=str(e))
 

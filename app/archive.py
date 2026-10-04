@@ -544,3 +544,11 @@ def archive_tracks(task_id: str, library: str | None = None, overwrite: bool = F
                      complete=bool(results) and all(r.action != "failed" for r in results))
     return ArchiveResult(status=status, library_dir=str(root), summary=summary,
                          tracks=results, errors=errors)
+
+
+def archived_container_paths(res: ArchiveResult) -> list[str]:
+    """从归档结果提取成功入库曲目的容器内绝对路径（供飞牛歌单同步等后置编排使用）。"""
+    if not res.library_dir:
+        return []
+    return [str(Path(res.library_dir) / t.target) for t in res.tracks
+            if t.action in ("linked", "copied", "skipped", "tag_unsupported") and t.target]
