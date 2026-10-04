@@ -70,7 +70,25 @@ def _qq_list_charts() -> list[ChartSummary]:
 
 
 def _netease_list_charts() -> list[ChartSummary]:
-    raise NotImplementedError  # Task 2 实现
+    r = httpx.get(NETEASE_LIST_URL, headers=_NE_HEADERS, timeout=_TIMEOUT)
+    r.raise_for_status()
+    data = r.json()
+    if data.get("code") != 200:
+        raise LookupError(f"网易云榜单目录接口返回错误（code={data.get('code')}），可能被限流，请稍后重试")
+    out = []
+    for t in data.get("list") or []:
+        if not t.get("id"):
+            continue
+        out.append(ChartSummary(
+            id=str(t["id"]),
+            source="netease",
+            name=t.get("name") or "未知榜单",
+            cover_url=t.get("coverImgUrl"),
+            track_count=None,
+            extra={"update_frequency": t.get("updateFrequency"),
+                   "description": (t.get("description") or "").strip() or None},
+        ))
+    return out
 
 
 def get_chart_tracks(source: str, chart_id: str, limit: int | None = None) -> list[Track]:

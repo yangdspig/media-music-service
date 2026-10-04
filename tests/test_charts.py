@@ -52,3 +52,28 @@ def test_qq_list_charts_error_code(monkeypatch):
 def test_list_charts_bad_source():
     with pytest.raises(ValueError):
         charts.list_charts("spotify")
+
+
+NE_LIST_RESP = {"code": 200, "list": [
+    {"id": 19723756, "name": "飙升榜", "coverImgUrl": "https://p2.music.126.net/aaa.jpg",
+     "updateFrequency": "每日更新", "description": "每天更新"},
+    {"id": 3779629, "name": "新歌榜", "coverImgUrl": "https://p2.music.126.net/bbb.jpg",
+     "updateFrequency": "每日更新", "description": ""},
+]}
+
+
+def test_netease_list_charts(monkeypatch):
+    monkeypatch.setattr(httpx, "get", lambda *a, **kw: FakeResp(NE_LIST_RESP))
+    out = charts.list_charts("netease")
+    assert [(c.id, c.name) for c in out] == [("19723756", "飙升榜"), ("3779629", "新歌榜")]
+    assert out[0].source == "netease"
+    assert out[0].cover_url == "https://p2.music.126.net/aaa.jpg"
+    assert out[0].extra["update_frequency"] == "每日更新"
+    assert out[1].extra["description"] is None  # 空串归一为 None
+
+
+def test_netease_list_charts_blocked(monkeypatch):
+    # 反爬限流（code -462）视为接口错误抛 LookupError，由 REST 层转 502
+    monkeypatch.setattr(httpx, "get", lambda *a, **kw: FakeResp({"code": -462, "list": []}))
+    with pytest.raises(LookupError):
+        charts.list_charts("netease")
