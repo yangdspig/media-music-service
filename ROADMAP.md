@@ -77,6 +77,12 @@
    - 第二期（另行立项）：歌单关键词搜索 `GET /api/v1/playlists/search`（网易 `/api/search/get` type=1000，QQ `client_search_cp` 歌单类型）
    - 第三期（候选）：榜单/歌单解析异步化，与下方"歌单批量下载"条目是同一个问题，届时合并解决
 
+2j. **飞牛音乐歌单同步** ✅ 第一期已完成（2026-10-04）
+   - 背景：下载入库的歌曲在飞牛音乐里只是散落在曲库中，缺歌单组织维度；典型场景：榜单批量下载后新建榜单歌单管理；以及把已有歌曲加入既有歌单的原子管理
+   - 设计文档：[docs/superpowers/specs/2026-10-04-fnos-playlist-design.md](docs/superpowers/specs/2026-10-04-fnos-playlist-design.md)（接口契约 2026-10-04 本机实证：authx 不校验、search/suggest 四组 top-5、search/<type> 无分页全量返回）
+   - 第一期：纯 API 客户端 `app/fnos.py`（password-login sha256+deviceId → userToken，music-token cookie，99999 惰性重登，token 持久化 `data/fnos_music_state.json` 原子写；不实现 authx、不读 music.db，guid 由 `track/list` 的 `audioSpec.path` 按 config `path_map` 精确解析，`scan_wait_s` 轮询等飞牛扫描）；`submit_download` 新增 `playlist` 参数（下载+归档后自动同步，失败隔离记 `playlist_result`）；REST 六端点 + MCP 六工具（歌单列/详情/建补 ensure/严格追加 404 + suggest/全量搜索）
+   - 后续（另行立项）：`download_album` 流程 `playlist` 参数（专辑歌单）；歌单封面/删除/改名/单内曲目移除；token 定时体检
+
 3. **MoviePilot 薄客户端插件**
    - 目标：在 MoviePilot 内完成"搜索 → 勾选 → 下载 → 入库整理"闭环
    - 要点：继承 `_PluginBase`，只做表单与 REST 调用，不直接依赖 musicdl

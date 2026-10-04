@@ -79,7 +79,7 @@ venv\Scripts\python.exe mcp_adapter.py
 | GET | `/api/v1/playlist?url=…&source=…` | 歌单解析（仅支持歌单的源） |
 | GET | `/api/v1/charts?source=…` | 榜单目录（QQ/网易云排行榜；source 省略返回合并列表） |
 | GET | `/api/v1/charts/{source}/{chart_id}?limit=…` | 榜单曲目（已缓存，可直接全量/挑选提交下载） |
-| POST | `/api/v1/downloads` | 提交下载（body：`{"tracks":[…], "subdir":?, "library":?, "max_size_mb":?}`；传 library 则下载后自动归档） |
+| POST | `/api/v1/downloads` | 提交下载（body：`{"tracks":[…], "subdir":?, "library":?, "max_size_mb":?, "playlist":?}`；传 library 则下载后自动归档；传 playlist（需配 fnos_music + library）则归档后自动同步飞牛歌单） |
 | GET | `/api/v1/downloads/{task_id}` | 查询任务状态/进度 |
 | GET | `/api/v1/downloads` | 任务列表 |
 | GET | `/api/v1/history` | 历史记录 |
@@ -89,6 +89,12 @@ venv\Scripts\python.exe mcp_adapter.py
 | POST | `/api/v1/albums/{collection_id}/download` | 专辑整单下载（逐曲消歧 + 序号命名 + manifest.json） |
 | POST | `/api/v1/albums/archive` | 专辑归档入库（硬链接/tag/嵌封面，需配置 library_root） |
 | POST | `/api/v1/tracks/archive` | 单曲归档入库（`{库根}/{艺人}/{曲名.ext}`） |
+| GET | `/api/v1/fnos/playlists` | 飞牛歌单列表（需配置 fnos_music） |
+| GET | `/api/v1/fnos/playlists/{name}/tracks` | 飞牛歌单内曲目（不存在 404） |
+| POST | `/api/v1/fnos/playlists` | 建/补飞牛歌单（body：`{"name":…, "task_id":?, "paths":?}`，ensure 语义幂等去重） |
+| POST | `/api/v1/fnos/playlists/{name}/tracks` | 严格追加到既有飞牛歌单（body：`{"paths":?, "guids":?}`；歌单不存在 404） |
+| GET | `/api/v1/fnos/search?q=…` | 飞牛库模糊搜索（track/album/artist/playlist 四组 top-5） |
+| GET | `/api/v1/fnos/search/tracks?q=…&limit=…` | 飞牛曲目全量搜索（带 guid，供追加歌单挑选） |
 | POST | `/api/v1/downloads/{task_id}/cancel` | 取消（仅 pending 态有效） |
 
 > 字段定义与完整示例见 [docs/API.md](docs/API.md)。
@@ -103,13 +109,19 @@ venv\Scripts\python.exe mcp_adapter.py
 | `parse_playlist(url, source?)` | 歌单解析 |
 | `list_charts(source?)` | 榜单目录（QQ/网易云排行榜） |
 | `get_chart_tracks(source, chart_id, limit?)` | 榜单曲目（可直接全量/挑选提交下载） |
-| `submit_download(tracks, subdir?, library?, max_size_mb?)` | 提交下载（tracks 须含 `raw`；传 library 下载后自动归档） |
+| `submit_download(tracks, subdir?, library?, max_size_mb?, playlist?)` | 提交下载（tracks 只传 `id`；传 library 下载后自动归档；传 playlist 归档后自动同步飞牛歌单） |
 | `get_download_status(task_id)` | 查询进度 |
 | `search_albums(keyword, artist?, limit?)` | 专辑搜索（iTunes 元数据） |
 | `get_album_info(collection_id)` | 专辑详情与官方曲目表 |
 | `download_album(collection_id, sources?, subdir?, …, max_size_mb?)` | 专辑整单下载（产出 manifest.json） |
 | `archive_album(task_id?, manifest_path?, overwrite?, …, library?)` | 专辑归档入库（需配置 library_root） |
 | `archive_tracks(task_id, library?, overwrite?)` | 单曲归档入库 |
+| `list_fnos_playlists()` | 飞牛歌单列表 |
+| `get_fnos_playlist_tracks(name)` | 飞牛歌单内曲目 |
+| `create_fnos_playlist(name, task_id?, paths?)` | 建/补飞牛歌单（ensure 语义，幂等去重） |
+| `add_fnos_playlist_tracks(name, paths?, guids?)` | 严格追加到既有飞牛歌单（404 防打错字） |
+| `search_fnos(q)` | 飞牛库模糊搜索（四组 top-5） |
+| `search_fnos_tracks(q, limit?)` | 飞牛曲目全量搜索（挑 guid 用） |
 
 > 接入配置与调用示例见 [docs/MCP.md](docs/MCP.md)。
 
@@ -118,6 +130,7 @@ venv\Scripts\python.exe mcp_adapter.py
 - **HLS 流下载**（Apple Music 等）：需要 [N_m3u8DL-RE](https://github.com/nilaoda/N_m3u8DL-RE)
 - **YouTube 下载**：需要 Node.js
 - **无损夸克源**（Mitu/Buguyy/Yinyuedao/Gequbao）：需在 `config.yaml` 配置夸克网盘 cookies
+- **飞牛音乐歌单同步**：需在 `config.yaml` 配置 `fnos_music` 段（飞牛音乐应用账号密码 + `path_map` 容器库根→宿主路径映射）；纯 API 客户端，不挂载不读取 music.db
 
 ## 升级 musicdl
 

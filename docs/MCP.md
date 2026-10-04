@@ -6,7 +6,7 @@
 
 - 服务名：`media-music`
 - 实现：基于 FastMCP 的**薄客户端**，不直接依赖 musicdl，所有能力通过 HTTP 调用核心 REST 服务
-- 工具数：17 个
+- 工具数：23 个
 - 传输方式：**stdio**（默认，本地 Agent 直接拉起，推荐）/ **http**（远程 Agent）
 
 ### 与 REST API 的关系
@@ -30,6 +30,12 @@
 | `cleanup_library` | `POST /api/v1/library/cleanup` |
 | `migrate_singles` | `POST /api/v1/library/migrate_singles` |
 | `backfill_lyrics` | `POST /api/v1/library/backfill_lyrics` |
+| `list_fnos_playlists` | `GET /api/v1/fnos/playlists` |
+| `get_fnos_playlist_tracks` | `GET /api/v1/fnos/playlists/{name}/tracks` |
+| `create_fnos_playlist` | `POST /api/v1/fnos/playlists` |
+| `add_fnos_playlist_tracks` | `POST /api/v1/fnos/playlists/{name}/tracks` |
+| `search_fnos` | `GET /api/v1/fnos/search` |
+| `search_fnos_tracks` | `GET /api/v1/fnos/search/tracks` |
 
 > 核心 REST 服务必须先启动并可达（默认 `http://127.0.0.1:8765`），MCP 适配器只是它的客户端。
 
@@ -108,8 +114,8 @@ mcp:
 
 获取排行榜曲目（含下载地址，已缓存 1 小时）。全量下载：`submit_download(tracks=[{"id": …}], subdir="榜单-XX")`；挑选下载传 id 子集。QQ 单页上限 100；VIP/付费无地址曲目已被过滤，数量偏少属预期。
 
-### submit_download(tracks, subdir?, library?, max_size_mb?)
-提交下载任务（异步）。`tracks` 每项**只需传 `id` 字段**（取自 `search_tracks`/`parse_playlist` 返回项，如 `[{"id": "KuwoMusicClient:594551679"}]`），服务端按搜索缓存自动补全下载上下文（缓存 1 小时，服务重启后失效，未命中会报 400 提示重新搜索）。返回 `task_id`。传 `library` 时下载完成后**自动归档**到该库（单曲结构 `{库根}/{艺人}/{曲名.ext}`，一步到位）；`max_size_mb` 为单文件体积上限（MB），>0 时超限曲目跳过且优先于服务端配置，0/空不限。
+### submit_download(tracks, subdir?, library?, max_size_mb?, playlist?)
+提交下载任务（异步）。`tracks` 每项**只需传 `id` 字段**（取自 `search_tracks`/`parse_playlist` 返回项，如 `[{"id": "KuwoMusicClient:594551679"}]`），服务端按搜索缓存自动补全下载上下文（缓存 1 小时，服务重启后失效，未命中会报 400 提示重新搜索）。返回 `task_id`。传 `library` 时下载完成后**自动归档**到该库（单曲结构 `{库根}/{艺人}/{曲名.ext}`，一步到位）；`max_size_mb` 为单文件体积上限（MB），>0 时超限曲目跳过且优先于服务端配置，0/空不限。传 `playlist`（**必须搭配 `library`**，需服务端配置 `fnos_music`）时，自动归档完成后把成功入库曲目**同步进飞牛音乐歌单**（不存在则新建，已有曲目按 guid 去重）；同步结果在任务的 `playlist_result` 字段（`get_download_status` 可见），失败不影响下载与归档。
 
 ### get_download_status(task_id)
 查询下载任务进度（status/completed/failed/save_dir/results/errors）。单曲与专辑任务通用；专辑任务完成后 `manifest_path` 指向结构化清单。
@@ -141,6 +147,24 @@ mcp:
 ### backfill_lyrics(library?, artist?, album?, sources?, limit?, dry_run?)
 扫描库内**无歌词**的音轨（flac/mp3/m4a/ogg/wma/wav/ape 等），按 tag（缺失时回退文件名/艺人目录名）搜索匹配，写同名 `.lrc` sidecar（同步，网络密集型）。**绝不修改音频、不覆盖已有 `.lrc`**；已有 sidecar 或内嵌歌词的曲目跳过。**注意：已入库曲目回填后飞牛不会自动识别歌词**——watcher 对单独的 `.lrc` 文件事件跳过（skip non-audio file），UI 重扫是增量扫描不处理未变化的音频；需把对应专辑目录移出媒体库根再移回触发飞牛重刮（曲目 ID 不变，收藏/播放记录保留）。新下载归档的曲目不受影响（音频是新文件，扫描时自然带上歌词）。匹配复用专辑消歧打分（阈值 0.6，另加艺人相似度下限 0.5 防同名歌错配无关艺人），只在带歌词的候选中择优。`limit`（默认 50）限制单次处理曲目数，超出时返回 `has_more=true` 分批调用；`dry_run` **默认 True** 只报告不写文件（先看 `matched` 的 score/来源确认质量），确认后传 `False` 实际写入。返回逐曲 `status`（already_has_lyrics/matched/unmatched/written/error）与匹配信息。
 
+### list_fnos_playlists()
+列出飞牛音乐全部歌单（guid/name/track_count）。前置：服务端配置 `fnos_music` 段。
+
+### get_fnos_playlist_tracks(name)
+查看飞牛歌单内曲目（guid/title/artists/album/duration/path）；歌单名精确匹配，不存在报错（404）。
+
+### create_fnos_playlist(name, task_id?, paths?)
+建/补飞牛歌单（ensure 语义：不存在则新建；按 guid 去重追加，幂等）。`task_id` 取单曲下载任务的成功入库曲目（任务须在内存）；`paths` 为容器内库文件绝对路径清单，两者可叠加、均缺只建空歌单。返回 `status`（ok/partial）/`added`/`already`/`unresolved`（飞牛未扫描到的路径，稍后同名重试即可）。新入库曲目依赖飞牛 watcher 扫描，可能阻塞至 `scan_wait_s`（默认 120s），属预期。
+
+### add_fnos_playlist_tracks(name, paths?, guids?)
+严格追加曲目到既有飞牛歌单：**歌单不存在报错（404），不会静默新建**（防止打错字建错单）。`paths` 为容器内路径（经 path_map 解析），`guids` 为飞牛曲目 guid（免解析直达，可由 `search_fnos`/`search_fnos_tracks` 获得），至少传其一。
+
+### search_fnos(q)
+飞牛音乐库模糊搜索（suggest）：标题/艺人/专辑/歌单一把搜，各返回 top-5（track 项含 guid 与宿主 path）。找歌加歌单首选；没中目标时用 `search_fnos_tracks`。
+
+### search_fnos_tracks(q, limit?)
+飞牛曲目全量搜索（带 guid）。`limit` 默认 50 最大 200；返回 `total`（飞牛侧全部匹配数）/`returned`/`items`。典型流程：搜索挑 guid → `add_fnos_playlist_tracks(歌单名, guids=[...])`。
+
 ## 五、典型调用流程
 
 ### 单曲下载（可自动归档入库）
@@ -168,6 +192,19 @@ mcp:
 2. `get_chart_tracks(source="qq", chart_id="4", limit=50)` 拿曲目
 3. `submit_download(tracks=[{"id": t.id} for t in tracks], subdir="榜单-巅峰榜流行指数")` 全量或挑选提交
 
+### 飞牛歌单同步（榜单场景）
+
+1. `get_chart_tracks(source="qq", chart_id="4", limit=50)` 拿曲目；
+2. `submit_download(tracks=[{"id": t.id} for t in tracks], library="singles", playlist="榜单-巅峰榜-2026-10")`；
+3. `get_download_status(task_id)` 轮询至完成，`playlist_result` 见同步结果（`unresolved` 非空说明个别曲目飞牛还没扫到，可用 `create_fnos_playlist("榜单-巅峰榜-2026-10", task_id=…)` 事后补，幂等）；
+4. `list_fnos_playlists()` / `get_fnos_playlist_tracks("榜单-巅峰榜-2026-10")` 复核。
+
+### 飞牛歌单原子管理（已有歌曲 → 既有歌单）
+
+1. `search_fnos_tracks("我也不想这样")` 或已知容器路径 `/singles/阿桑/叶子.flac`；
+2. `add_fnos_playlist_tracks("我的收藏", guids=[…])` 或 `paths=[…]`（歌单必须已存在）；
+3. 新歌单管理旧歌：`create_fnos_playlist("怀旧金曲", paths=[…])`（没有就建）。
+
 ## 六、故障排查
 
 - **Agent 看不到工具**：检查 `command`/`args` 路径、`fastmcp` 是否已装进对应 Python 环境；
@@ -175,3 +212,4 @@ mcp:
 - **提交下载报 400 提示缓存未命中**：仅传 `id` 时依赖服务端搜索缓存（1 小时有效，重启失效），重新 `search_tracks` 再提交即可；
 - **http 模式连不上**：检查 `8766` 端口是否放行、`mcp.service_url` 指向的核心 REST 服务是否可达（docker 默认 bridge 网络应为 `http://music-service:8765`；`network_mode: host` 时必须用 `http://127.0.0.1:8765`，否则报 `Name or service not known`）；
 - **搜索超时 / 归档特别慢**：若部署机 IPv6 出口不通但 DNS 返回 AAAA 记录，Python 库会串行尝试 IPv6 卡到内核超时。镜像已内置 IPv4-only 补丁；环境 IPv6 正常时可设 `MUSIC_SERVICE_ENABLE_IPV6=1` 关闭。
+- **飞牛歌单接口报 502 提示检查账号密码**：token 失效后自动重登也失败，多为 `fnos_music` 的账号密码变更或应用被重置——核对 config.yaml 后删除服务端 `data/fnos_music_state.json` 再试；

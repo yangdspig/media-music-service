@@ -103,6 +103,8 @@
 | `errors` | string[] | 错误信息列表 |
 | `manifest_path` | string \| null | 专辑任务产出的 `manifest.json` 路径（单曲任务为 null） |
 | `library` | string \| null | 目标库名；单曲任务传入时下载完成后自动归档到该库 |
+| `playlist` | string \| null | 目标飞牛歌单名（传入时下载+归档完成后自动同步） |
+| `playlist_result` | object \| null | 飞牛歌单同步结果：`status`（ok/partial/failed）、`playlist_guid`、`added`、`already`、`unresolved`、`error`；未同步为 null |
 
 ### AlbumSummary（专辑摘要）
 
@@ -251,8 +253,9 @@
 | `subdir` | 否 | 自动组织 | 下载根目录下的子目录 |
 | `library` | 否 | — | 目标库名（见 `/libraries`）；传入则下载完成后**自动归档**到该库（单曲结构 `{库根}/{艺人}/{曲名.ext}`） |
 | `max_size_mb` | 否 | 配置文件 | 单文件体积上限（MB）；>0 生效且优先于 `config.yaml` 的 `max_size_mb`，0/空不限。超限曲目跳过并记入 `errors`，全部超限返回 400 |
+| `playlist` | 否 | — | 飞牛音乐歌单名；**必须搭配 `library`**：下载+自动归档完成后把成功入库曲目同步进该歌单（不存在则新建，已有曲目按 guid 去重，失败隔离只记 `playlist_result`/`errors`）；需配置 `fnos_music` |
 
-**响应 200**：`DownloadTask`；**400**：`tracks` 为空 / 未知库名 / 全部曲目体积超限 / 仅传 `id` 但缓存未命中（需重新搜索）
+**响应 200**：`DownloadTask`；**400**：`tracks` 为空 / 未知库名 / 全部曲目体积超限 / 仅传 `id` 但缓存未命中（需重新搜索）/ 单传 `playlist` 不带 `library` / 传 `playlist` 但未配置 `fnos_music`
 
 ---
 
@@ -577,6 +580,106 @@
 > 逐曲 `status`：`already_has_lyrics`（已有 sidecar/内嵌歌词，跳过）、`matched`（dry_run 下命中可回填）、`unmatched`（无合格带歌词候选）、`written`（已写 `.lrc`）、`error`（写文件失败，整体 `status=partial`）。
 
 **400**：未知库名 / 艺人目录不存在 / `limit` < 1
+
+---
+
+### GET /api/v1/fnos/playlists
+
+列出飞牛音乐的全部歌单。**前置**：`config.yaml` 配置 `fnos_music` 段。
+
+**响应 200**
+
+```json
+[{"guid": "…", "name": "我的收藏", "track_count": 12}]
+```
+
+**错误**：未配置 `fnos_music` → 400；飞牛侧失败（含认证失败自动重登无效）→ 502
+
+---
+
+### GET /api/v1/fnos/playlists/{name}/tracks
+
+查看歌单内曲目。**路径参数**：`name`（歌单名，精确匹配，同名取首个）。
+
+**响应 200**
+
+```json
+{"playlist_guid": "…", "playlist_name": "我的收藏", "count": 1,
+ "tracks": [{"guid": "…", "title": "叶子", "artists": ["阿桑"], "album": "…",
+             "duration": 300000, "path": "/vol1/1000/Media/Singles/阿桑/叶子.flac"}]}
+```
+
+**错误**：歌单不存在 → 404；其余同上
+
+---
+
+### POST /api/v1/fnos/playlists
+
+建/补歌单（ensure 语义：不存在则新建；曲目按 guid 去重追加，幂等可重试）。
+
+**请求体**
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `name` | 是 | 歌单名 |
+| `task_id` | 否 | 单曲下载任务 ID：取其成功入库曲目（任务须在内存中且下载时传了 `library`，服务重启后请改用 `paths`） |
+| `paths` | 否 | 容器内库文件绝对路径清单（如 `/singles/阿桑/叶子.flac`）；与 `task_id` 可叠加；均缺只建空歌单 |
+
+**响应 200**
+
+```json
+{"status": "ok", "playlist_guid": "…", "playlist_name": "榜单-2026-10",
+ "added": 8, "already": 2, "unresolved": [], "error": null}
+```
+
+`status=partial` 时 `unresolved` 为飞牛尚未扫描到的路径（服务端已按 `scan_wait_s` 轮询等待），稍后以同名请求重试即可（幂等）。
+
+**错误**：`task_id` 任务不在内存/未指定 library → 400；其余同列端点
+
+---
+
+### POST /api/v1/fnos/playlists/{name}/tracks
+
+严格追加到既有歌单（**歌单不存在返回 404，不会静默新建**——防止打错字建错单；要"没有就建"用上面的 POST `/api/v1/fnos/playlists`）。
+
+**请求体**
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `paths` | 否 | 容器内库文件绝对路径清单（经 `path_map` 解析为飞牛 guid） |
+| `guids` | 否 | 飞牛曲目 guid 清单（免路径解析直达；可由 `/api/v1/fnos/search/tracks` 获得）。`paths`/`guids` **至少传其一** |
+
+**响应 200**：同建/补端点结构。
+
+**错误**：`paths`/`guids` 均缺 → 400；歌单不存在 → 404
+
+---
+
+### GET /api/v1/fnos/search
+
+飞牛音乐库模糊搜索（suggest）：标题/艺人/专辑/歌单一把搜，各返回 top-5。
+
+**Query 参数**：`q`（必填，空白 → 400）
+
+**响应 200**
+
+```json
+{"track": {"total": 1, "items": [{"guid": "…", "title": "我也不想这样",
+   "artists": ["王菲"], "album": "只爱陌生人", "duration": 240000,
+   "path": "/vol1/1000/Media/Music/王菲/我也不想这样.flac"}]},
+ "album": {"total": 0, "items": []}, "artist": {"total": 0, "items": []},
+ "playlist": {"total": 0, "items": []}}
+```
+
+---
+
+### GET /api/v1/fnos/search/tracks
+
+飞牛曲目全量搜索（fnos 侧无分页一次返全量，服务端字段裁剪 + limit 截断）：挑 guid 给追加端点用。
+
+**Query 参数**：`q`（必填，空白 → 400）、`limit`（默认 50，最大 200）
+
+**响应 200**：`{"total": 60, "returned": 50, "items": [{"guid", "title", "artists", "album", "duration", "path"}]}`
 
 ---
 
