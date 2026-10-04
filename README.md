@@ -77,6 +77,8 @@ venv\Scripts\python.exe mcp_adapter.py
 | GET | `/api/v1/sources` | 列出全部源及能力/可用性 |
 | GET | `/api/v1/search?keyword=…&sources=…&limit=…` | 聚合搜索，返回标准化 Track |
 | GET | `/api/v1/playlist?url=…&source=…` | 歌单解析（仅支持歌单的源） |
+| GET | `/api/v1/charts?source=…` | 榜单目录（QQ/网易云排行榜；source 省略返回合并列表） |
+| GET | `/api/v1/charts/{source}/{chart_id}?limit=…` | 榜单曲目（已缓存，可直接全量/挑选提交下载） |
 | POST | `/api/v1/downloads` | 提交下载（body：`{"tracks":[…], "subdir":?, "library":?, "max_size_mb":?}`；传 library 则下载后自动归档） |
 | GET | `/api/v1/downloads/{task_id}` | 查询任务状态/进度 |
 | GET | `/api/v1/downloads` | 任务列表 |
@@ -99,6 +101,8 @@ venv\Scripts\python.exe mcp_adapter.py
 | `list_libraries` | 列出归档目标库（默认库 + 命名附加库） |
 | `search_tracks(keyword, sources?, limit?)` | 搜索，返回含 `raw` 的 Track 列表 |
 | `parse_playlist(url, source?)` | 歌单解析 |
+| `list_charts(source?)` | 榜单目录（QQ/网易云排行榜） |
+| `get_chart_tracks(source, chart_id, limit?)` | 榜单曲目（可直接全量/挑选提交下载） |
 | `submit_download(tracks, subdir?, library?, max_size_mb?)` | 提交下载（tracks 须含 `raw`；传 library 下载后自动归档） |
 | `get_download_status(task_id)` | 查询进度 |
 | `search_albums(keyword, artist?, limit?)` | 专辑搜索（iTunes 元数据） |

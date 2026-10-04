@@ -6,7 +6,7 @@
 
 - 服务名：`media-music`
 - 实现：基于 FastMCP 的**薄客户端**，不直接依赖 musicdl，所有能力通过 HTTP 调用核心 REST 服务
-- 工具数：15 个
+- 工具数：17 个
 - 传输方式：**stdio**（默认，本地 Agent 直接拉起，推荐）/ **http**（远程 Agent）
 
 ### 与 REST API 的关系
@@ -17,6 +17,8 @@
 | `list_libraries` | `GET /api/v1/libraries` |
 | `search_tracks` | `GET /api/v1/search` |
 | `parse_playlist` | `GET /api/v1/playlist` |
+| `list_charts` | `GET /api/v1/charts` |
+| `get_chart_tracks` | `GET /api/v1/charts/{source}/{chart_id}` |
 | `submit_download` | `POST /api/v1/downloads` |
 | `get_download_status` | `GET /api/v1/downloads/{task_id}` |
 | `search_albums` | `GET /api/v1/albums/search` |
@@ -98,6 +100,14 @@ mcp:
 ### parse_playlist(url, source?)
 解析歌单 URL 为曲目列表（Track 含 `id`）。
 
+### list_charts(source?)
+
+浏览 QQ 音乐 / 网易云官方排行榜目录；source 留空返回两平台合并列表。返回榜单 id/name/cover_url/extra（QQ 含试听数与前三首预览，网易含更新频率）。
+
+### get_chart_tracks(source, chart_id, limit?)
+
+获取排行榜曲目（含下载地址，已缓存 1 小时）。全量下载：`submit_download(tracks=[{"id": …}], subdir="榜单-XX")`；挑选下载传 id 子集。QQ 单页上限 100；VIP/付费无地址曲目已被过滤，数量偏少属预期。
+
 ### submit_download(tracks, subdir?, library?, max_size_mb?)
 提交下载任务（异步）。`tracks` 每项**只需传 `id` 字段**（取自 `search_tracks`/`parse_playlist` 返回项，如 `[{"id": "KuwoMusicClient:594551679"}]`），服务端按搜索缓存自动补全下载上下文（缓存 1 小时，服务重启后失效，未命中会报 400 提示重新搜索）。返回 `task_id`。传 `library` 时下载完成后**自动归档**到该库（单曲结构 `{库根}/{艺人}/{曲名.ext}`，一步到位）；`max_size_mb` 为单文件体积上限（MB），>0 时超限曲目跳过且优先于服务端配置，0/空不限。
 
@@ -151,6 +161,12 @@ mcp:
 3. `get_download_status(task_id)` 轮询直到完成；
 4. 读取 `manifest_path` 指向的 `manifest.json`：逐曲 `status`（ok/unmatched/failed）、`match.score`（匹配置信分）、失败原因均在其中；`unmatched`/`failed` 的曲目可向用户报告并决定是否单曲补下；
 5. `archive_album(task_id)` 归档入库（媒体库结构 `{艺人}/{专辑}/`，多 Disc 自动 `CD1/CD2`）；归档结果里逐曲 `action` 为 `linked/copied/skipped/failed`，有 `failed` 时向用户报告 `errors`。
+
+### 榜单浏览与下载
+
+1. `list_charts()` 选榜单（如 QQ 巅峰榜·流行指数 id=4）
+2. `get_chart_tracks(source="qq", chart_id="4", limit=50)` 拿曲目
+3. `submit_download(tracks=[{"id": t.id} for t in tracks], subdir="榜单-巅峰榜流行指数")` 全量或挑选提交
 
 ## 六、故障排查
 
