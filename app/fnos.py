@@ -145,6 +145,93 @@ class FnosClient:
         r.raise_for_status()
         return r.json()
 
+    # —— 歌单原语 ——
+
+    def list_playlists(self) -> list[dict]:
+        data = self.request("GET", "/playlist/list")
+        return [{"guid": p.get("guid"), "name": p.get("name"),
+                 "track_count": p.get("trackCount")}
+                for p in (data or {}).get("list") or []]
+
+    def create_playlist(self, name: str) -> str:
+        data = self.request("POST", "/playlist/create", json={"name": name})
+        guid = (data or {}).get("guid")
+        if not guid:
+            raise FnosApiError(None, f"创建歌单未返回 guid: {data}")
+        return guid
+
+    def playlist_tracks(self, playlist_guid: str) -> list[dict]:
+        """歌单内全部曲目（完整对象，分页拉全，追加前去重依据）。"""
+        out: list[dict] = []
+        page, size = 1, 300
+        while True:
+            data = self.request("GET", "/track/playlist-detail/list",
+                                params={"playlistGUID": playlist_guid, "page": page, "size": size})
+            items = (data or {}).get("list") or []
+            out.extend(items)
+            total = (data or {}).get("total") or 0
+            if not items or len(out) >= total:
+                return out
+            page += 1
+
+    def add_tracks(self, playlist_guid: str, track_guids: list[str]) -> None:
+        if not track_guids:
+            return
+        self.request("POST", "/playlist/add-track",
+                     json={"guid": playlist_guid, "trackGUIDs": list(track_guids)})
+
+    # —— guid 解析 ——
+
+    def to_host_path(self, container_path: str) -> str | None:
+        """容器路径 → 宿主路径（path_map 最长前缀匹配，按目录边界）；无匹配返回 None。"""
+        for prefix in sorted(self.path_map, key=len, reverse=True):
+            p = prefix.rstrip("/")
+            if container_path == p or container_path.startswith(p + "/"):
+                return self.path_map[prefix].rstrip("/") + container_path[len(p):]
+        return None
+
+    def resolve_guids(self, container_paths: list[str]) -> dict[str, str | None]:
+        """容器路径集合 → 飞牛曲目 guid（按宿主路径精确匹配 track/list）。
+
+        path_map 无前缀匹配的路径直接记 None 不等待；未命中的在 scan_wait_s 内轮询
+        重扫（等飞牛 watcher 收编新文件），超时仍缺记 None。返回键为入参容器路径。
+        """
+        resolved: dict[str, str | None] = {}
+        pending: dict[str, str] = {}  # host_path → container_path
+        for cp in dict.fromkeys(container_paths):  # 去重保序
+            hp = self.to_host_path(cp)
+            resolved[cp] = None
+            if hp is not None:
+                pending[hp] = cp
+        if not pending:
+            return resolved
+        deadline = time.monotonic() + self.scan_wait_s
+        while True:
+            for hp, guid in self._scan_track_list(set(pending)).items():
+                if guid:
+                    resolved[pending.pop(hp)] = guid
+            if not pending or time.monotonic() >= deadline:
+                return resolved
+            time.sleep(min(10.0, max(1.0, deadline - time.monotonic())))
+
+    def _scan_track_list(self, targets: set[str]) -> dict[str, str | None]:
+        """track/list 按 createdAt 倒序分页扫描，命中 targets 中的宿主路径即记 guid。"""
+        found: dict[str, str | None] = {}
+        page, size = 1, 200
+        while targets - set(found):
+            data = self.request("GET", "/track/list",
+                                params={"page": page, "size": size, "sort": "createdAt,desc"})
+            items = (data or {}).get("list") or []
+            total = (data or {}).get("total") or 0
+            for t in items:
+                hp = (t.get("audioSpec") or {}).get("path") or ""
+                if hp in targets and hp not in found:
+                    found[hp] = t.get("guid")
+            if not items or page * size >= total:
+                break
+            page += 1
+        return found
+
 
 # ---- 单例门面（端点与下载钩子共用） ----
 

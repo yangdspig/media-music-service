@@ -167,3 +167,103 @@ def test_get_client_builds_from_settings(monkeypatch):
     assert c.scan_wait_s == 120 and c.verify_tls is False
     assert c.path_map == {"/singles": "/vol1/x"}
     fnos.reset_client()
+
+
+# ---- 歌单原语 ----
+
+def test_list_playlists(tmp_path, monkeypatch):
+    _state(tmp_path)
+    monkeypatch.setattr(httpx, "request", _router({
+        "/playlist/list": {"code": 0, "data": {"list": [
+            {"guid": "g1", "name": "最爱", "trackCount": 3},
+            {"guid": "g2", "name": "榜单"}]}}}))
+    out = _client(tmp_path, monkeypatch).list_playlists()
+    assert out == [{"guid": "g1", "name": "最爱", "track_count": 3},
+                   {"guid": "g2", "name": "榜单", "track_count": None}]
+
+
+def test_create_playlist(tmp_path, monkeypatch):
+    _state(tmp_path)
+    captured = {}
+
+    def _fake(method, url, **kw):
+        captured.update(url=url, json=kw.get("json"))
+        return FakeResp({"code": 0, "data": {"guid": "newg"}})
+
+    monkeypatch.setattr(httpx, "request", _fake)
+    assert _client(tmp_path, monkeypatch).create_playlist("我的榜单") == "newg"
+    assert captured["url"].endswith("/music/api/v1/playlist/create")
+    assert captured["json"] == {"name": "我的榜单"}
+
+
+def test_playlist_tracks_pagination(tmp_path, monkeypatch):
+    _state(tmp_path)
+    pages = {1: [{"guid": f"t{i}"} for i in range(3)], 2: [{"guid": "t3"}]}
+
+    def _fake(method, url, **kw):
+        params = kw.get("params") or {}
+        assert params["playlistGUID"] == "pg"
+        return FakeResp({"code": 0, "data": {"list": pages[params["page"]], "total": 4}})
+
+    monkeypatch.setattr(httpx, "request", _fake)
+    out = _client(tmp_path, monkeypatch).playlist_tracks("pg")
+    assert [t["guid"] for t in out] == ["t0", "t1", "t2", "t3"]
+
+
+def test_add_tracks_posts_batch(tmp_path, monkeypatch):
+    _state(tmp_path)
+    captured = {}
+
+    def _fake(method, url, **kw):
+        captured.update(url=url, json=kw.get("json"))
+        return FakeResp({"code": 0, "data": None})
+
+    monkeypatch.setattr(httpx, "request", _fake)
+    _client(tmp_path, monkeypatch).add_tracks("pg", ["a", "b"])
+    assert captured["url"].endswith("/music/api/v1/playlist/add-track")
+    assert captured["json"] == {"guid": "pg", "trackGUIDs": ["a", "b"]}
+
+
+# ---- guid 解析 ----
+
+def test_to_host_path_prefix_match(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    assert c.to_host_path("/singles/阿桑/叶子.flac") == "/vol1/1000/Media/Singles/阿桑/叶子.flac"
+    assert c.to_host_path("/library/王菲/我也不想这样.flac") == "/vol1/1000/Media/Music/王菲/我也不想这样.flac"
+    assert c.to_host_path("/downloads/x.flac") is None
+
+
+def test_resolve_guids_hit_first_page(tmp_path, monkeypatch):
+    _state(tmp_path)
+    monkeypatch.setattr(httpx, "request", _router({
+        "/track/list": {"code": 0, "data": {
+            "list": [_track("g1", "/vol1/1000/Media/Singles/阿桑/叶子.flac")], "total": 1}}}))
+    out = _client(tmp_path, monkeypatch).resolve_guids(["/singles/阿桑/叶子.flac"])
+    assert out == {"/singles/阿桑/叶子.flac": "g1"}
+
+
+def test_resolve_guids_unmapped_and_missed(tmp_path, monkeypatch):
+    _state(tmp_path)
+    monkeypatch.setattr(httpx, "request", _router({
+        "/track/list": {"code": 0, "data": {"list": [], "total": 0}}}))
+    # scan_wait_s=0 → 未命中不等待直接记 None
+    out = _client(tmp_path, monkeypatch).resolve_guids(["/downloads/x.flac", "/singles/未扫到.flac"])
+    assert out == {"/downloads/x.flac": None, "/singles/未扫到.flac": None}
+
+
+def test_resolve_guids_hit_on_second_scan(tmp_path, monkeypatch):
+    _state(tmp_path)
+    c = _client(tmp_path, monkeypatch, scan_wait_s=120)
+    scans = {"n": 0}
+
+    def _fake(method, url, **kw):
+        scans["n"] += 1
+        data = ({"list": [], "total": 0} if scans["n"] == 1
+                else {"list": [_track("g9", "/vol1/1000/Media/Singles/新曲.flac")], "total": 1})
+        return FakeResp({"code": 0, "data": data})
+
+    monkeypatch.setattr(httpx, "request", _fake)
+    monkeypatch.setattr(fnos.time, "sleep", lambda s: None)
+    out = c.resolve_guids(["/singles/新曲.flac"])
+    assert out == {"/singles/新曲.flac": "g9"}
+    assert scans["n"] == 2
