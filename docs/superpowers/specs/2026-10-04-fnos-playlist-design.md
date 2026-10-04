@@ -1,7 +1,7 @@
 # 飞牛音乐歌单同步设计
 
 日期：2026-10-04
-状态：待评审（已按评审意见修订一轮：补原子操作端点）
+状态：待评审（已按评审意见修订两轮：补原子操作端点 + 模糊搜索）
 
 ## 背景与问题
 
@@ -9,7 +9,7 @@
 库的歌曲在飞牛音乐 App 里只是散落在曲库中，缺少**歌单**这一组织维度。目标：批量下载
 一批歌曲时，允许直接把它们追加到飞牛音乐的某个既有歌单，或新建歌单管理——典型场景：
 通过榜单功能拉一批歌后，新建"榜单-巅峰榜流行指数-2026-10"歌单。同时也要支持脱离下
-载流程的原子管理：把曲库里任意已入库曲目加进既有歌单、查看歌单内容。
+载流程的原子管理：把曲库里任意已入库曲目加进既有歌单、查看歌单内容、模糊搜索曲目。
 
 ## 关键事实（2026-10-04 本机实证）
 
@@ -22,9 +22,10 @@
   `{"username", "password": sha256_hex(明文), "deviceId"}` → `data.userToken`；之后每个
   请求带 cookie `music-token=<userToken>`（fn-music-bridge api.go 佐证字段名；
   password-login 端点本身未在本机实测，列入 E2E 验证项）。
-- **authx 签名头本机不校验**（2026-10-04 探测矩阵 6 项全过）：重放旧 authx、同一 authx
-  换 payload、伪造 sign、完全不带 authx，读写端点（track/list、playlist/create、
-  playlist/delete）均 `code:0`。**本设计不实现 authx**；已验证算法存档备未来收紧时启用：
+- **authx 签名头本机不校验**（2026-10-04 探测矩阵 6 项全过 + 搜索端点复验）：重放旧
+  authx、同一 authx 换 payload、伪造 sign、完全不带 authx，读写端点（track/list、
+  playlist/create、playlist/delete、search/*）均 `code=0`。**本设计不实现 authx**；
+  已验证算法存档备未来收紧时启用：
   `authx = nonce=<6位>&timestamp=<毫秒>&sign=md5("{prefix}_{path}_{nonce}_{ts}_{md5(payload)}_{key}")`，
   GET payload 为原始 query string，POST JSON 为原始 body（HAR 14/15 命中，唯一 MISS 为
   multipart 上传，其 payload 固定 `{}`）；prefix/key 默认值见 fn-music-bridge signer.go。
@@ -42,6 +43,14 @@
   - 列表 `GET /music/api/v1/playlist/list` → `data.list[{guid,name,coverId,...}]`
   - 单内曲目 `GET /music/api/v1/track/playlist-detail/list?playlistGUID=...&page=1&size=300`
     → `data.list`（追加前去重依据）
+- **模糊搜索**（2026-10-04 本机实测，均无需 authx）：
+  - 建议 `GET /music/api/v1/search/suggest?q=...` → `data{track,album,artist,playlist}`
+    四组各 top-5（组内 `total` 为该组返回条数，**非真实匹配总数**）；track 项为完整
+    曲目对象（含 `guid` 与 `audioSpec.path`）；标题/艺人跨字段模糊命中，带 score
+  - 全量 `GET /music/api/v1/search/{track|album|artist|playlist}?q=...` →
+    `data{list,total}`（四族端点均实测存在）；**分页参数（page/size、pageNum/pageSize）
+    均被忽略，一次返回全部匹配**（实测 q="的" → total 252、返回 252）→ 服务端必须
+    自行裁剪（字段精简 + 条数上限）
 - **m3u 死路**（社区口径，官方无文档）：飞牛音乐不自动扫描收编媒体库 m3u，放弃。
 
 ## 目标
@@ -51,14 +60,16 @@
 - 原子管理端点与 MCP 工具（脱离下载流程，覆盖"已有歌曲 → 既有歌单"等事后管理）：
   列出飞牛歌单；查看歌单内曲目；按下载任务或路径清单建/补歌单；把任意已入库曲目
   （按容器路径或 fnos guid）追加到既有歌单
+- 模糊搜索：按标题/艺人/专辑/歌单发现（suggest 四组 top-5 + track 全量搜索），结果
+  含 guid，与"严格追加"两步配合完成"搜到 → 加进歌单"
 - username/password 自动登录，token 持久化，失效自动重登兜底（QQ 保活同一哲学）
 
 ## 非目标
 
 - 不读不写 music.db，不实现 authx（均已论证无必要）
 - 不做歌单封面设置、歌单删除/改名、歌单内曲目移除（API 已知，按需后续）
-- 不做按标题/艺人模糊搜歌加单：fnos 搜索接口未取证，且容器路径/guid "指哪打哪"已
-  覆盖本期场景，后续需要再立项
+- 追加端点不接受模糊 query 入参（避免误匹配自动加单）；模糊搜索只用于发现，
+  加单一律两步走（搜索挑 guid → 按 guid 追加）
 - 不接 `download_album` 流程（专辑歌单化后续同模式另立项）
 - 不做多用户：歌单建在配置的单个音乐应用账号下
 - 第一期不做 token 定时体检；采用惰性重登（99999 触发）
@@ -83,6 +94,12 @@ class FnosClient:
     create_playlist(name) -> str             # POST playlist/create → guid
     playlist_tracks(guid) -> list[dict]      # GET track/playlist-detail/list 分页 → 完整曲目对象
     add_tracks(playlist_guid, track_guids)   # POST playlist/add-track（批量）
+
+    # —— 搜索 ——
+    search_suggest(q) -> dict    # GET search/suggest → {track,album,artist,playlist} 四组
+                                 # top-5，字段裁剪（track 留 guid/title/artists/album/path/duration）
+    search_tracks(q) -> dict     # GET search/track → {total, items(裁剪)}；
+                                 # fnos 侧无分页一次返全量，调用方按 limit 截断
 
     # —— guid 解析 ——
     resolve_guids(container_paths) -> dict[path, str|None]
@@ -142,7 +159,7 @@ fnos_music:
 - 失败隔离：歌单同步失败（飞牛不可达/认证失败/扫描超时）只记任务 errors 与新字段，
   不影响下载与归档结果。
 
-**2. 独立端点（原子管理）**
+**2. 独立端点（原子管理 + 搜索）**
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -150,6 +167,8 @@ fnos_music:
 | GET | `/api/v1/fnos/playlists/{name}/tracks` | 歌单内曲目（guid/title/artists/...）；歌单不存在 → 404 |
 | POST | `/api/v1/fnos/playlists` | 建/补歌单（ensure 语义）：body `{name, task_id?, paths?}`，按任务成功入库曲目和/或容器路径清单建单（不存在则建）并追加，幂等去重；task_id/paths 均缺 → 只建空歌单 |
 | POST | `/api/v1/fnos/playlists/{name}/tracks` | 严格追加到既有歌单：body `{paths?, guids?}`（至少其一，否则 400）；歌单不存在 → 404（不静默建单）；解析失败的路径记 `unresolved`（status=partial），其余正常追加 |
+| GET | `/api/v1/fnos/search?q=...` | 模糊搜索 suggest：{track,album,artist,playlist} 四组 top-5，字段裁剪（track 留 guid/title/artists/album/path/duration） |
+| GET | `/api/v1/fnos/search/tracks?q=...&limit=50` | 曲目全量搜索（fnos 侧无分页一次返全量）：服务端字段裁剪 + limit 截断（默认 50、上限 200），返回 {total, returned, items} |
 
 通用：未配置 fnos_music → 400；飞牛侧失败（不可达 / code!=0 非 99999）→ 502 附说明。
 歌单一律按 name 定位（用户把手），同名取列表首个，与 sync_playlist 语义一致。
@@ -161,6 +180,8 @@ fnos_music:
 - `get_fnos_playlist_tracks(name)` → 歌单内曲目
 - `create_fnos_playlist(name, task_id?, paths?)` → 建/补歌单结果
 - `add_fnos_playlist_tracks(name, paths?, guids?)` → 严格追加结果
+- `search_fnos(q)` → suggest 四组结果
+- `search_fnos_tracks(q, limit=50)` → 曲目全量搜索结果
 
 ### 数据流（榜单场景）
 
@@ -182,11 +203,21 @@ add_fnos_playlist_tracks("我的收藏", paths=["/singles/阿桑/叶子.flac"])
   → playlist-detail/list 取已有去重 → add-track → 返回 added/already/unresolved
 ```
 
+### 数据流（搜索 → 加歌单）
+
+```
+search_fnos_tracks("我也不想这样") → {total, items[{guid,title,artists,path,...}]} → 人工/Agent 挑 guid
+add_fnos_playlist_tracks("我的收藏", guids=["<guid>"])
+  → 免路径解析直达 → playlist-detail/list 去重 → add-track → 返回 added/already
+（两步确定性流程；追加端点不接受 query 入参，避免模糊匹配误加）
+```
+
 ## 错误处理
 
 - 未配置 `fnos_music` → 端点 400「未配置 fnos_music」；`submit_download` 传 playlist → 400
 - 单传 `playlist` 不带 `library` → 400
 - 严格追加 / 歌单详情：歌单名不存在 → 404；`paths`/`guids` 均缺 → 400
+- 搜索端点：`q` 缺失或空白 → 400；结果超 limit 截断（响应含 `total` 与 `returned`）
 - 飞牛不可达 / `code!=0`（非 99999）→ 独立端点 502 附说明；`submit_download` 场景记任务
   errors + `playlist_result.status="failed"`
 - 认证：`code==99999` → 自动重登重试一次；重登失败 → 同上按失败处理并附「检查
@@ -199,13 +230,14 @@ add_fnos_playlist_tracks("我的收藏", paths=["/singles/阿桑/叶子.flac"])
 - `tests/test_fnos.py`：httpx 层 mock，覆盖——password-login 请求体（sha256/deviceId）、
   token 持久化读写与优先级、99999→重登→重试（仅一次）、path_map 转换、resolve_guids
   分页/命中/未命中、sync_playlist 建单/追加/去重/部分成功、append_tracks 严格语义
-  （404/路径+guid 混合/partial）、playlist_detail、错误映射
-- 端点集成：四个端点的 400/404/502 与成功路径（fnos 编排层 mock）；
+  （404/路径+guid 混合/partial）、playlist_detail、search_suggest 四组字段裁剪、
+  search_tracks limit 截断与 total/returned、错误映射
+- 端点集成：六个端点的 400/404/502 与成功路径（fnos 编排层 mock）；
   `submit_download` playlist 参数校验（400 两例）与成功路径
 - 主链路手动 E2E（NAS 实机）：配好 `fnos_music` → `submit_download` 两首单曲带
   `library="singles", playlist="测试-歌单同步"` → 飞牛 App 验证歌单与曲目 →
-  原子端点验证（列歌单/看详情/单曲追加既有歌单/404 路径）→ 改错密码触发重登失败
-  路径 → 飞牛 App 手动删测试歌单
+  原子端点验证（列歌单/看详情/搜索 suggest 与 tracks/单曲追加既有歌单/404 路径）→
+  改错密码触发重登失败路径 → 飞牛 App 手动删测试歌单
 
 ## 风险
 
@@ -219,10 +251,12 @@ add_fnos_playlist_tracks("我的收藏", paths=["/singles/阿桑/叶子.flac"])
   并发同时加单极小概率重复（自用场景可接受）
 - **老曲目解析翻页成本**：原子追加指向早期入库曲目时 track/list 需翻较多页（200/页），
   属一次性延迟；已知 guid 时走 `guids` 入参可免解析
+- **全量搜索无分页**：`search/<type>` 一次返回全部匹配（实测 252 条），大结果集消耗
+  内存/带宽 → 服务端 limit 截断 + 字段精简；suggest top-5 作为首选发现入口
 
 ## 里程碑
 
 - **第一期（本设计）**：`app/fnos.py` + token 状态机 + `submit_download` playlist 参数 +
-  REST 四端点 + MCP 五处 + 单测 + NAS 实机 E2E + README/API/MCP/ROADMAP 文档
-- **后续（另行立项）**：`download_album` 流程 playlist 参数（专辑歌单）；按标题/艺人
-  模糊搜歌加单；歌单封面；歌单删除/改名；歌单内曲目移除；token 定时体检
+  REST 六端点 + MCP 七处 + 单测 + NAS 实机 E2E + README/API/MCP/ROADMAP 文档
+- **后续（另行立项）**：`download_album` 流程 playlist 参数（专辑歌单）；歌单封面；
+  歌单删除/改名；歌单内曲目移除；token 定时体检
