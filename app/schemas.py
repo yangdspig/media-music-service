@@ -44,6 +44,16 @@ class SourceInfo(BaseModel):
     note: str = ""
 
 
+class ChartSummary(BaseModel):
+    """榜单摘要（QQ / 网易云排行榜目录项）。"""
+    id: str = Field(description="榜单 id：QQ 为 topid，网易云为 playlist id")
+    source: str = Field(description="榜单来源：qq / netease")
+    name: str = Field(description="榜单名")
+    cover_url: Optional[str] = Field(default=None, description="榜单封面 URL")
+    track_count: Optional[int] = Field(default=None, description="曲目数（接口提供时；目录接口通常不给）")
+    extra: dict[str, Any] = Field(default_factory=dict, description="源特有附加信息（试听数/更新频率/前三首预览等）")
+
+
 class DownloadTrackInput(Track):
     """下载提交项：仅 id 必填（服务端按搜索/歌单缓存补全 raw 与其余字段）；
     也兼容完整 Track（含 raw）直传——raw 非空时优先使用传入值，不查缓存。"""

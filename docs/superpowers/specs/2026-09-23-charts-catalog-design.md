@@ -1,7 +1,7 @@
 # 榜单目录（排行榜浏览 + 全量/挑选下载）设计
 
 日期：2026-09-23
-状态：待确认
+状态：第一期已实现（2026-10-04，见 docs/superpowers/plans/2026-10-04-charts-catalog.md）
 
 ## 背景与问题
 
@@ -9,8 +9,8 @@
 
 关键事实（2026-09-23 实测验证）：
 
-- **网易云的排行榜本质是歌单**：`GET https://music.163.com/api/toplist`（免登录，PC UA + Referer）返回全部榜单，每个榜单的 `id` 就是 playlist id，榜单详情直接复用现有 `parse_playlist`（`https://music.163.com/playlist?id={id}`）即可拿到带下载地址的 Track。
-- **QQ 的排行榜是独立体系**：榜单列表 `GET https://c.y.qq.com/v8/fcg-bin/fcg_myqq_toplist.fcg`（免登录，Referer: y.qq.com）返回 `data.topList`（id/topTitle/picUrl/listenCount/前三首预览）；榜单详情 `GET https://c.y.qq.com/v8/fcg-bin/fcg_v8_toplist_cp.fcg?topid={id}&tpl=3&page=detail&type=top` 返回 `songlist[].data`（songmid/songname/singer/albumname/interval/pay 等，共约 300 首，含 `date` 更新日期）。
+- **网易云的排行榜本质是歌单**：`GET https://music.163.com/api/toplist`（免登录，PC UA + Referer）返回全部榜单，每个榜单的 `id` 就是 playlist id，榜单详情直接复用现有 `parse_playlist`（`https://music.163.com/#/playlist?id={id}`）即可拿到带下载地址的 Track。（2026-10-04 E2E 修正：必须用 `#/playlist?id=` 片段形式，`?id=` 查询串形式 musicdl 无法提取 id 会解析 0 首。）
+- **QQ 的排行榜是独立体系**：榜单列表 `GET https://c.y.qq.com/v8/fcg-bin/fcg_myqq_toplist.fcg?format=json`（免登录，Referer: y.qq.com；**必须显式传 `format=json`**，缺省返回 JSONP（`MusicJsonCallback` 包裹）无法直接解析，2026-10-04 E2E 实测修正）返回 `data.topList`（id/topTitle/picUrl/listenCount/前三首预览）；榜单详情 `GET https://c.y.qq.com/v8/fcg-bin/fcg_v8_toplist_cp.fcg?topid={id}&tpl=3&page=detail&type=top&format=json` 返回 `songlist[].data`（songmid/songname/singer/albumname/interval/pay 等，共约 300 首，含 `date` 更新日期）。
 - **榜单详情接口只返回元数据，不含下载地址**，而 `normalize_song` 会跳过无 `download_url` 的条目（`app/search.py:112`）。QQ 榜单曲目需要逐曲解析下载地址——musicdl `QQMusicClient.parseplaylist` 已有现成模式：对每条原始曲目 dict 调 `_parsewithofficialapiv1(search_result=…)`，失败回退 `_parsewiththirdpartapis`（`qq.py:494-505`）。toplist_cp 的 `songlist[].data` 与歌单 songlist 条目同构，可直接套用。
 - musicu 网关的 `toplist.ToplistServer/GetAllToplist` 实测被拒（code 500003），**不用**；用旧的 c.y.qq.com fcg 接口。
 

@@ -119,6 +119,51 @@ def parse_playlist(url: str, source: str | None = None) -> dict:
 
 
 @mcp.tool()
+def list_charts(source: str | None = None) -> dict:
+    """浏览 QQ 音乐 / 网易云音乐的官方排行榜目录（榜单名、id、封面、试听数/更新频率）。
+
+    Args:
+        source: 平台，qq 或 netease；留空返回两平台合并列表（单平台失败不阻断另一平台）
+    Returns:
+        榜单列表：id 供 get_chart_tracks 使用，source/name/cover_url/extra（试听数、前三首预览等）。
+    """
+    params = {"source": source} if source else {}
+    with _client() as c:
+        r = c.get("/api/v1/charts", params=params)
+        r.raise_for_status()
+        charts = r.json()
+    return {"total": len(charts), "charts": charts}
+
+
+@mcp.tool()
+def get_chart_tracks(source: str, chart_id: str, limit: int | None = None) -> dict:
+    """获取排行榜曲目（含下载地址，已落缓存，可直接用 submit_download 全量或挑选下载）。
+
+    Args:
+        source: 平台，qq 或 netease
+        chart_id: 榜单 id（取自 list_charts）
+        limit: 只取前 N 首（可选；QQ 单页上限 100 超出按 100 截断；网易云全量解析后截断，
+            大榜单为同步阻塞解析，较慢）
+    Returns:
+        曲目列表（id/source/title/artists/album/ext/quality/size_bytes/duration_s/cover_url）。
+        全量下载：submit_download(tracks=[{"id": t["id"]} for t in tracks], subdir="榜单-XX")；
+        挑选下载：传子集即可。无下载地址的 VIP/付费曲目已被过滤，数量可能少于名义曲目数，属预期。
+    """
+    params: dict[str, Any] = {}
+    if limit:
+        params["limit"] = limit
+    with _client() as c:
+        r = c.get(f"/api/v1/charts/{source}/{chart_id}", params=params, timeout=600)
+        r.raise_for_status()
+        tracks = r.json()
+    return {"total": len(tracks),
+            "tracks": [{"id": t["id"], "source": t["source"], "title": t["title"],
+                        "artists": t["artists"], "album": t["album"], "ext": t["ext"],
+                        "quality": t["quality"], "size_bytes": t["size_bytes"],
+                        "duration_s": t["duration_s"], "cover_url": t["cover_url"]} for t in tracks]}
+
+
+@mcp.tool()
 def submit_download(tracks: list[dict], subdir: str | None = None, library: str | None = None,
                     max_size_mb: float | None = None) -> dict:
     """提交下载任务（异步）。

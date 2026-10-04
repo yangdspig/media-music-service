@@ -7,11 +7,11 @@ from __future__ import annotations
 from fastapi import Depends, FastAPI, Header, HTTPException
 
 from .config import settings
-from .schemas import AlbumDownloadRequest, AlbumInfo, AlbumSummary, ArchiveRequest, ArchiveResult, BackfillLyricsRequest, CleanupLibraryRequest, DownloadRequest, DownloadTask, MigrateSinglesRequest, ReplaceTrackRequest, SearchResponse, SourceInfo, Track, TrackArchiveRequest
+from .schemas import AlbumDownloadRequest, AlbumInfo, AlbumSummary, ArchiveRequest, ArchiveResult, BackfillLyricsRequest, ChartSummary, CleanupLibraryRequest, DownloadRequest, DownloadTask, MigrateSinglesRequest, ReplaceTrackRequest, SearchResponse, SourceInfo, Track, TrackArchiveRequest
 from . import album as album_svc
 from . import archive as archive_svc
 from . import download as dl
-from . import backfill, libraries, libops, meta, registry, storage
+from . import backfill, charts as charts_svc, libraries, libops, meta, registry, storage
 from .playlist import parse_playlist
 from .search import search
 
@@ -63,6 +63,33 @@ def api_playlist(url: str, source: str | None = None) -> list[Track]:
         return parse_playlist(url=url, source=source)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"歌单解析失败: {e}")
+
+
+@app.get("/api/v1/charts", response_model=list[ChartSummary], dependencies=[Depends(auth)])
+def api_charts(source: str | None = None) -> list[ChartSummary]:
+    if source is not None and source not in charts_svc.SOURCES:
+        raise HTTPException(status_code=400,
+                            detail=f"不支持的榜单源：{source}（可选：{', '.join(charts_svc.SOURCES)}）")
+    sources = [source] if source else list(charts_svc.SOURCES)
+    charts, errors = [], []
+    for s in sources:
+        try:
+            charts.extend(charts_svc.list_charts(s))
+        except Exception as e:
+            errors.append(f"{s}: {e}")
+    if not charts and errors:
+        raise HTTPException(status_code=502, detail=f"榜单目录获取失败：{'; '.join(errors)}")
+    return charts
+
+
+@app.get("/api/v1/charts/{source}/{chart_id}", response_model=list[Track], dependencies=[Depends(auth)])
+def api_chart_tracks(source: str, chart_id: str, limit: int | None = None) -> list[Track]:
+    try:
+        return charts_svc.get_chart_tracks(source, chart_id, limit=limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"榜单曲目获取失败（{source}/{chart_id}）：{e}")
 
 
 def _get_album_or_404(collection_id: str) -> AlbumInfo:

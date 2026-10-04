@@ -63,6 +63,17 @@
 > **提交下载时只需回传 `id`**，服务端按缓存自动补全 `raw`（缓存在服务重启后失效，需重新搜索）；
 > 含 `raw` 的完整 Track 直传也兼容（此时以传入值为准，不查缓存）。
 
+### ChartSummary（榜单摘要）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| id | string | 榜单 id：QQ 为 topid，网易云为 playlist id |
+| source | string | 榜单来源：`qq` / `netease` |
+| name | string | 榜单名 |
+| cover_url | string\|null | 榜单封面 URL |
+| track_count | int\|null | 曲目数（目录接口通常不给，为 null） |
+| extra | object | 源特有附加信息：QQ 含 listen_count/update/preview（前三首"艺人-曲名"）；网易云含 update_frequency/description |
+
 ### SourceInfo（源信息）
 
 | 字段 | 类型 | 说明 |
@@ -170,6 +181,44 @@
 **响应 200**：`Track[]`；**400**：解析失败
 
 **重要提示**：该接口为**同步阻塞**，耗时随歌单规模线性增长（实测 42 首约 50 秒）。客户端**超时建议 ≥ 10 分钟**，建议请求头加 `Connection: close` 避免长连接被中间设备挂起。大歌单建议改用 MCP 异步方式。
+
+---
+
+### GET /api/v1/charts
+
+浏览 QQ 音乐 / 网易云音乐的官方排行榜目录。
+
+**Query 参数**
+
+| 参数 | 必填 | 说明 |
+|---|---|---|
+| source | 否 | `qq` 或 `netease`；省略返回两平台合并列表（单平台失败不阻断另一平台） |
+
+**响应**：`list[ChartSummary]`
+
+**错误**：source 非法 → 400；全部平台失败 → 502（附各平台错误说明）
+
+---
+
+### GET /api/v1/charts/{source}/{chart_id}
+
+获取排行榜曲目（标准化 Track，含下载地址，已落缓存，可直接 `POST /api/v1/downloads` 全量或挑选提交）。
+
+**路径参数**：`source`（qq/netease）、`chart_id`（取自 `/api/v1/charts` 的 id）
+
+**Query 参数**
+
+| 参数 | 必填 | 说明 |
+|---|---|---|
+| limit | 否 | 只取前 N 首；QQ 单页上限 100（缺省 100，超出按 100 截断），网易云为全量解析后截断 |
+
+**响应**：`list[Track]`（字段同搜索接口）
+
+**说明**：榜单详情接口只返回元数据，服务端逐曲解析下载地址（同步阻塞，大榜单较慢，客户端需容忍长超时）；无下载地址的 VIP/付费/区域限制曲目被过滤，返回数量可能少于名义曲目数，属预期。
+
+**错误**：source 非法 → 400；上游接口失败/限流 → 502
+
+**典型流程**：`GET /api/v1/charts` → `GET /api/v1/charts/qq/4?limit=50` → `POST /api/v1/downloads`（tracks 只传 id 列表，subdir 如 `榜单-巅峰榜流行指数-2026-10-04`）
 
 ---
 
@@ -554,3 +603,5 @@
 6. **外部工具**：HLS 下载依赖 `N_m3u8DL-RE`，YouTube 下载依赖 `Node.js`（Docker 镜像已内置）。
 7. **专辑元数据为 iTunes 单源**：小众/独立专辑可能查不到（404）；各 storefront 语言不一（HK/TW 繁体、US/JP 可能罗马音），匹配消歧时已做繁转简，但罗马音艺人名（如 `Jay Chou` vs `周杰伦`）会拉低歌手维度得分，可能导致冷门专辑 `unmatched`——此为有意保守策略，看 `manifest.json` 复核后可改走单曲补下。
 8. **专辑下载耗时**：逐曲串行匹配（每曲一次聚合搜索），一张 10 首专辑全程约 5–10 分钟，属预期；任务为异步，客户端轮询即可。
+
+- 榜单曲目解析（`/api/v1/charts/{source}/{chart_id}`）为同步阻塞：QQ 逐曲解析下载地址（单页上限 100），网易云复用歌单全量解析，大榜单耗时长，客户端需容忍长超时
