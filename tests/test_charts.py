@@ -77,3 +77,126 @@ def test_netease_list_charts_blocked(monkeypatch):
     monkeypatch.setattr(httpx, "get", lambda *a, **kw: FakeResp({"code": -462, "list": []}))
     with pytest.raises(LookupError):
         charts.list_charts("netease")
+
+
+QQ_DETAIL_RESP = {"code": 0, "subcode": 0, "date": "2026-09-23", "total_song_num": 2, "songlist": [
+    {"data": {"songmid": "midAAA", "songname": "歌曲A", "interval": 200,
+              "singer": [{"name": "歌手甲"}], "albumname": "专辑A", "albummid": "albAAA"}},
+    {"data": {"songmid": "midBBB", "songname": "歌曲B", "interval": 180,
+              "singer": [{"name": "歌手乙"}], "albumname": "专辑B", "albummid": "albBBB"}},
+]}
+
+
+class _FakeSong:
+    """模拟 musicdl SongInfo：只带 with_valid_download_url 与 todict（normalize_song 用）。"""
+    def __init__(self, mid, name, valid=True):
+        self._d = {"identifier": mid, "song_name": name, "singers": ["歌手甲"],
+                   "download_url": f"https://dl.example.com/{mid}.flac" if valid else "",
+                   "ext": "flac", "raw_data": {"search": {}}}
+
+    @property
+    def with_valid_download_url(self):
+        return bool(self._d["download_url"])
+
+    def todict(self):
+        return dict(self._d)
+
+
+class _FakeQQClient:
+    def __init__(self):
+        self.default_cookies = None
+
+    def _parsewiththirdpartapis(self, search_result):
+        return _FakeSong("flac-" + search_result["songmid"], search_result["songname"], valid=False)
+
+    def _parsewithofficialapiv1(self, search_result, song_info_flac=None,
+                                lossless_quality_is_sufficient=True):
+        return _FakeSong(search_result["songmid"], search_result["songname"], valid=True)
+
+
+class _FakeMusicClient:
+    def __init__(self):
+        self.music_clients = {"QQMusicClient": _FakeQQClient()}
+
+
+def test_qq_chart_tracks(monkeypatch):
+    captured = {}
+
+    def _fake_get(url, params=None, **kw):
+        captured["params"] = params
+        return FakeResp(QQ_DETAIL_RESP)
+
+    monkeypatch.setattr(httpx, "get", _fake_get)
+    monkeypatch.setattr(charts, "build_client", lambda sources: _FakeMusicClient())
+    out = charts.get_chart_tracks("qq", "4", limit=2)
+    assert captured["params"]["topid"] == "4"
+    assert captured["params"]["song_num"] == 2  # limit 映射为 song_num
+    assert captured["params"]["song_begin"] == 0
+    assert [t.id for t in out] == ["QQMusicClient:midAAA", "QQMusicClient:midBBB"]
+    assert out[0].title == "歌曲A"
+    assert out[0].source == "QQMusicClient"
+    assert out[0].ext == "flac"
+
+
+def test_qq_chart_tracks_page_cap(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(httpx, "get",
+                        lambda url, params=None, **kw: captured.update(params=params) or FakeResp(QQ_DETAIL_RESP))
+    monkeypatch.setattr(charts, "build_client", lambda sources: _FakeMusicClient())
+    charts.get_chart_tracks("qq", "4")
+    assert captured["params"]["song_num"] == 100  # limit 缺省取单页上限
+    charts.get_chart_tracks("qq", "4", limit=150)
+    assert captured["params"]["song_num"] == 100  # 超出按 100 截断
+
+
+def test_qq_chart_tracks_skips_unresolvable(monkeypatch):
+    monkeypatch.setattr(httpx, "get", lambda *a, **kw: FakeResp(QQ_DETAIL_RESP))
+    monkeypatch.setattr(charts, "build_client", lambda sources: _FakeMusicClient())
+    monkeypatch.setattr(charts, "_resolve_qq_track",
+                        lambda client, sr: _FakeSong(sr["songmid"], sr["songname"])
+                        if sr["songmid"] == "midBBB" else None)
+    out = charts.get_chart_tracks("qq", "4")
+    assert [t.id for t in out] == ["QQMusicClient:midBBB"]  # 解析失败条目跳过，不阻断整榜
+
+
+def test_qq_chart_tracks_error_code(monkeypatch):
+    monkeypatch.setattr(httpx, "get", lambda *a, **kw: FakeResp({"code": -1}))
+    with pytest.raises(LookupError):
+        charts.get_chart_tracks("qq", "4")
+
+
+def test_resolve_qq_track_falls_back_to_flac():
+    class C:
+        default_cookies = {"musickey": "x"}
+
+        def _parsewiththirdpartapis(self, search_result):
+            return _FakeSong("m1", "歌", valid=True)
+
+        def _parsewithofficialapiv1(self, **kw):
+            raise RuntimeError("boom")
+
+    song = charts._resolve_qq_track(C(), {"songmid": "m1"})
+    assert song is not None and song.with_valid_download_url  # official 异常回退 thirdpart 结果
+
+
+def test_resolve_qq_track_none_when_no_url():
+    class C:
+        default_cookies = None
+
+        def _parsewiththirdpartapis(self, search_result):
+            return _FakeSong("m1", "歌", valid=False)
+
+        def _parsewithofficialapiv1(self, **kw):
+            return _FakeSong("m1", "歌", valid=False)
+
+    assert charts._resolve_qq_track(C(), {"songmid": "m1"}) is None  # VIP/付费无地址 → None
+
+
+def test_qq_chart_tracks_client_unavailable(monkeypatch):
+    class _Empty:
+        music_clients = {}
+
+    monkeypatch.setattr(httpx, "get", lambda *a, **kw: FakeResp(QQ_DETAIL_RESP))
+    monkeypatch.setattr(charts, "build_client", lambda sources: _Empty())
+    with pytest.raises(LookupError):
+        charts.get_chart_tracks("qq", "4")

@@ -92,7 +92,62 @@ def _netease_list_charts() -> list[ChartSummary]:
 
 
 def get_chart_tracks(source: str, chart_id: str, limit: int | None = None) -> list[Track]:
-    """取榜单曲目（标准化 Track，含下载地址，已落缓存可直接 submit_download）。"""
-    if source not in SOURCES:
-        raise ValueError(f"不支持的榜单源：{source}（可选：{', '.join(SOURCES)}）")
-    raise NotImplementedError  # Task 3/4 实现
+    """取榜单曲目（标准化 Track，含下载地址，已落缓存可直接 submit_download）。
+
+    QQ 侧 song_num 单页上限 100，limit 缺省/超出均按 100；网易云为全量解析后截断（Task 4）。
+    逐曲解析失败的条目跳过，不阻断整榜。
+    """
+    if source == "qq":
+        return _qq_chart_tracks(chart_id, limit)
+    if source == "netease":
+        return _netease_chart_tracks(chart_id, limit)
+    raise ValueError(f"不支持的榜单源：{source}（可选：{', '.join(SOURCES)}）")
+
+
+def _qq_chart_tracks(chart_id: str, limit: int | None) -> list[Track]:
+    song_num = min(limit, _QQ_PAGE_CAP) if limit else _QQ_PAGE_CAP
+    r = httpx.get(QQ_DETAIL_URL, params={"topid": chart_id, "tpl": 3, "page": "detail",
+                                         "type": "top", "song_begin": 0, "song_num": song_num},
+                  headers=_QQ_HEADERS, timeout=_TIMEOUT)
+    r.raise_for_status()
+    data = r.json()
+    if data.get("code") != 0:
+        raise LookupError(f"QQ 榜单详情接口返回错误（topid={chart_id}, code={data.get('code')}）")
+    client = build_client(["QQMusicClient"]).music_clients.get("QQMusicClient")
+    if client is None:
+        raise LookupError("QQ 源不可用（未配置 cookies 或登录凭证失效），无法解析榜单曲目下载地址")
+    tracks: list[Track] = []
+    for item in data.get("songlist") or []:
+        sr = item.get("data") or item  # toplist_cp 条目为 {"data": {...}} 包裹，兼容裸条目
+        try:
+            song = _resolve_qq_track(client, sr)
+        except Exception:
+            continue  # 逐曲解析失败跳过，不阻断整榜（与 musicdl parseplaylist 口径一致）
+        if song is None:
+            continue
+        t = normalize_song("QQMusicClient", song)
+        if t:
+            tracks.append(t)
+    cache_tracks(tracks)  # 落缓存，submit_download 可仅按 id 提交
+    return tracks
+
+
+def _resolve_qq_track(client, search_result: dict):
+    """复用 QQMusicClient.parseplaylist 的逐曲解析模式（musicdl qq.py:494-505）：
+    thirdpart 先试（无 cookies 时可出无损），official 兜底；official 异常时回退 thirdpart 结果。
+    两者都无有效下载地址返回 None（VIP/付费/区域限制），调用方跳过。"""
+    song_info_flac = client._parsewiththirdpartapis(search_result=search_result)
+    song_info = None
+    with suppress(Exception):
+        song_info = client._parsewithofficialapiv1(
+            search_result=search_result, song_info_flac=song_info_flac,
+            lossless_quality_is_sufficient=not bool(client.default_cookies))
+    if song_info is not None and getattr(song_info, "with_valid_download_url", False):
+        return song_info
+    if song_info_flac is not None and getattr(song_info_flac, "with_valid_download_url", False):
+        return song_info_flac
+    return None
+
+
+def _netease_chart_tracks(chart_id: str, limit: int | None) -> list[Track]:
+    raise NotImplementedError  # Task 4 实现
