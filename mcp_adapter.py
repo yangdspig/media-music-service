@@ -165,7 +165,7 @@ def get_chart_tracks(source: str, chart_id: str, limit: int | None = None) -> di
 
 @mcp.tool()
 def submit_download(tracks: list[dict], subdir: str | None = None, library: str | None = None,
-                    max_size_mb: float | None = None) -> dict:
+                    max_size_mb: float | None = None, playlist: str | None = None) -> dict:
     """提交下载任务（异步）。
 
     Args:
@@ -177,6 +177,10 @@ def submit_download(tracks: list[dict], subdir: str | None = None, library: str 
         library: 目标库名（可选，见 list_libraries）；传入则下载完成后自动归档到该库，
             单曲入库结构为 {库根}/{艺人}/{曲名.ext}（专辑请用 download_album + archive_album）
         max_size_mb: 单文件体积上限（MB，可选）；>0 时超限曲目跳过且优先于服务端配置，0/空不限
+        playlist: 飞牛音乐歌单名（可选，必须搭配 library）：下载+自动归档完成后把成功入库
+            曲目同步进该歌单（不存在则新建，已有曲目按 guid 去重）；需服务端配置 fnos_music。
+            同步结果在任务的 playlist_result 字段（get_download_status 可见），
+            失败不影响下载与归档
     Returns:
         task_id 等，用 get_download_status 轮询进度，以其 status/errors 为最终结果。
     """
@@ -187,6 +191,8 @@ def submit_download(tracks: list[dict], subdir: str | None = None, library: str 
         payload["library"] = library
     if max_size_mb:
         payload["max_size_mb"] = max_size_mb
+    if playlist:
+        payload["playlist"] = playlist
     with _client() as c:
         r = c.post("/api/v1/downloads", json=payload)
         r.raise_for_status()
@@ -467,6 +473,117 @@ def backfill_lyrics(library: str | None = None, artist: str | None = None,
         payload["sources"] = [s.strip() for s in sources.split(",") if s.strip()]
     with _client() as c:
         r = c.post("/api/v1/library/backfill_lyrics", json=payload, timeout=600)
+        r.raise_for_status()
+        return r.json()
+
+
+@mcp.tool()
+def list_fnos_playlists() -> dict:
+    """列出飞牛音乐的全部歌单（guid/name/track_count）。
+
+    前置：服务端 config.yaml 已配置 fnos_music 段（飞牛音乐应用账号密码）。
+    """
+    with _client() as c:
+        r = c.get("/api/v1/fnos/playlists")
+        r.raise_for_status()
+        items = r.json()
+    return {"total": len(items), "playlists": items}
+
+
+@mcp.tool()
+def get_fnos_playlist_tracks(name: str) -> dict:
+    """查看飞牛音乐指定歌单内的曲目（guid/title/artists/album/duration/path）。
+
+    Args:
+        name: 歌单名（精确匹配；不存在会返回 404 错误）
+    """
+    with _client() as c:
+        r = c.get(f"/api/v1/fnos/playlists/{name}/tracks", timeout=300)
+        r.raise_for_status()
+        return r.json()
+
+
+@mcp.tool()
+def create_fnos_playlist(name: str, task_id: str | None = None,
+                         paths: list[str] | None = None) -> dict:
+    """建/补飞牛音乐歌单（ensure 语义：不存在则新建；曲目按 guid 去重追加，幂等可重试）。
+
+    Args:
+        name: 歌单名
+        task_id: 单曲下载任务 ID（可选；取其成功入库曲目。任务须在内存中且下载时传了
+            library，服务重启后请改用 paths）
+        paths: 容器内库文件绝对路径清单（可选，如 ["/singles/阿桑/叶子.flac"]）；
+            与 task_id 可叠加；两者均缺时只建空歌单
+    Returns:
+        status（ok/partial）、playlist_guid、added（新加）、already（已存在去重）、
+        unresolved（飞牛尚未扫描到的路径，稍后用同名调用重试即可，幂等）。
+        新入库曲目依赖飞牛 watcher 扫描，服务端会轮询等待（scan_wait_s，默认 120s），
+        本工具可能阻塞较久，属预期。
+    """
+    payload: dict[str, Any] = {"name": name}
+    if task_id:
+        payload["task_id"] = task_id
+    if paths:
+        payload["paths"] = paths
+    with _client() as c:
+        r = c.post("/api/v1/fnos/playlists", json=payload, timeout=600)
+        r.raise_for_status()
+        return r.json()
+
+
+@mcp.tool()
+def add_fnos_playlist_tracks(name: str, paths: list[str] | None = None,
+                             guids: list[str] | None = None) -> dict:
+    """严格追加曲目到既有飞牛歌单（歌单不存在返回 404，不会静默新建——防止打错字建错单）。
+
+    Args:
+        name: 既有歌单名（精确匹配）
+        paths: 容器内库文件绝对路径清单（可选；经 path_map 解析为飞牛 guid）
+        guids: 飞牛曲目 guid 清单（可选，免路径解析直达；可由 search_fnos /
+            search_fnos_tracks 获得）。paths/guids 至少传其一
+    Returns:
+        同 create_fnos_playlist：status/added/already/unresolved。
+    """
+    payload: dict[str, Any] = {}
+    if paths:
+        payload["paths"] = paths
+    if guids:
+        payload["guids"] = guids
+    with _client() as c:
+        r = c.post(f"/api/v1/fnos/playlists/{name}/tracks", json=payload, timeout=600)
+        r.raise_for_status()
+        return r.json()
+
+
+@mcp.tool()
+def search_fnos(q: str) -> dict:
+    """飞牛音乐库模糊搜索（suggest）：标题/艺人/专辑/歌单一把搜，各返回 top-5。
+
+    Args:
+        q: 搜索词（曲名/艺人/专辑/歌单名均可，跨字段模糊命中）
+    Returns:
+        track/album/artist/playlist 四组（track 项含 guid 与宿主 path）。
+        找歌加歌单首选本工具；top-5 没中目标时用 search_fnos_tracks 全量翻。
+    """
+    with _client() as c:
+        r = c.get("/api/v1/fnos/search", params={"q": q})
+        r.raise_for_status()
+        return r.json()
+
+
+@mcp.tool()
+def search_fnos_tracks(q: str, limit: int = 50) -> dict:
+    """飞牛音乐库曲目全量搜索（带 guid，供 add_fnos_playlist_tracks 使用）。
+
+    Args:
+        q: 搜索词
+        limit: 返回条数上限（默认 50，最大 200；响应 total 为飞牛侧全部匹配数）
+    Returns:
+        total/returned/items（guid/title/artists/album/duration/path）。
+        典型流程：搜索挑 guid → add_fnos_playlist_tracks(歌单名, guids=[...])。
+    """
+    with _client() as c:
+        r = c.get("/api/v1/fnos/search/tracks", params={"q": q, "limit": limit}, timeout=300)
         r.raise_for_status()
         return r.json()
 
