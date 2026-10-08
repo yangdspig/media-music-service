@@ -83,10 +83,22 @@
    - 第一期：纯 API 客户端 `app/fnos.py`（password-login sha256+deviceId → userToken，music-token cookie，99999 惰性重登，token 持久化 `data/fnos_music_state.json` 原子写；不实现 authx、不读 music.db，guid 由 `track/list` 的 `audioSpec.path` 按 config `path_map` 精确解析，`scan_wait_s` 轮询等飞牛扫描）；`submit_download` 新增 `playlist` 参数（下载+归档后自动同步，失败隔离记 `playlist_result`）；REST 六端点 + MCP 六工具（歌单列/详情/建补 ensure/严格追加 404 + suggest/全量搜索）
    - 后续（另行立项）：`download_album` 流程 `playlist` 参数（专辑歌单）；歌单封面/删除/改名/单内曲目移除；token 定时体检
 
-3. **MoviePilot 薄客户端插件**
+2k. **独立 Web UI（进行中，2026-10-08 立项）**
+   - 背景：补齐浏览器操作入口，配置修改与全部业务功能前端化，PC/手机双端响应式
+   - 方案：可行性与方案已审核（[2026-10-08-web-ui-feasibility.md](docs/superpowers/specs/2026-10-08-web-ui-feasibility.md)，方案 A：Vue 3 + Vuetify 3 SPA + FastAPI StaticFiles 同源托管）；后端仅新增 config 读写 + system/status 端点（配置热更新已核可实现：全局 settings 各模块调用时现读）
+   - 原型：设计文稿 [2026-10-08-web-ui-design.md](docs/superpowers/specs/2026-10-08-web-ui-design.md)（9 页 + 扫码登录 + 借鉴 go-music-dl 视觉语言），可交互 HTML 原型 `docs/superpowers/specs/2026-10-08-web-ui-prototype.html`（单文件双击即开）
+   - 分期：P1 后端补能 + 骨架 + 仪表盘/搜索/任务中心 → P2 榜单/专辑/歌单/媒体库 → P3 设置 + 飞牛 + 移动端打磨
+   - 借鉴调研：[2026-10-08-go-music-dl-comparison.md](docs/superpowers/specs/2026-10-08-go-music-dl-comparison.md)（含扫码登录设计、镜像瘦身方案）
+
+2l. **镜像瘦身（待启动，2026-10-08 提案）**
+   - 背景：当前镜像 1.29GB，其中 Node/ffmpeg/N_m3u8DL-RE 层占 634MB——已核实五个启用源对三者零引用（Node 仅海外源、ffmpeg/HLS 仅 tidal 等使用）
+   - 方案：Dockerfile 多 target：slim 默认（预计 ~350MB，MCP 依赖拆到 MCP 容器单独装）/ full 供海外源（下方第 6 条）启用时用
+
+3. **MoviePilot 薄客户端插件（暂缓，2026-10-08 完成调研留档）**
    - 目标：在 MoviePilot 内完成"搜索 → 勾选 → 下载 → 入库整理"闭环
    - 要点：继承 `_PluginBase`，只做表单与 REST 调用，不直接依赖 musicdl
-   - 参考：设计文档 §4.1
+   - 参考：设计文档 §4.1 + [2026-10-08-moviepilot-plugin-design.md](docs/superpowers/specs/2026-10-08-moviepilot-plugin-design.md)（V3 插件契约调研：plugins.v3/package.v3.json/app.sdk；发现 V3 宿主已内置音乐链、官方市场无音乐类插件——空白生态位）
+   - 暂缓原因：优先推进独立 Web UI（2k）；重启时直接按调研文档执行
 
 3. **歌单批量下载**
    - 现状：`/api/v1/playlist` 已可解析歌单（42 首网易云歌单实测通过），但为同步阻塞接口，大歌单会慢

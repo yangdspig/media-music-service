@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>MediaMusicService Web UI 原型</title>
+<link href="https://cdn.jsdelivr.net/npm/vuetify@3.9.0/dist/vuetify.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
+<style>
+  /* 原型补充样式：Vuetify 之外的最小自定义 */
+  html { overflow-y: auto; }
+  /* 借鉴 go-music-dl：顶部三色径向渐变光晕，向下渐隐 */
+  .v-main::before { content:''; position:fixed; top:0; left:0; right:0; height:600px; z-index:0;
+    pointer-events:none;
+    background:
+      radial-gradient(ellipse 50% 60% at 15% 0%, rgba(16,185,129,.16), transparent 70%),
+      radial-gradient(ellipse 45% 55% at 55% 0%, rgba(99,102,241,.12), transparent 70%),
+      radial-gradient(ellipse 50% 60% at 90% 0%, rgba(52,211,153,.14), transparent 70%); }
+  .v-main > * { position: relative; z-index: 1; }
+  /* 渐变文字（Logo/主标题） */
+  .grad-text { background: linear-gradient(135deg,#34d399,#059669);
+    -webkit-background-clip:text; background-clip:text; color:transparent; }
+  /* 卡片圆角加大 + hover 上浮 */
+  .v-card { border-radius: 16px !important; }
+  .v-card[href], .v-card.cursor-p { transition: transform .18s ease, box-shadow .18s ease; }
+  .v-card[href]:hover, .v-card.cursor-p:hover { transform: translateY(-2px); }
+  /* 胶囊搜索按钮 */
+  .btn-pill { border-radius: 999px !important; }
+  .proto-cover { display:flex; align-items:center; justify-content:center;
+    color:#fff; font-weight:600; border-radius:8px; }
+  .q-flac { background:#2e7d32; } .q-320 { background:#1565c0; } .q-other { background:#757575; }
+  .track-row-mobile { border-bottom: 1px solid rgba(128,128,128,.18); }
+  .sticky-bar { position: fixed; left:0; right:0; bottom:0; z-index: 1006;
+    box-shadow: 0 -2px 12px rgba(0,0,0,.18); }
+  @media (max-width:959px){ .sticky-bar { bottom: 64px; } } /* 避开手机底部Tab */
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .proto-banner { position: sticky; top: 64px; z-index: 5; }
+  .cursor-p { cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue-router@4.5.0/dist/vue-router.global.prod.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vuetify@3.9.0/dist/vuetify.min.js"></script>
+<script>
+/* ============================================================
+ * MediaMusicService Web UI 原型（静态 mock，无真实后端）
+ * 对应设计文稿：docs/superpowers/specs/2026-10-08-web-ui-design.md
+ * ============================================================ */
+const { createApp, reactive, computed, ref, watch, onMounted, onUnmounted } = Vue;
+const { createRouter, createWebHashHistory } = VueRouter;
+
+/* ---------------- Mock 数据 ---------------- */
+const SOURCES = [
+  { name: 'MiguMusicClient',    label: '咪咕',   ok: true,  note: '无损可用' },
+  { name: 'NeteaseMusicClient', label: '网易云', ok: true,  note: '' },
+  { name: 'QQMusicClient',      label: 'QQ音乐', ok: true,  note: '保活中 · 剩余41h自动续' },
+  { name: 'KuwoMusicClient',    label: '酷我',   ok: true,  note: '' },
+  { name: 'QianqianMusicClient',label: '千千',   ok: false, note: '未配置 cookies' },
+];
+const ALL_TRACKS = [
+  { title:'晴天', artist:'周杰伦', album:'叶惠美', duration:'4:29', quality:'FLAC', source:'QQMusicClient', size:'31.2MB' },
+  { title:'晴天', artist:'周杰伦', album:'叶惠美', duration:'4:29', quality:'320k', source:'MiguMusicClient', size:'10.9MB' },
+  { title:'以父之名', artist:'周杰伦', album:'叶惠美', duration:'5:42', quality:'FLAC', source:'NeteaseMusicClient', size:'39.5MB' },
+  { title:'稻香', artist:'周杰伦', album:'魔杰座', duration:'3:43', quality:'FLAC', source:'MiguMusicClient', size:'26.8MB' },
+  { title:'圣诞星（feat. 杨瑞代）', artist:'周杰伦', album:'圣诞星', duration:'3:18', quality:'FLAC', source:'QQMusicClient', size:'24.1MB' },
+  { title:'想你就写信 (Live)', artist:'谭咏麟', album:'Alan Tam Live', duration:'4:55', quality:'FLAC', source:'NeteaseMusicClient', size:'35.0MB' },
+  { title:'难舍难分', artist:'谭咏麟', album:'难舍难分', duration:'4:31', quality:'320k', source:'KuwoMusicClient', size:'11.2MB' },
+  { title:'红尘来去一场梦', artist:'巫启贤', album:'红尘来去一场梦', duration:'4:20', quality:'FLAC', source:'MiguMusicClient', size:'30.4MB' },
+  { title:'现代爱情故事', artist:'张智霖&许秋怡', album:'现代爱情故事', duration:'4:12', quality:'128k', source:'QianqianMusicClient', size:'4.1MB' },
+];
+const ALBUMS = [
+  { id:'1460558069', title:'叶惠美', artist:'周杰伦', year:2003, genre:'国语流行', tracks:11, src:'iTunes', color:'#5c6bc0' },
+  { id:'185903435', title:'范特西', artist:'周杰伦', year:2001, genre:'国语流行', tracks:10, src:'iTunes', color:'#8e24aa' },
+  { id:'netease:183787176', title:'圣诞星', artist:'周杰伦', year:2023, genre:'国语流行', tracks:1, src:'网易云', color:'#00897b' },
+  { id:'qq:002J4UUk29y8BY', title:'难舍难分', artist:'谭咏麟', year:1990, genre:'粤语流行', tracks:10, src:'QQ', color:'#c62828' },
+  { id:'1369', title:'红尘来去一场梦', artist:'巫启贤', year:1993, genre:'国语流行', tracks:10, src:'iTunes', color:'#ef6c00' },
+  { id:'1987', title:'现代爱情故事', artist:'张智霖 / 许秋怡', year:1991, genre:'粤语流行', tracks:10, src:'iTunes', color:'#00695c' },
+];
+const ALBUM_TRACKS = [
+  { d:1, n:1, title:'以父之名', duration:'5:42' }, { d:1, n:2, title:'懦夫', duration:'3:30' },
+  { d:1, n:3, title:'晴天', duration:'4:29' },   { d:1, n:4, title:'三年二班', duration:'4:40' },
+  { d:1, n:5, title:'东风破', duration:'5:14' }, { d:1, n:6, title:'你听得到', duration:'3:50' },
+  { d:1, n:7, title:'同一种调调', duration:'3:51' }, { d:1, n:8, title:'她的睫毛', duration:'3:52' },
+  { d:1, n:9, title:'爱情悬崖', duration:'4:22' }, { d:1, n:10, title:'梯田', duration:'3:33' },
+  { d:1, n:11, title:'双刀', duration:'4:32' },
+];
+const CHARTS = {
+  netease: [
+    { id:'19723756', name:'飙升榜', update:'每日更新' }, { id:'3779629', name:'新歌榜', update:'每日更新' },
+    { id:'3778678', name:'热歌榜', update:'每周四更新' }, { id:'2884035', name:'原创榜', update:'每周更新' },
+  ],
+  qq: [
+    { id:'26', name:'巅峰榜·热歌', update:'每日更新' }, { id:'27', name:'巅峰榜·新歌', update:'每日更新' },
+    { id:'4', name:'巅峰榜·流行指数', update:'每日更新' }, { id:'62', name:'巅峰榜·网络歌曲', update:'每日更新' },
+  ],
+};
+const LIBRARIES = [
+  { name:'default', root:'/library', default:true },
+  { name:'singles', root:'/singles', default:false },
+];
+const FNOS_PLAYLISTS = [
+  { name:'国语精选', count:42 }, { name:'谭咏麟合集', count:18 }, { name:'榜单-网易热歌2026W40', count:50 },
+];
+const FNOS_TRACKS = [
+  { title:'晴天', artist:'周杰伦', album:'叶惠美' }, { title:'难舍难分', artist:'谭咏麟', album:'难舍难分' },
+  { title:'现代爱情故事', artist:'张智霖&许秋怡', album:'现代爱情故事' }, { title:'稻香', artist:'周杰伦', album:'魔杰座' },
+];
+
+/* ---------------- 全局 store（mock） ---------------- */
+const store = reactive({
+  apiKey: localStorage.getItem('proto_key') ?? null,
+  get loggedIn(){ return this.apiKey !== null; },
+  snack: { show:false, text:'', color:'success' },
+  toast(text, color='success'){ this.snack = { show:true, text, color }; },
+  taskSeq: 4,
+  tasks: [
+    { id:'a1b2c3d4', kind:'album', title:'叶惠美 - 周杰伦', status:'running', done:5, total:11,
+      library:'default', elapsed:'02:13', errors:[] },
+    { id:'e5f6g7h8', kind:'single', title:'圣诞星（feat. 杨瑞代）', status:'pending', done:0, total:1,
+      library:'singles', elapsed:'-', errors:[] },
+    { id:'i9j0k1l2', kind:'album', title:'难舍难分 - 谭咏麟', status:'success', done:10, total:10,
+      library:'default', elapsed:'09:41', errors:[], archived:false },
+    { id:'m3n4o5p6', kind:'single', title:'现代爱情故事', status:'failed', done:0, total:1,
+      library:'singles', elapsed:'00:37', errors:['体积超限：候选 88.2MB > 上限 60MB（全部超限，记 unmatched）',
+      '候选池过浅：千千源仅 128k 版本可用'] },
+  ],
+  history: [
+    { time:'2026-10-07 22:14', title:'红尘来去一场梦 - 巫启贤（专辑）', result:'成功 10/10，已归档' },
+    { time:'2026-10-07 21:02', title:'晴天（单曲）', result:'成功，已归档 singles' },
+    { time:'2026-10-06 20:48', title:'想你就写信 (Live)（单曲）', result:'成功，已归档 singles' },
+    { time:'2026-10-06 19:30', title:'圣诞星（专辑）', result:'成功 1/1，已归档并同步歌单' },
+  ],
+  addTask(t){ this.tasks.unshift({ id: Math.random().toString(16).slice(2,10), ...t }); },
+});
+
+/* 模拟任务轮询：仅任务中心页面激活时推进 running 进度 */
+let pollTimer = null;
+function startPolling(){
+  stopPolling();
+  pollTimer = setInterval(() => {
+    store.tasks.forEach(t => {
+      if (t.status === 'running' && t.done < t.total){
+        t.done++;
+        if (t.done >= t.total){ t.status = 'success'; store.toast(`任务完成：${t.title}`); }
+      }
+    });
+  }, 3000);
+}
+function stopPolling(){ if (pollTimer){ clearInterval(pollTimer); pollTimer = null; } }
+
+/* ---------------- 通用小组件 ---------------- */
+const QualityChip = {
+  props:['quality'],
+  template: `<v-chip size="x-small" :class="['text-white', quality==='FLAC'?'q-flac':(quality==='320k'?'q-320':'q-other')]" label>{{ quality==='FLAC'?'无损':quality }}</v-chip>`
+};
+const SrcChip = {
+  props:['source'],
+  methods:{ short(s){ return ({MiguMusicClient:'咪咕',NeteaseMusicClient:'网易',QQMusicClient:'QQ',KuwoMusicClient:'酷我',QianqianMusicClient:'千千'})[s] || s; } },
+  template: `<v-chip size="x-small" variant="tonal" label>{{ short(source) }}</v-chip>`
+};
+const StatusChip = {
+  props:['status'],
+  template: `<v-chip size="small" :color="({pending:'blue',running:'green',success:'grey',failed:'red'})[status]" variant="tonal" label>{{ ({pending:'等待中',running:'下载中',success:'已完成',failed:'失败'})[status] }}</v-chip>`
+};
+/* 曲目勾选列表：PC 表格 / 手机卡片 双渲染 */
+const TrackPicker = {
+  props:['tracks','modelValue'],
+  emits:['update:modelValue'],
+  components:{ QualityChip, SrcChip },
+  computed:{
+    selected:{ get(){ return this.modelValue; }, set(v){ this.$emit('update:modelValue', v); } },
+    allChecked(){ return this.selected.length === this.tracks.length && this.tracks.length>0; },
+  },
+  methods:{
+    toggleAll(){ this.selected = this.allChecked ? [] : this.tracks.map(t=>t.title+t.source); },
+    keyOf(t){ return t.title+t.source; },
+    toggle(k){ const i=this.selected.indexOf(k); i>=0?this.selected.splice(i,1):this.selected.push(k); },
+  },
+  template: `
+  <div>
+    <!-- PC 表格 -->
+    <v-table class="d-none d-md-table" density="comfortable">
+      <thead><tr>
+        <th style="width:40px"><v-checkbox-btn :model-value="allChecked" @update:model-value="toggleAll"></v-checkbox-btn></th>
+        <th>歌名</th><th>歌手</th><th>专辑</th><th>时长</th><th>音质</th><th>大小</th><th>来源</th>
+      </tr></thead>
+      <tbody>
+        <tr v-for="t in tracks" :key="keyOf(t)" class="cursor-p" @click="toggle(keyOf(t))">
+          <td><v-checkbox-btn :model-value="selected.includes(keyOf(t))" @click.stop @update:model-value="toggle(keyOf(t))"></v-checkbox-btn></td>
+          <td>{{ t.title }}</td><td>{{ t.artist }}</td><td>{{ t.album }}</td>
+          <td class="mono">{{ t.duration }}</td>
+          <td><QualityChip :quality="t.quality"/></td>
+          <td class="mono">{{ t.size }}</td>
+          <td><SrcChip :source="t.source"/></td>
+        </tr>
+      </tbody>
+    </v-table>
+    <!-- 手机卡片流 -->
+    <div class="d-md-none">
+      <div class="d-flex align-center px-2 py-1">
+        <v-checkbox-btn :model-value="allChecked" @update:model-value="toggleAll"></v-checkbox-btn>
+        <span class="text-caption text-medium-emphasis">全选（{{ selected.length }}/{{ tracks.length }}）</span>
+      </div>
+      <div v-for="t in tracks" :key="keyOf(t)" class="d-flex align-center px-2 py-2 track-row-mobile" @click="toggle(keyOf(t))">
+        <v-checkbox-btn :model-value="selected.includes(keyOf(t))" @click.stop @update:model-value="toggle(keyOf(t))"></v-checkbox-btn>
+        <div class="flex-grow-1 ml-1" style="min-width:0">
+          <div class="text-body-2 text-truncate">{{ t.title }} <span class="text-medium-emphasis">- {{ t.artist }}</span></div>
+          <div class="text-caption text-medium-emphasis text-truncate">{{ t.album }} · {{ t.duration }} · {{ t.size }}</div>
+        </div>
+        <QualityChip :quality="t.quality" class="ml-2"/><SrcChip :source="t.source" class="ml-1"/>
+      </div>
+    </div>
+  </div>`
+};
+/* 下载选项对话框（勾选下载共用） */
+const DownloadDialog = {
+  props:['modelValue','count'],
+  emits:['update:modelValue','submit'],
+  data(){ return { library:'default', maxSize:null, subdir:'', playlist:'' }; },
+  computed:{ show:{ get(){return this.modelValue;}, set(v){this.$emit('update:modelValue',v);} } },
+  template: `
+  <v-dialog v-model="show" max-width="420">
+    <v-card title="下载选项" :subtitle="'已选 ' + count + ' 首'">
+      <v-card-text class="d-flex flex-column ga-3">
+        <v-select v-model="library" :items="[{title:'默认库（专辑）',value:'default'},{title:'singles（单曲）',value:'singles'}]"
+          label="目标库（下载后自动归档）" density="comfortable"/>
+        <v-text-field v-model="maxSize" type="number" label="体积上限 MB（留空=配置默认）" density="comfortable" hide-details/>
+        <v-text-field v-model="subdir" label="子目录（可选）" density="comfortable" hide-details/>
+        <v-text-field v-if="library==='singles'" v-model="playlist" label="同步到飞牛歌单（可留空）" density="comfortable" hide-details/>
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer/><v-btn variant="text" @click="show=false">取消</v-btn>
+        <v-btn color="primary" variant="flat" @click="$emit('submit',{library,maxSize,subdir,playlist}); show=false">提交下载</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>`
+};
+
+/* ---------------- 页面：仪表盘 ---------------- */
+const PageDashboard = {
+  data(){ return { sources: SOURCES, history: store.history, fnosConfigured: true,
+    disk: { used: 4.2, quota: 10 } }; },
+  computed:{ running(){ return store.tasks.filter(t=>t.status==='running'||t.status==='pending'); },
+    recentDone(){ return store.tasks.filter(t=>t.status==='success').slice(0,3); } },
+  template: `
+  <v-container fluid class="pa-4">
+    <v-row>
+      <v-col cols="12" md="4">
+        <v-card title="音源状态" subtitle="5 个默认源" height="100%">
+          <v-list density="compact">
+            <v-list-item v-for="s in sources" :key="s.name">
+              <template #prepend>
+                <v-icon :color="s.ok?'green':'orange'">{{ s.ok?'mdi-check-circle':'mdi-alert-circle' }}</v-icon>
+              </template>
+              <v-list-item-title>{{ s.label }}</v-list-item-title>
+              <v-list-item-subtitle>{{ s.note || '正常' }}</v-list-item-subtitle>
+            </v-list-item>
+          </v-list>
+          <v-card-actions><v-btn size="small" variant="text" to="/settings">去设置管理 →</v-btn></v-card-actions>
+        </v-card>
+      </v-col>
+      <v-col cols="12" md="4">
+        <v-card title="在途任务" height="100%">
+          <v-card-text>
+            <div class="text-h3 mb-2">{{ running.length }}<span class="text-body-1 text-medium-emphasis"> 个进行中</span></div>
+            <div v-if="recentDone.length" class="text-body-2">
+              <div class="text-medium-emphasis mb-1">最近完成</div>
+              <div v-for="t in recentDone" :key="t.id" class="d-flex align-center mb-1">
+                <v-icon size="small" color="green" class="mr-1">mdi-check</v-icon>{{ t.title }}
+              </div>
+            </div>
+          </v-card-text>
+          <v-card-actions><v-btn size="small" variant="text" to="/tasks">查看全部 →</v-btn></v-card-actions>
+        </v-card>
+      </v-col>
+      <v-col cols="12" md="4">
+        <v-card title="下载目录占用" subtitle="阈值 10GB，超过自动清理" height="100%">
+          <v-card-text>
+            <v-progress-linear :model-value="disk.used/disk.quota*100" color="primary" height="14" rounded class="mb-2"/>
+            <div class="text-body-2">{{ disk.used }} GB / {{ disk.quota }} GB</div>
+          </v-card-text>
+          <v-card-actions><v-btn size="small" variant="text" disabled>立即清理（未达阈值）</v-btn></v-card-actions>
+        </v-card>
+      </v-col>
+      <v-col cols="12" md="4">
+        <v-card title="QQ 音乐登录态" subtitle="自动保活">
+          <v-card-text>
+            <v-chip color="green" variant="tonal" label class="mb-2">有效</v-chip>
+            <div class="text-body-2">musickey 有效期至 2026-10-11 03:12</div>
+            <div class="text-caption text-medium-emphasis">剩余 &lt;24h 时自动刷新（每小时检查）</div>
+          </v-card-text>
+          <v-card-actions><v-btn size="small" variant="text">立即刷新</v-btn></v-card-actions>
+        </v-card>
+      </v-col>
+      <v-col cols="12" md="4">
+        <v-card title="飞牛音乐" subtitle="歌单同步">
+          <v-card-text v-if="fnosConfigured">
+            <v-chip color="green" variant="tonal" label class="mb-2">已连通</v-chip>
+            <div class="text-body-2">3 个歌单 · 110 首曲目</div>
+          </v-card-text>
+          <v-card-text v-else>
+            <v-alert type="info" variant="tonal" density="compact">未配置 fnos_music，去设置页开启</v-alert>
+          </v-card-text>
+          <v-card-actions><v-btn size="small" variant="text" to="/fnos">管理歌单 →</v-btn></v-card-actions>
+        </v-card>
+      </v-col>
+      <v-col cols="12" md="4">
+        <v-card title="快捷入口">
+          <v-card-text class="d-flex flex-wrap ga-2">
+            <v-btn prepend-icon="mdi-magnify" variant="tonal" to="/search">搜索</v-btn>
+            <v-btn prepend-icon="mdi-album" variant="tonal" to="/albums">专辑</v-btn>
+            <v-btn prepend-icon="mdi-chart-line" variant="tonal" to="/charts">榜单</v-btn>
+            <v-btn prepend-icon="mdi-playlist-music" variant="tonal" to="/playlist">歌单解析</v-btn>
+            <v-btn prepend-icon="mdi-folder-music" variant="tonal" to="/library">媒体库</v-btn>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+  </v-container>`
+};
+
+/* ---------------- 页面：搜索下载 ---------------- */
+const PageSearch = {
+  components:{ TrackPicker, DownloadDialog },
+  data(){ return { keyword:'周杰伦', srcFilter:[], sources: SOURCES,
+    searched:true, results: ALL_TRACKS, selected:[], dlg:false, searching:false }; },
+  methods:{
+    doSearch(){
+      this.searching = true;
+      setTimeout(()=>{
+        const kw = this.keyword.trim();
+        this.results = ALL_TRACKS.filter(t =>
+          (!kw || (t.title+t.artist+t.album).includes(kw)) &&
+          (!this.srcFilter.length || this.srcFilter.includes(t.source)));
+        this.searched = true; this.searching = false; this.selected = [];
+      }, 400);
+    },
+    submit(opts){
+      store.addTask({ kind:'single', title:`勾选的 ${this.selected.length} 首单曲`, status:'pending',
+        done:0, total:this.selected.length, library:opts.library, elapsed:'-', errors:[],
+        playlist: opts.playlist });
+      store.toast(`已提交 ${this.selected.length} 首下载`);
+      this.selected = [];
+      this.$router.push('/tasks');
+    },
+  },
+  template: `
+  <v-container fluid class="pa-4" style="padding-bottom:96px">
+    <div class="d-flex ga-2 flex-wrap align-center mb-3">
+      <v-text-field v-model="keyword" label="搜索歌名 / 歌手 / 专辑" prepend-inner-icon="mdi-magnify"
+        density="comfortable" hide-details clearable style="max-width:420px;min-width:240px"
+        @keyup.enter="doSearch"/>
+      <v-select v-model="srcFilter" :items="sources" item-title="label" item-value="name" label="源（默认全部）"
+        density="comfortable" hide-details multiple chips closable-chips style="max-width:300px"/>
+      <v-btn color="primary" class="btn-pill px-6" :loading="searching" @click="doSearch">搜索</v-btn>
+    </div>
+    <v-alert v-if="searched && !results.length" type="info" variant="tonal">无结果，换个关键词或扩大源范围试试</v-alert>
+    <TrackPicker v-if="results.length" v-model="selected" :tracks="results"/>
+    <transition name="v-fade-transition">
+      <v-card v-if="selected.length" class="sticky-bar" color="surface" elevation="8">
+        <div class="d-flex align-center px-4 py-2">
+          <span class="text-body-1">已选 <b>{{ selected.length }}</b> 首</span>
+          <v-spacer/>
+          <v-btn variant="text" @click="selected=[]">清空</v-btn>
+          <v-btn color="primary" variant="flat" prepend-icon="mdi-download" @click="dlg=true">下载</v-btn>
+        </div>
+      </v-card>
+    </transition>
+    <DownloadDialog v-model="dlg" :count="selected.length" @submit="submit"/>
+  </v-container>`
+};
+
+/* ---------------- 页面：专辑列表 ---------------- */
+const PageAlbums = {
+  data(){ return { keyword:'', list: ALBUMS }; },
+  methods:{ doSearch(){ const kw=this.keyword.trim();
+      this.list = ALBUMS.filter(a=>!kw || (a.title+a.artist).includes(kw)); } },
+  template: `
+  <v-container fluid class="pa-4">
+    <div class="d-flex ga-2 mb-4 flex-wrap">
+      <v-text-field v-model="keyword" label="搜索专辑名 / 艺人" prepend-inner-icon="mdi-magnify"
+        density="comfortable" hide-details clearable style="max-width:420px;min-width:240px"
+        @keyup.enter="doSearch"/>
+      <v-btn color="primary" @click="doSearch">搜索</v-btn>
+    </div>
+    <v-row>
+      <v-col v-for="a in list" :key="a.id" cols="6" sm="4" md="3" lg="2">
+        <v-card :to="'/albums/'+a.id" class="cursor-p" hover>
+          <div class="proto-cover" :style="{background:a.color, aspectRatio:'1', fontSize:'28px'}">
+            <v-icon size="48">mdi-music-circle</v-icon>
+          </div>
+          <v-card-title class="text-body-1 pb-0 text-truncate">{{ a.title }}</v-card-title>
+          <v-card-subtitle class="text-truncate">{{ a.artist }} · {{ a.year }}</v-card-subtitle>
+          <v-card-text class="pt-1">
+            <v-chip size="x-small" variant="tonal" label>{{ a.src }}</v-chip>
+            <span class="text-caption text-medium-emphasis ml-1">{{ a.tracks }} 首</span>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+    <v-alert v-if="!list.length" type="info" variant="tonal">无匹配专辑</v-alert>
+  </v-container>`
+};
+
+/* ---------------- 页面：专辑详情 ---------------- */
+const PageAlbumDetail = {
+  data(){ return { album: ALBUMS[0], tracks: ALBUM_TRACKS, fixDlg:false, fixName:'', downDlg:false,
+    library:'default', compilation:false }; },
+  computed:{ discs(){ const m={}; this.tracks.forEach(t=>{ (m[t.d]=m[t.d]||[]).push(t); }); return m; },
+    discCount(){ return Object.keys(this.discs).length; } },
+  methods:{
+    submitDownload(){
+      store.addTask({ kind:'album', title:`${this.album.title} - ${this.album.artist}`,
+        status:'running', done:0, total:this.tracks.length, library:this.library, elapsed:'-', errors:[] });
+      store.toast('专辑下载已提交'); this.downDlg=false; this.$router.push('/tasks');
+    },
+  },
+  template: `
+  <v-container fluid class="pa-4" style="max-width:900px">
+    <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/albums" class="mb-2">返回</v-btn>
+    <v-card class="mb-4">
+      <div class="d-flex flex-wrap pa-4 ga-4">
+        <div class="proto-cover flex-shrink-0" :style="{background:album.color, width:'140px', height:'140px'}">
+          <v-icon size="56">mdi-music-circle</v-icon>
+        </div>
+        <div class="flex-grow-1" style="min-width:220px">
+          <div class="text-h5 d-flex align-center flex-wrap ga-2">{{ album.title }}
+            <v-btn size="x-small" variant="text" icon="mdi-pencil" title="显示名修正（罗马音场景）" @click="fixDlg=true"/>
+          </div>
+          <div class="text-body-2 text-medium-emphasis mb-2">{{ album.artist }} · {{ album.year }} · {{ album.genre }} · {{ tracks.length }} 首 · 来源 {{ album.src }}</div>
+          <div class="text-body-2 mb-3">简介：周杰伦第四张录音室专辑，以母亲名字命名……（中文简介由元数据补充链路提供，折叠展示）</div>
+          <div class="d-flex ga-2 flex-wrap">
+            <v-btn color="primary" prepend-icon="mdi-download" @click="downDlg=true">下载整张专辑</v-btn>
+            <v-btn variant="tonal" prepend-icon="mdi-content-copy" @click="store.toast('曲目表已复制')">复制曲目表</v-btn>
+          </div>
+        </div>
+      </div>
+    </v-card>
+    <v-card v-for="(list, d) in discs" :key="d" class="mb-3">
+      <v-card-subtitle class="pt-3" v-if="discCount>1">CD {{ d }}</v-card-subtitle>
+      <v-list density="compact">
+        <v-list-item v-for="t in list" :key="d+'-'+t.n">
+          <template #prepend><span class="mono text-medium-emphasis mr-3" style="width:22px">{{ t.n }}</span></template>
+          <v-list-item-title>{{ t.title }}</v-list-item-title>
+          <template #append><span class="mono text-medium-emphasis">{{ t.duration }}</span></template>
+        </v-list-item>
+      </v-list>
+    </v-card>
+
+    <v-dialog v-model="downDlg" max-width="420">
+      <v-card title="下载整张专辑" :subtitle="album.title + ' · ' + tracks.length + ' 首'">
+        <v-card-text class="d-flex flex-column ga-3">
+          <v-select v-model="library" :items="[{title:'默认库（专辑）',value:'default'},{title:'singles（单曲）',value:'singles'}]" label="目标库" density="comfortable"/>
+          <v-switch v-model="compilation" label="合集/原声带（Various Artists，归档到 群星/）" density="compact" hide-details color="primary"/>
+          <v-alert type="info" variant="tonal" density="compact">逐曲搜索打分消歧（阈值 0.6），低于阈值记 unmatched；同分段优先无损</v-alert>
+        </v-card-text>
+        <v-card-actions><v-spacer/>
+          <v-btn variant="text" @click="downDlg=false">取消</v-btn>
+          <v-btn color="primary" variant="flat" @click="submitDownload">开始下载</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+    <v-dialog v-model="fixDlg" max-width="400">
+      <v-card title="显示名修正" subtitle="iTunes 罗马音专辑名场景：下载/归档时携带覆盖参数">
+        <v-card-text><v-text-field v-model="fixName" label="中文专辑名" density="comfortable" hide-details/></v-card-text>
+        <v-card-actions><v-spacer/><v-btn variant="text" @click="fixDlg=false">取消</v-btn>
+          <v-btn color="primary" variant="flat" @click="fixDlg=false; store.toast('已记录显示名覆盖')">保存</v-btn></v-card-actions>
+      </v-card>
+    </v-dialog>
+  </v-container>`
+};
+
+/* ---------------- 页面：榜单 ---------------- */
+const PageCharts = {
+  data(){ return { tab:'netease', charts: CHARTS }; },
+  template: `
+  <v-container fluid class="pa-4">
+    <v-tabs v-model="tab" class="mb-4">
+      <v-tab value="netease">网易云</v-tab><v-tab value="qq">QQ音乐</v-tab>
+    </v-tabs>
+    <v-row>
+      <v-col v-for="c in charts[tab]" :key="c.id" cols="6" sm="4" md="3">
+        <v-card :to="'/charts/'+tab+'/'+c.id+'?name='+c.name" hover>
+          <v-card-title class="text-body-1">{{ c.name }}</v-card-title>
+          <v-card-subtitle>{{ c.update }}</v-card-subtitle>
+          <v-card-text><v-icon size="40" color="primary">mdi-chart-box-outline</v-icon></v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+  </v-container>`
+};
+
+/* ---------------- 页面：榜单曲目 ---------------- */
+const PageChartTracks = {
+  components:{ TrackPicker, DownloadDialog },
+  data(){ return { name: this.$route.query.name || '榜单', loading:true, tracks:[], selected:[], dlg:false }; },
+  mounted(){ setTimeout(()=>{ this.tracks = ALL_TRACKS.slice(0,8); this.loading=false; }, 1200); },
+  methods:{
+    submit(opts){
+      store.addTask({ kind:'single', title:`${this.name} · ${this.selected.length} 首`,
+        status:'pending', done:0, total:this.selected.length, library:opts.library, elapsed:'-', errors:[] });
+      store.toast('已提交下载'); this.$router.push('/tasks');
+    },
+    downloadAll(){ this.selected = this.tracks.map(t=>t.title+t.source); this.dlg = true; },
+  },
+  template: `
+  <v-container fluid class="pa-4" style="padding-bottom:96px">
+    <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/charts" class="mb-2">返回榜单目录</v-btn>
+    <div class="d-flex align-center flex-wrap ga-3 mb-3">
+      <span class="text-h6">{{ name }}</span>
+      <v-chip size="small" variant="tonal" label>{{ $route.params.source==='netease'?'网易云':'QQ音乐' }}</v-chip>
+      <v-spacer/>
+      <v-btn color="primary" variant="tonal" prepend-icon="mdi-download-multiple" :disabled="loading"
+        @click="downloadAll">全表下载</v-btn>
+    </div>
+    <v-alert type="info" variant="tonal" density="compact" class="mb-3">榜单解析为同步请求，约需数秒，请勿重复点击</v-alert>
+    <v-skeleton-loader v-if="loading" type="list-item@6"/>
+    <TrackPicker v-else v-model="selected" :tracks="tracks"/>
+    <transition name="v-fade-transition">
+      <v-card v-if="selected.length" class="sticky-bar" elevation="8">
+        <div class="d-flex align-center px-4 py-2">
+          <span>已选 <b>{{ selected.length }}</b> 首</span><v-spacer/>
+          <v-btn variant="text" @click="selected=[]">清空</v-btn>
+          <v-btn color="primary" variant="flat" prepend-icon="mdi-download" @click="dlg=true">下载</v-btn>
+        </div>
+      </v-card>
+    </transition>
+    <DownloadDialog v-model="dlg" :count="selected.length" @submit="submit"/>
+  </v-container>`
+};
+
+/* ---------------- 页面：歌单解析 ---------------- */
+const PagePlaylist = {
+  components:{ TrackPicker, DownloadDialog },
+  data(){ return { url:'', source:'auto', parsing:false, tracks:[], selected:[], dlg:false }; },
+  methods:{
+    parse(){
+      if(!this.url.trim()){ store.toast('请粘贴歌单 URL','warning'); return; }
+      this.parsing = true; this.tracks = [];
+      setTimeout(()=>{ this.tracks = ALL_TRACKS.slice(2,9); this.parsing=false; }, 2500);
+    },
+    submit(opts){
+      store.addTask({ kind:'single', title:`歌单 · ${this.selected.length} 首`, status:'pending',
+        done:0, total:this.selected.length, library:opts.library, elapsed:'-', errors:[] });
+      store.toast('已提交下载'); this.$router.push('/tasks');
+    },
+  },
+  template: `
+  <v-container fluid class="pa-4" style="padding-bottom:96px">
+    <v-card class="mb-4"><v-card-text>
+      <div class="d-flex ga-2 flex-wrap align-center">
+        <v-text-field v-model="url" label="粘贴歌单 URL（网易云 / QQ 音乐）" density="comfortable" hide-details
+          style="min-width:260px;flex:1" prepend-inner-icon="mdi-link-variant"/>
+        <v-select v-model="source" :items="[{title:'自动识别',value:'auto'},{title:'网易云',value:'netease'},{title:'QQ音乐',value:'qq'}]"
+          density="comfortable" hide-details style="max-width:160px"/>
+        <v-btn color="primary" :loading="parsing" :disabled="parsing" @click="parse">解析</v-btn>
+      </div>
+      <v-expand-transition>
+        <v-alert v-if="parsing" type="info" variant="tonal" density="compact" class="mt-3">
+          大歌单解析较慢（同步阻塞接口），请耐心等待，勿重复提交……
+        </v-alert>
+      </v-expand-transition>
+    </v-card-text></v-card>
+    <v-skeleton-loader v-if="parsing" type="list-item@6"/>
+    <template v-else-if="tracks.length">
+      <div class="text-subtitle-2 text-medium-emphasis mb-2">共 {{ tracks.length }} 首</div>
+      <TrackPicker v-model="selected" :tracks="tracks"/>
+    </template>
+    <v-alert v-else type="info" variant="tonal" icon="mdi-information-outline">
+      粘贴平台 App 里分享的歌单链接，解析后可勾选下载
+    </v-alert>
+    <transition name="v-fade-transition">
+      <v-card v-if="selected.length" class="sticky-bar" elevation="8">
+        <div class="d-flex align-center px-4 py-2">
+          <span>已选 <b>{{ selected.length }}</b> 首</span><v-spacer/>
+          <v-btn variant="text" @click="selected=[]">清空</v-btn>
+          <v-btn color="primary" variant="flat" prepend-icon="mdi-download" @click="dlg=true">下载</v-btn>
+        </div>
+      </v-card>
+    </transition>
+    <DownloadDialog v-model="dlg" :count="selected.length" @submit="submit"/>
+  </v-container>`
+};
+
+/* ---------------- 页面：任务中心 ---------------- */
+const PageTasks = {
+  components:{ StatusChip },
+  data(){ return { tab:'running', archiveDlg:false, archiveTarget:null, archiveLib:'default',
+    va:false, archiveResult:null }; },
+  computed:{
+    active(){ return store.tasks.filter(t=>t.status==='running'||t.status==='pending'); },
+    finished(){ return store.tasks.filter(t=>t.status==='success'||t.status==='failed'); },
+    history(){ return store.history; },
+  },
+  mounted(){ startPolling(); },
+  unmounted(){ stopPolling(); },
+  methods:{
+    cancel(t){ if(t.status==='pending'){ t.status='failed'; t.errors=['已取消']; store.toast('任务已取消','info'); } },
+    openArchive(t){ this.archiveTarget=t; this.archiveResult=null; this.archiveDlg=true; },
+    doArchive(){
+      const total=this.archiveTarget.total;
+      this.archiveResult = [
+        { n:1, title:'以父之名', st:'ok', msg:'已入库' }, { n:2, title:'懦夫', st:'ok', msg:'已入库' },
+        { n:3, title:'晴天', st:'skip', msg:'已存在，幂等跳过' }, { n:8, title:'她的睫毛', st:'fail', msg:'匹配分数 0.52 < 阈值，unmatched' },
+      ];
+      this.archiveTarget.archived = true;
+      store.toast('归档完成：成功 '+(total-2)+' / 跳过 1 / 失败 1');
+    },
+    retryTrack(item){ this.archiveDlg=false; this.$router.push('/search'); store.toast(`已跳转搜索页，重搜「${item.title}」`,'info'); },
+  },
+  template: `
+  <v-container fluid class="pa-4" style="max-width:900px">
+    <v-alert type="warning" variant="tonal" density="compact" closable class="mb-3">
+      服务重启后进行中的任务状态会丢失，完整记录见「历史」Tab
+    </v-alert>
+    <v-tabs v-model="tab" class="mb-3">
+      <v-tab value="running">进行中 <v-badge v-if="active.length" :content="active.length" color="primary" inline/></v-tab>
+      <v-tab value="done">已结束</v-tab>
+      <v-tab value="history">历史</v-tab>
+    </v-tabs>
+
+    <template v-if="tab==='running'">
+      <v-alert v-if="!active.length" type="info" variant="tonal">暂无进行中任务，去搜索一首歌试试</v-alert>
+      <v-card v-for="t in active" :key="t.id" class="mb-3">
+        <v-card-text>
+          <div class="d-flex align-center flex-wrap ga-2 mb-2">
+            <v-chip size="x-small" :color="t.kind==='album'?'purple':'teal'" label class="text-white">{{ t.kind==='album'?'专辑':'单曲' }}</v-chip>
+            <span class="text-body-1 font-weight-medium">{{ t.title }}</span><v-spacer/>
+            <StatusChip :status="t.status"/>
+          </div>
+          <v-progress-linear v-if="t.status==='running'" :model-value="t.done/t.total*100" color="green" height="10" rounded class="mb-1"/>
+          <div class="d-flex align-center text-caption text-medium-emphasis">
+            <span>{{ t.done }}/{{ t.total }} 首 · 目标库 {{ t.library }} · 已用时 {{ t.elapsed }}</span><v-spacer/>
+            <v-btn size="small" variant="text" color="red" :disabled="t.status!=='pending'"
+              :title="t.status!=='pending'?'运行中任务不可中断':''" @click="cancel(t)">取消</v-btn>
+          </div>
+        </v-card-text>
+      </v-card>
+    </template>
+
+    <template v-if="tab==='done'">
+      <v-alert v-if="!finished.length" type="info" variant="tonal">暂无已结束任务</v-alert>
+      <v-card v-for="t in finished" :key="t.id" class="mb-3">
+        <v-card-text>
+          <div class="d-flex align-center flex-wrap ga-2 mb-1">
+            <v-chip size="x-small" :color="t.kind==='album'?'purple':'teal'" label class="text-white">{{ t.kind==='album'?'专辑':'单曲' }}</v-chip>
+            <span class="text-body-1 font-weight-medium">{{ t.title }}</span><v-spacer/>
+            <StatusChip :status="t.status"/>
+          </div>
+          <div class="text-caption text-medium-emphasis mb-1">{{ t.done }}/{{ t.total }} 首 · 目标库 {{ t.library }} · 用时 {{ t.elapsed }}</div>
+          <v-expand-transition><div v-if="t.errors && t.errors.length">
+            <v-alert type="error" variant="tonal" density="compact" class="mb-2">
+              <div v-for="(e,i) in t.errors" :key="i" class="text-caption">{{ e }}</div>
+            </v-alert>
+          </div></v-expand-transition>
+          <div class="d-flex ga-2">
+            <v-btn v-if="t.kind==='album' && t.status==='success' && !t.archived" size="small" color="primary"
+              variant="flat" prepend-icon="mdi-archive-arrow-down" @click="openArchive(t)">去归档</v-btn>
+            <v-chip v-if="t.archived" size="small" color="green" variant="tonal" label>已归档</v-chip>
+          </div>
+        </v-card-text>
+      </v-card>
+    </template>
+
+    <template v-if="tab==='history'">
+      <v-list lines="two">
+        <v-list-item v-for="(h,i) in history" :key="i">
+          <v-list-item-title>{{ h.title }}</v-list-item-title>
+          <v-list-item-subtitle>{{ h.time }} · {{ h.result }}</v-list-item-subtitle>
+        </v-list-item>
+      </v-list>
+    </template>
+
+    <v-dialog v-model="archiveDlg" max-width="520">
+      <v-card v-if="archiveTarget" :title="'归档：'+archiveTarget.title" subtitle="硬链接入库 · 写 tag · 嵌封面歌词 · 幂等跳过">
+        <v-card-text v-if="!archiveResult" class="d-flex flex-column ga-3">
+          <v-select v-model="archiveLib" :items="[{title:'默认库（专辑）',value:'default'},{title:'singles（单曲）',value:'singles'}]" label="目标库" density="comfortable"/>
+          <v-switch v-model="va" label="合集/原声带（归档到 群星/）" density="compact" hide-details color="primary"/>
+        </v-card-text>
+        <v-card-text v-else>
+          <v-list density="compact">
+            <v-list-item v-for="r in archiveResult" :key="r.n">
+              <template #prepend>
+                <v-icon :color="({ok:'green',skip:'grey',fail:'red'})[r.st]">
+                  {{ ({ok:'mdi-check-circle',skip:'mdi-minus-circle',fail:'mdi-alert-circle'})[r.st] }}</v-icon>
+              </template>
+              <v-list-item-title>{{ r.n }}. {{ r.title }}</v-list-item-title>
+              <v-list-item-subtitle>{{ r.msg }}</v-list-item-subtitle>
+              <template #append>
+                <v-btn v-if="r.st==='fail'" size="x-small" variant="tonal" color="primary" @click="retryTrack(r)">重搜此曲</v-btn>
+              </template>
+            </v-list-item>
+          </v-list>
+        </v-card-text>
+        <v-card-actions><v-spacer/>
+          <v-btn variant="text" @click="archiveDlg=false">关闭</v-btn>
+          <v-btn v-if="!archiveResult" color="primary" variant="flat" @click="doArchive">执行归档</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+  </v-container>`
+};
+
+/* ---------------- 页面：媒体库 ---------------- */
+const PageLibrary = {
+  data(){ return {
+    lib:'default', libs: LIBRARIES,
+    dlg:null, /* backfill | replace | cleanup | migrate */
+    form:{}, preview:null, result:null, confirmWhole:false,
+  }; },
+  methods:{
+    open(kind){ this.dlg=kind; this.form={}; this.preview=null; this.result=null; this.confirmWhole=false; },
+    dryRun(){
+      const n = { backfill:7, migrate:2, cleanup:3 }[this.dlg] || 0;
+      this.preview = Array.from({length:n}, (_,i)=>({ name:`示例文件 ${i+1}.flac`, path:`/library/巫启贤/红尘来去一场梦/0${i+1}.flac` }));
+    },
+    execute(){
+      this.result = `执行完成：共处理 ${this.preview?this.preview.length:1} 项，失败 0`;
+      store.toast('操作已完成');
+      if (this.dlg==='backfill') store.toast('提示：回填后需在飞牛侧触发重扫（目录移出再移回）','info');
+    },
+  },
+  template: `
+  <v-container fluid class="pa-4" style="max-width:900px">
+    <v-tabs v-model="lib" class="mb-4">
+      <v-tab v-for="l in libs" :key="l.name" :value="l.name">{{ l.name==='default'?'默认库':'singles 库' }}
+        <span class="text-caption text-medium-emphasis ml-1">{{ l.root }}</span></v-tab>
+    </v-tabs>
+    <v-row>
+      <v-col cols="12" sm="6">
+        <v-card hover class="cursor-p" @click="open('backfill')">
+          <v-card-title><v-icon color="primary" class="mr-2">mdi-text-box-search-outline</v-icon>歌词回填</v-card-title>
+          <v-card-text class="text-body-2 text-medium-emphasis">扫描库内无歌词音轨，搜索匹配后写同名 .lrc（dry_run 预览，不改音频）</v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="6">
+        <v-card hover class="cursor-p" @click="open('replace')">
+          <v-card-title><v-icon color="primary" class="mr-2">mdi-swap-horizontal</v-icon>曲目替换</v-card-title>
+          <v-card-text class="text-body-2 text-medium-emphasis">重搜专辑指定曲目，新候选音质更高（或强制）才替换，沿用旧 tag</v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="6">
+        <v-card hover class="cursor-p" @click="open('cleanup')">
+          <v-card-title><v-icon color="red" class="mr-2">mdi-delete-sweep-outline</v-icon>库内清理</v-card-title>
+          <v-card-text class="text-body-2 text-medium-emphasis">按曲目/专辑/艺人三级粒度删除，整目录删除需显式确认</v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="6">
+        <v-card hover class="cursor-p" @click="open('migrate')">
+          <v-card-title><v-icon color="primary" class="mr-2">mdi-folder-move-outline</v-icon>单曲迁移</v-card-title>
+          <v-card-text class="text-body-2 text-medium-emphasis">只有一个音频文件的专辑目录迁入 singles 库</v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <v-dialog :model-value="!!dlg" @update:model-value="dlg=null" max-width="560">
+      <v-card v-if="dlg" :title="({backfill:'歌词回填',replace:'曲目替换',cleanup:'库内清理',migrate:'单曲迁移'})[dlg]">
+        <v-card-text class="d-flex flex-column ga-3">
+          <template v-if="dlg==='backfill'">
+            <v-text-field v-model="form.artist" label="艺人（可选，限定范围）" density="comfortable" hide-details/>
+            <v-text-field v-model="form.album" label="专辑（可选）" density="comfortable" hide-details/>
+            <v-text-field v-model="form.limit" type="number" label="单次上限（默认 50）" density="comfortable" hide-details/>
+          </template>
+          <template v-if="dlg==='replace'">
+            <v-text-field v-model="form.artist" label="艺人" density="comfortable" hide-details/>
+            <v-text-field v-model="form.album" label="专辑" density="comfortable" hide-details/>
+            <v-text-field v-model="form.track" label='曲目（歌名或序号，多碟用 "1-03" 消歧）' density="comfortable" hide-details/>
+            <v-switch v-model="form.force" label="强制替换（不要求新候选音质更高）" density="compact" hide-details color="primary"/>
+          </template>
+          <template v-if="dlg==='cleanup'">
+            <v-text-field v-model="form.artist" label="艺人（必填）" density="comfortable" hide-details/>
+            <v-text-field v-model="form.album" label="专辑（可选，留空=整艺人目录）" density="comfortable" hide-details/>
+            <v-text-field v-model="form.tracks" label="曲目（可选，逗号分隔）" density="comfortable" hide-details/>
+            <v-checkbox v-if="form.artist && !form.tracks" v-model="confirmWhole" color="red" density="compact" hide-details
+              label="我知道这是整目录删除（不可恢复）"/>
+          </template>
+          <template v-if="dlg==='migrate'">
+            <v-text-field v-model="form.artist" label="艺人（可选，限定范围）" density="comfortable" hide-details/>
+            <v-alert type="info" variant="tonal" density="compact">将迁移到 singles 库，清序号类 tag 并带 .lrc</v-alert>
+          </template>
+
+          <v-expand-transition><div v-if="preview">
+            <v-alert type="warning" variant="tonal" density="compact" class="mb-2">
+              预览（dry_run）：将影响 {{ preview.length }} 项</v-alert>
+            <v-list density="compact" max-height="200" style="overflow-y:auto">
+              <v-list-item v-for="p in preview" :key="p.path" :title="p.name" :subtitle="p.path"/>
+            </v-list>
+          </div></v-expand-transition>
+          <v-alert v-if="result" type="success" variant="tonal" density="compact">{{ result }}</v-alert>
+        </v-card-text>
+        <v-card-actions><v-spacer/>
+          <v-btn variant="text" @click="dlg=null">关闭</v-btn>
+          <v-btn v-if="!preview && dlg!=='replace'" variant="tonal" @click="dryRun">预览（dry_run）</v-btn>
+          <v-btn color="primary" variant="flat" :disabled="dlg==='cleanup' && form.artist && !form.tracks && !confirmWhole"
+            @click="execute">执行</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+  </v-container>`
+};
+
+/* ---------------- 页面：飞牛歌单 ---------------- */
+const PageFnos = {
+  data(){ return { lists: FNOS_PLAYLISTS, createDlg:false, newName:'', fromTask:'' }; },
+  template: `
+  <v-container fluid class="pa-4" style="max-width:900px">
+    <div class="d-flex align-center mb-3">
+      <span class="text-h6">飞牛歌单</span><v-spacer/>
+      <v-btn color="primary" prepend-icon="mdi-plus" @click="createDlg=true">新建歌单</v-btn>
+    </div>
+    <v-row>
+      <v-col v-for="p in lists" :key="p.name" cols="12" sm="6" md="4">
+        <v-card :to="'/fnos/'+p.name" hover>
+          <v-card-title class="text-body-1">{{ p.name }}</v-card-title>
+          <v-card-subtitle>{{ p.count }} 首</v-card-subtitle>
+          <v-card-text><v-icon size="36" color="primary">mdi-playlist-music</v-icon></v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+    <v-dialog v-model="createDlg" max-width="420">
+      <v-card title="新建歌单（建补 ensure）" subtitle="已存在则补齐缺失曲目，不重复添加">
+        <v-card-text class="d-flex flex-column ga-3">
+          <v-text-field v-model="newName" label="歌单名" density="comfortable" hide-details/>
+          <v-select v-model="fromTask" :items="['（不关联任务）','晴天 ×1（已完成）','圣诞星（已完成）']"
+            label="从已完成任务导入曲目（可选）" density="comfortable" hide-details/>
+        </v-card-text>
+        <v-card-actions><v-spacer/><v-btn variant="text" @click="createDlg=false">取消</v-btn>
+          <v-btn color="primary" variant="flat" @click="lists.push({name:newName||'新歌单',count:0}); createDlg=false; store.toast('歌单已创建')">创建</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+  </v-container>`
+};
+const PageFnosDetail = {
+  data(){ return { name: this.$route.params.name, tracks: FNOS_TRACKS, appendDlg:false, q:'', suggestions:[] }; },
+  watch:{ q(v){ this.suggestions = v ? ALL_TRACKS.filter(t=>(t.title+t.artist).includes(v)).slice(0,5) : []; } },
+  template: `
+  <v-container fluid class="pa-4" style="max-width:900px">
+    <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/fnos" class="mb-2">返回</v-btn>
+    <div class="d-flex align-center mb-3 flex-wrap ga-2">
+      <span class="text-h6">{{ name }}</span>
+      <v-chip size="small" variant="tonal" label>{{ tracks.length }} 首</v-chip><v-spacer/>
+      <v-btn color="primary" variant="tonal" prepend-icon="mdi-playlist-plus" @click="appendDlg=true">追加曲目</v-btn>
+    </div>
+    <v-list lines="two">
+      <v-list-item v-for="(t,i) in tracks" :key="i">
+        <template #prepend><v-icon>mdi-music-note</v-icon></template>
+        <v-list-item-title>{{ t.title }} <span class="text-medium-emphasis">- {{ t.artist }}</span></v-list-item-title>
+        <v-list-item-subtitle>{{ t.album }}</v-list-item-subtitle>
+      </v-list-item>
+    </v-list>
+    <v-dialog v-model="appendDlg" max-width="480">
+      <v-card title="追加曲目（严格追加）" subtitle="飞牛曲库内精确匹配，找不到的曲目会列入 not_found">
+        <v-card-text>
+          <v-text-field v-model="q" label="搜索飞牛曲库" prepend-inner-icon="mdi-magnify" density="comfortable" hide-details/>
+          <v-list v-if="suggestions.length" density="compact" class="mt-2">
+            <v-list-item v-for="s in suggestions" :key="s.title+s.source" :title="s.title+' - '+s.artist"
+              @click="tracks.push({title:s.title,artist:s.artist,album:s.album}); store.toast('已追加'); appendDlg=false">
+              <template #append><v-icon size="small">mdi-plus</v-icon></template>
+            </v-list-item>
+          </v-list>
+        </v-card-text>
+        <v-card-actions><v-spacer/><v-btn variant="text" @click="appendDlg=false">关闭</v-btn></v-card-actions>
+      </v-card>
+    </v-dialog>
+  </v-container>`
+};
+
+/* ---------------- 页面：设置 ---------------- */
+const HotChip = { props:['hot'],
+  template:`<v-chip size="x-small" :color="hot==='hot'?'green':(hot==='restart'?'orange':'blue')" variant="tonal" label class="ml-2">{{ ({hot:'热生效',restart:'需重启',info:'只读'})[hot] }}</v-chip>` };
+const PageSettings = {
+  components:{ HotChip },
+  data(){ return { panel:[0], saved:false,
+    cfg:{ threads:5, maxSize:null, comment:'yangds整理', sources:['MiguMusicClient','NeteaseMusicClient','QQMusicClient'],
+      downloadRoot:'/app/downloads', dbPath:'/app/data/music_service.db',
+      libraryRoot:'/library', singles:'/singles',
+      qq:'', netease:'', kuwo:'', migu:'', qianqian:'',
+      afterArchive:true, periodic:true, interval:21600, maxGb:10, keepHours:24,
+      qqKeepalive:true, qqInterval:3600,
+      fnosUrl:'', fnosUser:'', fnosPass:'', fnosMap:'/library → /vol1/1000/Media/Music\n/singles → /vol1/1000/Media/Singles',
+      apiKey:'', mcpTransport:'stdio', mcpPort:8766 },
+    qr:{ show:false, key:'', label:'', status:'waiting', cells:[], timers:[] } }; },
+  methods:{
+    save(){ store.toast('已热生效 5 项；3 项（路径/线程数）需重启服务后生效'); },
+    openQr(key, label){
+      this.closeQr(true);
+      this.qr.show = true; this.qr.key = key; this.qr.label = label; this.qr.status = 'waiting';
+      this.qr.cells = this.genQr();
+      this.qr.timers.push(setTimeout(()=>{ this.qr.status='scanned'; }, 2000));
+      this.qr.timers.push(setTimeout(()=>{
+        this.qr.status='success';
+        this.cfg[key] = '扫码获取·'+new Date().toLocaleTimeString();
+        store.toast(this.label+'登录成功，Cookies 已回填并热生效');
+        this.qr.timers.push(setTimeout(()=>this.closeQr(), 900));
+      }, 4500));
+    },
+    closeQr(keepShow){
+      this.qr.timers.forEach(clearTimeout); this.qr.timers = [];
+      if (!keepShow) this.qr.show = false;
+    },
+    genQr(){ /* 伪二维码：21×21 随机点阵 + 三个定位角，仅供原型演示 */
+      const n=21, cells=new Array(n*n).fill(false);
+      const finder=(x,y)=>{ for(let i=0;i<7;i++)for(let j=0;j<7;j++){
+        const edge=(i===0||i===6||j===0||j===6), core=(i>=2&&i<=4&&j>=2&&j<=4);
+        cells[(y+i)*n+(x+j)] = edge||core; } };
+      for(let i=0;i<n*n;i++) cells[i]=Math.random()<0.42;
+      finder(0,0); finder(n-7,0); finder(0,n-7);
+      return cells; },
+  },
+  template: `
+  <v-container fluid class="pa-4" style="max-width:860px;padding-bottom:96px">
+    <v-alert type="info" variant="tonal" density="compact" class="mb-3">
+      保存即写回 config.yaml（保留注释）；标注「需重启」的项改后重启容器生效</v-alert>
+    <v-expansion-panels v-model="panel" multiple>
+      <v-expansion-panel title="基础">
+        <v-expansion-panel-text class="d-flex flex-column ga-3">
+          <div>每源下载线程数<HotChip hot="restart"/><v-text-field v-model="cfg.threads" type="number" density="comfortable" hide-details/></div>
+          <div>单文件体积上限 MB<HotChip hot="hot"/><v-text-field v-model="cfg.maxSize" type="number" density="comfortable" hide-details placeholder="0 / 留空不限"/></div>
+          <div>归档注释 COMMENT<HotChip hot="hot"/><v-text-field v-model="cfg.comment" density="comfortable" hide-details/></div>
+          <div>默认搜索源<HotChip hot="hot"/>
+            <v-select v-model="cfg.sources" :items="['MiguMusicClient','NeteaseMusicClient','QQMusicClient','KuwoMusicClient','QianqianMusicClient']" multiple chips closable-chips density="comfortable" hide-details/></div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+      <v-expansion-panel title="下载与存储">
+        <v-expansion-panel-text class="d-flex flex-column ga-3">
+          <div>下载根目录（容器内路径）<HotChip hot="restart"/><v-text-field v-model="cfg.downloadRoot" density="comfortable" hide-details/></div>
+          <div>数据库路径<HotChip hot="restart"/><v-text-field v-model="cfg.dbPath" density="comfortable" hide-details/></div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+      <v-expansion-panel title="媒体库">
+        <v-expansion-panel-text class="d-flex flex-column ga-3">
+          <div>主库根 library_root<HotChip hot="restart"/><v-text-field v-model="cfg.libraryRoot" density="comfortable" hide-details/></div>
+          <div>命名库 singles<HotChip hot="restart"/><v-text-field v-model="cfg.singles" density="comfortable" hide-details/></div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+      <v-expansion-panel title="音源 Cookies">
+        <v-expansion-panel-text class="d-flex flex-column ga-3">
+          <v-alert type="info" variant="tonal" density="compact">Cookies 只保存在本服务器；支持扫码的平台可直接扫码登录，成功后自动回填</v-alert>
+          <div v-for="(label,key) in {qq:'QQ音乐',netease:'网易云',kuwo:'酷我',migu:'咪咕',qianqian:'千千'}" :key="key">
+            <div class="d-flex align-center">{{ label }}<HotChip hot="hot"/><v-spacer/>
+              <v-btn v-if="['qq','netease'].includes(key)" size="x-small" variant="tonal" color="primary"
+                prepend-icon="mdi-qrcode-scan" class="btn-pill" @click="openQr(key,label)">扫码</v-btn>
+            </div>
+            <v-text-field v-model="cfg[key]" type="password" density="comfortable" hide-details
+              :placeholder="key==='qq'?'••••••••（已设置，粘贴新值覆盖）':'未设置'"/>
+          </div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+      <v-expansion-panel title="清理策略">
+        <v-expansion-panel-text class="d-flex flex-column ga-2">
+          <div>归档后自动清理<HotChip hot="hot"/><v-switch v-model="cfg.afterArchive" color="primary" density="compact" hide-details/></div>
+          <div>定期容量清理<HotChip hot="hot"/><v-switch v-model="cfg.periodic" color="primary" density="compact" hide-details/></div>
+          <div>扫描周期（秒）<HotChip hot="hot"/><v-text-field v-model="cfg.interval" type="number" density="comfortable" hide-details/></div>
+          <div>占用阈值 GB<HotChip hot="hot"/><v-text-field v-model="cfg.maxGb" type="number" density="comfortable" hide-details/></div>
+          <div>保护期（小时）<HotChip hot="hot"/><v-text-field v-model="cfg.keepHours" type="number" density="comfortable" hide-details/></div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+      <v-expansion-panel title="QQ 登录态保活">
+        <v-expansion-panel-text class="d-flex flex-column ga-2">
+          <div>启用自动保活<HotChip hot="hot"/><v-switch v-model="cfg.qqKeepalive" color="primary" density="compact" hide-details/></div>
+          <div>检查周期（秒）<HotChip hot="hot"/><v-text-field v-model="cfg.qqInterval" type="number" density="comfortable" hide-details/></div>
+          <v-btn size="small" variant="tonal" prepend-icon="mdi-refresh" @click="store.toast('已触发强制刷新')">立即刷新</v-btn>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+      <v-expansion-panel title="飞牛音乐">
+        <v-expansion-panel-text class="d-flex flex-column ga-3">
+          <div>base_url<HotChip hot="hot"/><v-text-field v-model="cfg.fnosUrl" density="comfortable" hide-details placeholder="https://192.168.254.112:5667"/></div>
+          <div>应用账号<HotChip hot="hot"/><v-text-field v-model="cfg.fnosUser" density="comfortable" hide-details/></div>
+          <div>应用密码<HotChip hot="hot"/><v-text-field v-model="cfg.fnosPass" type="password" density="comfortable" hide-details placeholder="••••••••"/></div>
+          <div>path_map（容器内库根 → 飞牛宿主机路径）<HotChip hot="hot"/>
+            <v-textarea v-model="cfg.fnosMap" rows="2" density="comfortable" hide-details class="mono"/></div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+      <v-expansion-panel title="安全">
+        <v-expansion-panel-text>
+          <div>API Key（留空=关闭鉴权）<HotChip hot="hot"/>
+            <v-text-field v-model="cfg.apiKey" type="password" density="comfortable" hide-details placeholder="••••••••"/></div>
+          <v-alert v-if="cfg.apiKey" type="warning" variant="tonal" density="compact" class="mt-2">保存后需用新密钥重新登录</v-alert>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+      <v-expansion-panel title="MCP 适配器">
+        <v-expansion-panel-text class="d-flex flex-column ga-3">
+          <div>传输方式<HotChip hot="info"/><v-text-field v-model="cfg.mcpTransport" density="comfortable" hide-details readonly/></div>
+          <div>HTTP 端口<HotChip hot="info"/><v-text-field v-model="cfg.mcpPort" density="comfortable" hide-details readonly/></div>
+          <v-alert type="info" variant="tonal" density="compact">MCP 为独立进程，改动请编辑 config.yaml 并重启 mcp 容器</v-alert>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+    </v-expansion-panels>
+    <v-card class="sticky-bar" elevation="8">
+      <div class="d-flex align-center px-4 py-2">
+        <span class="text-body-2 text-medium-emphasis">改动即时写回 config.yaml</span><v-spacer/>
+        <v-btn color="primary" variant="flat" prepend-icon="mdi-content-save" class="btn-pill" @click="save">保存</v-btn>
+      </div>
+    </v-card>
+
+    <!-- 扫码登录弹窗（状态机演示：waiting 2s → scanned 2.5s → success 自动回填） -->
+    <v-dialog v-model="qr.show" max-width="min(360px, 92vw)" @update:model-value="!$event && closeQr()">
+      <v-card :title="qr.label + '扫码登录'">
+        <v-card-text class="text-center">
+          <div class="mx-auto my-2 pa-3" style="width:min(280px,86vw);border:1px solid rgba(128,128,128,.3);border-radius:12px;position:relative">
+            <div :style="{display:'grid', gridTemplateColumns:'repeat(21,1fr)', gap:'1px', aspectRatio:'1'}">
+              <div v-for="(c,i) in qr.cells" :key="i" :style="{background: c ? 'currentColor':'transparent'}"></div>
+            </div>
+            <div v-if="qr.status==='expired'" class="d-flex align-center justify-center"
+              style="position:absolute;inset:0;background:rgba(255,255,255,.88);border-radius:12px">
+              <span class="text-body-2 text-error">二维码已过期，请刷新</span>
+            </div>
+          </div>
+          <div class="d-flex align-center justify-center ga-2 mt-2">
+            <v-icon size="small" :color="({waiting:'grey',scanned:'orange',success:'green',expired:'red',failed:'red'})[qr.status]">
+              {{ ({waiting:'mdi-qrcode-scan',scanned:'mdi-cellphone-check',success:'mdi-check-circle',expired:'mdi-refresh',failed:'mdi-alert-circle'})[qr.status] }}</v-icon>
+            <span :class="'text-body-2 text-'+({waiting:'medium-emphasis',scanned:'orange',success:'green',expired:'red',failed:'red'})[qr.status]">
+              {{ ({waiting:'等待扫码中…',scanned:'已扫码，请在手机上确认',success:'登录成功，Cookies 已自动回填',expired:'二维码已过期',failed:'登录失败'})[qr.status] }}</span>
+          </div>
+        </v-card-text>
+        <v-card-actions><v-spacer/>
+          <v-btn variant="tonal" size="small" class="btn-pill" @click="openQr(qr.key, qr.label)">刷新二维码</v-btn>
+          <v-btn variant="text" size="small" @click="closeQr">关闭</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+  </v-container>`
+};
+
+/* ---------------- 页面：登录 ---------------- */
+const PageLogin = {
+  data(){ return { key:'', loading:false }; },
+  methods:{ login(){ this.loading=true; setTimeout(()=>{
+      localStorage.setItem('proto_key', this.key || ''); store.apiKey = this.key || '';
+      store.toast('已进入（原型模式，任意密钥可通过）'); this.$router.push('/'); }, 500); } },
+  template: `
+  <v-container fluid class="d-flex align-center justify-center" style="min-height:100vh">
+    <v-card width="360" class="pa-4">
+      <div class="text-center mb-4">
+        <v-icon size="48" color="primary">mdi-music-circle</v-icon>
+        <div class="text-h6 mt-2 grad-text">MediaMusicService</div>
+        <div class="text-caption text-medium-emphasis">输入 API Key 进入（未启用鉴权可直接进入）</div>
+      </div>
+      <v-text-field v-model="key" type="password" label="API Key" density="comfortable" @keyup.enter="login"/>
+      <v-btn block color="primary" :loading="loading" @click="login">进入</v-btn>
+    </v-card>
+  </v-container>`
+};
+
+/* ---------------- 路由 ---------------- */
+const routes = [
+  { path:'/', component:PageDashboard, meta:{ title:'仪表盘', icon:'mdi-view-dashboard' } },
+  { path:'/search', component:PageSearch, meta:{ title:'搜索下载', icon:'mdi-magnify' } },
+  { path:'/albums', component:PageAlbums, meta:{ title:'专辑', icon:'mdi-album' } },
+  { path:'/albums/:id', component:PageAlbumDetail, meta:{ title:'专辑详情', icon:'mdi-album' } },
+  { path:'/tasks', component:PageTasks, meta:{ title:'任务中心', icon:'mdi-download-circle' } },
+  { path:'/charts', component:PageCharts, meta:{ title:'榜单', icon:'mdi-chart-line' } },
+  { path:'/charts/:source/:id', component:PageChartTracks, meta:{ title:'榜单曲目', icon:'mdi-chart-line' } },
+  { path:'/playlist', component:PagePlaylist, meta:{ title:'歌单解析', icon:'mdi-playlist-music' } },
+  { path:'/library', component:PageLibrary, meta:{ title:'媒体库', icon:'mdi-folder-music' } },
+  { path:'/fnos', component:PageFnos, meta:{ title:'飞牛歌单', icon:'mdi-playlist-star' } },
+  { path:'/fnos/:name', component:PageFnosDetail, meta:{ title:'歌单详情', icon:'mdi-playlist-star' } },
+  { path:'/settings', component:PageSettings, meta:{ title:'设置', icon:'mdi-cog' } },
+  { path:'/login', component:PageLogin, meta:{ title:'登录', plain:true } },
+];
+const PRIMARY = ['/', '/search', '/albums', '/tasks', '/settings'];   // 手机底部 Tab
+const router = createRouter({ history: createWebHashHistory(), routes });
+router.beforeEach((to) => { if (!store.loggedIn && to.path !== '/login') return '/login'; });
+
+/* ---------------- 应用壳 ---------------- */
+const AppShell = {
+  data(){ return { drawer:false, dark:false }; },
+  computed:{
+    route(){ return this.$route; },
+    title(){ return this.$route.meta.title || ''; },
+    isMobile(){ return !this.$vuetify.display.mdAndUp; },
+    isLogin(){ return this.$route.path === '/login'; },
+    primaryNav(){ return routes.filter(r=>PRIMARY.includes(r.path)); },
+    secondaryNav(){ return routes.filter(r=>!PRIMARY.includes(r.path) && !r.meta.plain && !r.path.includes(':')); },
+    runningCount(){ return store.tasks.filter(t=>t.status==='running'||t.status==='pending').length; },
+  },
+  watch:{ dark(v){ this.$vuetify.theme.global.name = v ? 'dark' : 'light'; } },
+  methods:{
+    logout(){ localStorage.removeItem('proto_key'); store.apiKey = null; this.$router.push('/login'); },
+    navItem(r){ return { title:r.meta.title, icon:r.meta.icon, to:r.path }; },
+  },
+  template: `
+  <v-app>
+    <template v-if="isLogin"><router-view/></template>
+    <template v-else>
+      <v-app-bar color="primary" density="comfortable">
+        <v-app-bar-nav-icon v-if="isMobile" @click="drawer=!drawer"/>
+        <v-app-bar-title class="text-truncate">{{ title }}</v-app-bar-title>
+        <v-btn icon :title="dark?'切换浅色':'切换深色'" @click="dark=!dark">
+          <v-icon>{{ dark?'mdi-weather-sunny':'mdi-weather-night' }}</v-icon></v-btn>
+        <v-btn icon title="更换密钥 / 退出" @click="logout"><v-icon>mdi-key-variant</v-icon></v-btn>
+      </v-app-bar>
+
+      <v-navigation-drawer v-model="drawer" :permanent="!isMobile" :temporary="isMobile">
+        <v-list density="compact" nav>
+          <v-list-item title="MediaMusicService" subtitle="Web UI 原型 v0.1" class="mb-2">
+            <template #prepend><v-icon color="primary" size="32">mdi-music-circle</v-icon></template>
+          </v-list-item>
+          <v-divider class="mb-2"/>
+          <v-list-item v-for="r in primaryNav" :key="r.path" v-bind="navItem(r)" rounded="lg">
+            <template #append v-if="r.path==='/tasks' && runningCount">
+              <v-badge :content="runningCount" color="primary" inline/></template>
+          </v-list-item>
+          <v-divider class="my-2"/>
+          <v-list-item v-for="r in secondaryNav" :key="r.path" v-bind="navItem(r)" rounded="lg"/>
+        </v-list>
+      </v-navigation-drawer>
+
+      <v-main><router-view/></v-main>
+
+      <v-bottom-navigation v-if="isMobile" grow color="primary" height="64" style="position:fixed">
+        <v-btn v-for="r in primaryNav" :key="r.path" :to="r.path">
+          <v-badge v-if="r.path==='/tasks' && runningCount" :content="runningCount" color="red" offset-x="8" offset-y="2">
+            <v-icon>{{ r.meta.icon }}</v-icon></v-badge>
+          <v-icon v-else>{{ r.meta.icon }}</v-icon>
+          <span>{{ r.meta.title }}</span>
+        </v-btn>
+      </v-bottom-navigation>
+    </template>
+
+    <v-snackbar v-model="store.snack.show" :color="store.snack.color" timeout="2500" location="top">
+      {{ store.snack.text }}
+    </v-snackbar>
+  </v-app>`
+};
+
+/* ---------------- 启动 ---------------- */
+const vuetify = Vuetify.createVuetify({
+  theme: { defaultTheme: (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light',
+    themes: { light: { colors: { primary: '#10b981' } }, dark: { colors: { primary: '#34d399' } } } },
+});
+const app = createApp(AppShell);
+app.config.globalProperties.store = store;
+app.use(router); app.use(vuetify);
+app.mount('#app');
+</script>
+</body>
+</html>
