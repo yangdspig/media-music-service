@@ -10,3 +10,5 @@ fastmcp>=2.0
 opencc-python-reimplemented>=0.1.7
 # 归档时写音频 tag / 嵌封面歌词（flac/mp3）
 mutagen>=1.46
+# Web 控制台配置回写：round-trip 模式保留 config.yaml 注释
+ruamel.yaml>=0.18

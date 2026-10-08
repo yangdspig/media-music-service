@@ -3,6 +3,15 @@
 # MediaMusicService 镜像
 # 基础镜像：python:3.11-slim（Debian），与 musicdl 官方推荐版本一致
 
+# ---- 前端构建（Vue 3 + Vite，产物由 FastAPI StaticFiles 托管在 /） ----
+FROM node:20-alpine AS web-builder
+
+WORKDIR /build
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+COPY web ./
+RUN npm run build
+
 FROM python:3.11-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
@@ -40,6 +49,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY mcp_adapter.py ./
 COPY config.yaml ./
+# 前端构建产物（web-builder 阶段；app/main.py 的 SPA 托管从 web/dist 读取）
+COPY --from=web-builder /build/dist ./web/dist
 
 # 数据目录（下载 + SQLite），运行时挂载卷持久化
 RUN mkdir -p /app/downloads /app/data

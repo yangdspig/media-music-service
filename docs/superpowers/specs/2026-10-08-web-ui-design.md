@@ -2,7 +2,7 @@
 
 - 文档状态：**原型待确认**（确认后按 P1→P3 分期动工）
 - 创建日期：2026-10-08
-- 技术栈：Vue 3 + Vuetify 3 + Vite + vue-router + Pinia + axios（方案 A，已选定）
+- 技术栈：**Vue 3 + Vite + vue-router + Pinia + Tailwind CSS 4 + axios + lucide-vue-next**（2026-10-08 定稿：为像素级贴合用户设计稿，放弃 Vuetify 组件体系，设计稿的 Tailwind class 可直接迁移）
 - 前置方案：独立 Web 前端可行性与开发方案（2026-10-08 已审核）
 - 设计基线：纯内网单用户；同一套响应式代码适配 PC 与手机；后端只新增 config/system 两组端点
 - **视觉基线（2026-10-08 更新）：以用户提供的设计稿为准**，见第 0 节
@@ -302,6 +302,6 @@ GET  /api/v1/auth/qr/{source}?key=…    轮询状态 → {status, cookies?}
 6. 扫码登录源范围：网易云 + QQ（酷狗备选）是否够用
 7. 镜像瘦身（非 WebUI 范围，附带提案）：Dockerfile 改多 target——slim 默认（砍 Node/ffmpeg/N_m3u8DL-RE，1.29GB→约 350MB）/ full 供海外源
 8. 设计稿中"下载目录-浏览"按钮需要服务端目录浏览接口，暂不在计划内（实施时降级为纯文本输入 + 占位符提示）
-9. 实现技术栈细节：设计稿为 Tailwind+原生 HTML；实现按方案 A（Vue3+Vuetify3）映射 tokens。若要求像素级还原，可改 Vue3+Tailwind4（需放弃 Vuetify 组件体系换 Headless UI/自绘），动工前定夺
+9. ~~实现技术栈细节~~ 已定稿（2026-10-08，用户指示"按设计稿开发"）：Vue 3 + Tailwind CSS 4（设计稿 class 直接迁移，像素级贴合），放弃 Vuetify；图标用 lucide-vue-next 对齐设计稿
 
 确认无误后按 P1（后端补能 + 骨架 + 仪表盘/搜索/任务中心）动工。

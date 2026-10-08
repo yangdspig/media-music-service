@@ -13,5 +13,7 @@ data/
 .git/
 .gitignore
 specs/
+web/node_modules/
+web/dist/
 *.md
 !README.md
