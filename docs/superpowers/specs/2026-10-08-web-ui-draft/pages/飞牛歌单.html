@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>飞牛歌单</title>
+    <style id="theme-vars">
+/* MediaMusicService Design Tokens - free-explore brand prefix: mm */
+:root {
+  /* Brand hue: deep teal-cyan, professional media tool */
+  --mm-brand-50: #effaf9;
+  --mm-brand-100: #d7f2f1;
+  --mm-brand-200: #b0e5e3;
+  --mm-brand-300: #7dd3d0;
+  --mm-brand-400: #44b8b5;
+  --mm-brand-500: #289c9a;
+  --mm-brand-600: #1f7f7e;
+  --mm-brand-700: #1c6665;
+  --mm-brand-800: #1a5252;
+  --mm-brand-900: #194545;
+
+  /* Neutral scale: cool slate */
+  --mm-gray-50: #f8fafc;
+  --mm-gray-100: #f1f5f9;
+  --mm-gray-200: #e2e8f0;
+  --mm-gray-300: #cbd5e1;
+  --mm-gray-400: #94a3b8;
+  --mm-gray-500: #64748b;
+  --mm-gray-600: #475569;
+  --mm-gray-700: #334155;
+  --mm-gray-800: #1e293b;
+  --mm-gray-900: #0f172a;
+
+  /* Semantic aliases required by apply-html-head-contract */
+  --mm-background: var(--mm-gray-50);
+  --mm-foreground: var(--mm-gray-900);
+  --mm-card: #ffffff;
+  --mm-card-foreground: var(--mm-gray-900);
+  --mm-popover: #ffffff;
+  --mm-popover-foreground: var(--mm-gray-900);
+  --mm-primary: var(--mm-brand-600);
+  --mm-primary-foreground: #ffffff;
+  --mm-muted: var(--mm-gray-100);
+  --mm-muted-foreground: var(--mm-gray-500);
+  --mm-border: var(--mm-gray-200);
+  --mm-input: var(--mm-gray-300);
+  --mm-ring: var(--mm-brand-500);
+
+  /* Radius */
+  --mm-radius-sm: 4px;
+  --mm-radius-md: 8px;
+  --mm-radius-lg: 16px;
+
+  /* Shadows */
+  --mm-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --mm-shadow-md: 0 8px 24px -8px rgba(15, 23, 42, 0.12);
+  --mm-shadow-lg: 0 24px 60px -20px rgba(15, 23, 42, 0.18);
+
+  /* State colors (semantic only) */
+  --state-success: #059669;
+  --state-warning: #d97706;
+  --state-error: #dc2626;
+  --state-info: #2563eb;
+
+  /* Typography */
+  --mm-font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --mm-font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--mm-background);
+    --color-foreground: var(--mm-foreground);
+    --color-card: var(--mm-card);
+    --color-card-foreground: var(--mm-card-foreground);
+    --color-popover: var(--mm-popover);
+    --color-popover-foreground: var(--mm-popover-foreground);
+    --color-primary: var(--mm-primary);
+    --color-primary-foreground: var(--mm-primary-foreground);
+    --color-muted: var(--mm-muted);
+    --color-muted-foreground: var(--mm-muted-foreground);
+    --color-border: var(--mm-border);
+    --color-input: var(--mm-input);
+    --color-ring: var(--mm-ring);
+    --radius-sm: var(--mm-radius-sm);
+    --radius-md: var(--mm-radius-md);
+    --radius-lg: var(--mm-radius-lg);
+  }
+  @layer base {
+    body { background: var(--mm-background); color: var(--mm-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--mm-background); }
+      .text-background { color: var(--mm-background); }
+      .border-background { border-color: var(--mm-background); }
+      .ring-background { --tw-ring-color: var(--mm-background); }
+      .bg-foreground { background-color: var(--mm-foreground); }
+      .text-foreground { color: var(--mm-foreground); }
+      .border-foreground { border-color: var(--mm-foreground); }
+      .ring-foreground { --tw-ring-color: var(--mm-foreground); }
+      .bg-card { background-color: var(--mm-card); }
+      .text-card { color: var(--mm-card); }
+      .border-card { border-color: var(--mm-card); }
+      .ring-card { --tw-ring-color: var(--mm-card); }
+      .bg-card-foreground { background-color: var(--mm-card-foreground); }
+      .text-card-foreground { color: var(--mm-card-foreground); }
+      .border-card-foreground { border-color: var(--mm-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--mm-card-foreground); }
+      .bg-popover { background-color: var(--mm-popover); }
+      .text-popover { color: var(--mm-popover); }
+      .border-popover { border-color: var(--mm-popover); }
+      .ring-popover { --tw-ring-color: var(--mm-popover); }
+      .bg-popover-foreground { background-color: var(--mm-popover-foreground); }
+      .text-popover-foreground { color: var(--mm-popover-foreground); }
+      .border-popover-foreground { border-color: var(--mm-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--mm-popover-foreground); }
+      .bg-primary { background-color: var(--mm-primary); }
+      .text-primary { color: var(--mm-primary); }
+      .border-primary { border-color: var(--mm-primary); }
+      .ring-primary { --tw-ring-color: var(--mm-primary); }
+      .bg-primary-foreground { background-color: var(--mm-primary-foreground); }
+      .text-primary-foreground { color: var(--mm-primary-foreground); }
+      .border-primary-foreground { border-color: var(--mm-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--mm-primary-foreground); }
+      .bg-muted { background-color: var(--mm-muted); }
+      .text-muted { color: var(--mm-muted); }
+      .border-muted { border-color: var(--mm-muted); }
+      .ring-muted { --tw-ring-color: var(--mm-muted); }
+      .bg-muted-foreground { background-color: var(--mm-muted-foreground); }
+      .text-muted-foreground { color: var(--mm-muted-foreground); }
+      .border-muted-foreground { border-color: var(--mm-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--mm-muted-foreground); }
+      .bg-border { background-color: var(--mm-border); }
+      .text-border { color: var(--mm-border); }
+      .border-border { border-color: var(--mm-border); }
+      .ring-border { --tw-ring-color: var(--mm-border); }
+      .bg-input { background-color: var(--mm-input); }
+      .text-input { color: var(--mm-input); }
+      .border-input { border-color: var(--mm-input); }
+      .ring-input { --tw-ring-color: var(--mm-input); }
+      .bg-ring { background-color: var(--mm-ring); }
+      .text-ring { color: var(--mm-ring); }
+      .border-ring { border-color: var(--mm-ring); }
+      .ring-ring { --tw-ring-color: var(--mm-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <style id="critical-layout">
+      /* Critical layout: guarantee first-screen geometry before Tailwind runtime boots */
+      body { margin: 0; background: var(--mm-background); color: var(--mm-foreground); }
+      .app-shell-root { min-height: 100vh; display: flex; flex-direction: column; }
+      .top-nav { position: sticky; top: 0; z-index: 40; height: 64px; background: var(--mm-card); border-bottom: 1px solid var(--mm-border); }
+      .top-nav-inner { height: 64px; max-width: 1440px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; gap: 32px; }
+      .page-main { flex: 1; width: 100%; max-width: 1440px; margin: 0 auto; padding: 24px; }
+      .panel { background: var(--mm-card); border: 1px solid var(--mm-border); border-radius: var(--mm-radius-md); box-shadow: var(--mm-shadow-sm); }
+      /* Micro-interaction: playlist row hover */
+      .playlist-row { transition: background-color 160ms cubic-bezier(.2,.8,.2,1), transform 160ms cubic-bezier(.2,.8,.2,1); cursor: pointer; }
+      .playlist-row:hover { background: var(--mm-muted); }
+      .playlist-row.is-active { background: var(--mm-brand-50); box-shadow: inset 3px 0 0 var(--mm-primary); }
+      .result-item { transition: background-color 160ms cubic-bezier(.2,.8,.2,1); }
+      .result-item:hover { background: var(--mm-muted); }
+      .btn-primary { background: var(--mm-primary); color: var(--mm-primary-foreground); border-radius: var(--mm-radius-md); transition: filter 160ms cubic-bezier(.2,.8,.2,1), transform 160ms cubic-bezier(.2,.8,.2,1); }
+      .btn-primary:hover { filter: brightness(1.08); }
+      .btn-primary:active { transform: translateY(1px); }
+      .btn-primary:focus-visible, .btn-ghost:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+        outline: 2px solid var(--mm-ring); outline-offset: 2px;
+      }
+      .btn-ghost { border: 1px solid var(--mm-border); border-radius: var(--mm-radius-md); background: var(--mm-card); transition: background-color 160ms cubic-bezier(.2,.8,.2,1); }
+      .btn-ghost:hover { background: var(--mm-muted); }
+      .modal-mask { background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(2px); }
+      .truncate-path { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      table.detail-table th, table.detail-table td { text-align: left; }
+    </style>
+
+    <div class="app-shell-root">
+      <!-- ============ top-nav ============ -->
+      <nav class="top-nav sticky top-0 z-40 bg-card/95 backdrop-blur border-b border-border" data-region="top-nav">
+        <div class="top-nav-inner">
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-primary text-primary-foreground">
+              <i data-lucide="music-4" class="w-4 h-4"></i>
+            </span>
+            <span class="font-semibold text-sm tracking-wide">MediaMusicService</span>
+          </div>
+          <ul class="flex items-center gap-1 text-sm h-full">
+            <li class="h-full flex items-center"><a data-dom-id="nav-dashboard" data-nav-key="dashboard" href="dashboard.html" class="px-3 h-full inline-flex items-center text-muted-foreground hover:text-foreground transition-colors">概览</a></li>
+            <li class="h-full flex items-center"><a data-dom-id="nav-search" data-nav-key="search" href="search.html" class="px-3 h-full inline-flex items-center text-muted-foreground hover:text-foreground transition-colors">搜索</a></li>
+            <li class="h-full flex items-center"><a data-dom-id="nav-playlists" data-nav-key="playlists" href="playlists.html" class="px-3 h-full inline-flex items-center text-muted-foreground hover:text-foreground transition-colors">歌单</a></li>
+            <li class="h-full flex items-center"><a data-dom-id="nav-charts" data-nav-key="charts" href="charts.html" class="px-3 h-full inline-flex items-center text-muted-foreground hover:text-foreground transition-colors">榜单</a></li>
+            <li class="h-full flex items-center"><a data-dom-id="nav-albums" data-nav-key="albums" href="albums.html" class="px-3 h-full inline-flex items-center text-muted-foreground hover:text-foreground transition-colors">专辑</a></li>
+            <li class="h-full flex items-center"><a data-dom-id="nav-tasks" data-nav-key="tasks" href="tasks.html" class="px-3 h-full inline-flex items-center text-muted-foreground hover:text-foreground transition-colors">任务</a></li>
+            <li class="h-full flex items-center"><a data-dom-id="nav-library" data-nav-key="library" href="library.html" class="px-3 h-full inline-flex items-center text-muted-foreground hover:text-foreground transition-colors">媒体库</a></li>
+            <li class="h-full flex items-center"><a data-dom-id="nav-fnos" data-nav-key="fnos" href="fnos.html" aria-current="page" class="px-3 h-full inline-flex items-center text-primary border-b-2 border-primary font-medium">飞牛</a></li>
+            <li class="h-full flex items-center"><a data-dom-id="nav-settings" data-nav-key="settings" href="settings.html" class="px-3 h-full inline-flex items-center text-muted-foreground hover:text-foreground transition-colors">设置</a></li>
+          </ul>
+          <div class="ml-auto flex items-center gap-3 text-sm text-muted-foreground">
+            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted">
+              <i data-lucide="server" class="w-3.5 h-3.5"></i>
+              fnOS 已连接
+            </span>
+          </div>
+        </div>
+      </nav>
+
+      <main class="page-main space-y-6">
+        <!-- ============ fnos-search ============ -->
+        <section id="fnos-search" class="panel p-5" data-region="fnos-search">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h1 class="text-lg font-semibold flex items-center gap-2">
+                <i data-lucide="hard-drive" class="w-5 h-5 text-primary"></i>
+                飞牛媒体库搜索
+              </h1>
+              <p class="text-xs text-muted-foreground mt-1">在 fnOS 音乐库中检索曲目、专辑、艺人与歌单，每类返回前 5 条</p>
+            </div>
+            <span class="text-xs text-muted-foreground font-mono">config: fnos_music</span>
+          </div>
+          <div class="flex gap-3 items-center">
+            <div class="relative flex-1">
+              <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"></i>
+              <input data-dom-id="fnos-search-input" id="fnos-search-input" type="text" value="周杰伦"
+                     placeholder="输入关键词搜索 fnOS 媒体库…"
+                     class="w-full h-10 pl-9 pr-3 rounded-md border border-input bg-background text-sm" />
+            </div>
+            <select class="h-10 px-3 rounded-md border border-input bg-background text-sm" aria-label="返回数量">
+              <option selected>每类 5 条</option>
+              <option>每类 10 条</option>
+              <option>每类 20 条</option>
+            </select>
+            <button data-dom-id="fnos-search-submit" id="fnos-search-submit" class="btn-primary h-10 px-5 inline-flex items-center gap-2 text-sm font-medium">
+              <i data-lucide="search" class="w-4 h-4"></i>
+              搜索
+            </button>
+          </div>
+
+          <!-- 4 result groups -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-5">
+            <!-- 曲目 -->
+            <div class="border border-border rounded-md overflow-hidden">
+              <header class="px-3 py-2 bg-muted flex items-center gap-2 text-sm font-medium">
+                <i data-lucide="music" class="w-4 h-4 text-primary"></i>曲目<span class="text-xs text-muted-foreground font-normal">Top 5</span>
+              </header>
+              <ul class="divide-y divide-border text-sm">
+                <li class="result-item px-3 py-2 flex items-center gap-3">
+                  <span class="flex-1 min-w-0"><span class="block truncate font-medium">晴天</span><span class="block text-xs text-muted-foreground truncate">周杰伦 · 叶惠美</span></span>
+                  <span class="text-xs text-muted-foreground font-mono">04:29</span>
+                  <span class="truncate-path text-xs text-muted-foreground font-mono">/vol1/music/周杰伦/叶惠美/晴天.flac</span>
+                </li>
+                <li class="result-item px-3 py-2 flex items-center gap-3">
+                  <span class="flex-1 min-w-0"><span class="block truncate font-medium">稻香</span><span class="block text-xs text-muted-foreground truncate">周杰伦 · 魔杰座</span></span>
+                  <span class="text-xs text-muted-foreground font-mono">03:43</span>
+                  <span class="truncate-path text-xs text-muted-foreground font-mono">/vol1/music/周杰伦/魔杰座/稻香.flac</span>
+                </li>
+                <li class="result-item px-3 py-2 flex items-center gap-3">
+                  <span class="flex-1 min-w-0"><span class="block truncate font-medium">七里香</span><span class="block text-xs text-muted-foreground truncate">周杰伦 · 七里香</span></span>
+                  <span class="text-xs text-muted-foreground font-mono">04:57</span>
+                  <span class="truncate-path text-xs text-muted-foreground font-mono">/vol1/music/周杰伦/七里香/七里香.flac</span>
+                </li>
+                <li class="result-item px-3 py-2 flex items-center gap-3">
+                  <span class="flex-1 min-w-0"><span class="block truncate font-medium">夜曲</span><span class="block text-xs text-muted-foreground truncate">周杰伦 · 十一月的萧邦</span></span>
+                  <span class="text-xs text-muted-foreground font-mono">03:46</span>
+                  <span class="truncate-path text-xs text-muted-foreground font-mono">/vol1/music/周杰伦/十一月的萧邦/夜曲.flac</span>
+                </li>
+                <li class="result-item px-3 py-2 flex items-center gap-3">
+                  <span class="flex-1 min-w-0"><span class="block truncate font-medium">青花瓷</span><span class="block text-xs text-muted-foreground truncate">周杰伦 · 我很忙</span></span>
+                  <span class="text-xs text-muted-foreground font-mono">03:55</span>
+                  <span class="truncate-path text-xs text-muted-foreground font-mono">/vol1/music/周杰伦/我很忙/青花瓷.flac</span>
+                </li>
+              </ul>
+            </div>
+            <!-- 专辑 -->
+            <div class="border border-border rounded-md overflow-hidden">
+              <header class="px-3 py-2 bg-muted flex items-center gap-2 text-sm font-medium">
+                <i data-lucide="disc-3" class="w-4 h-4 text-primary"></i>专辑<span class="text-xs text-muted-foreground font-normal">Top 5</span>
+              </header>
+              <ul class="divide-y divide-border text-sm">
+                <li class="result-item px-3 py-2 flex items-center gap-3"><span class="flex-1 min-w-0"><span class="block truncate font-medium">叶惠美</span><span class="block text-xs text-muted-foreground truncate">周杰伦 · 2003</span></span><span class="truncate-path text-xs text-muted-foreground font-mono">/vol1/music/周杰伦/叶惠美</span></li>
+                <li class="result-item px-3 py-2 flex items-center gap-3"><span class="flex-1 min-w-0"><span class="block truncate font-medium">范特西</span><span class="block text-xs text-muted-foreground truncate">周杰伦 · 2001</span></span><span class="truncate-path text-xs text-muted-foreground font-mono">/vol1/music/周杰伦/范特西</span></li>
+                <li class="result-item px-3 py-2 flex items-center gap-3"><span class="flex-1 min-w-0"><span class="block truncate font-medium">七里香</span><span class="block text-xs text-muted-foreground truncate">周杰伦 · 2004</span></span><span class="truncate-path text-xs text-muted-foreground font-mono">/vol1/music/周杰伦/七里香</span></li>
+                <li class="result-item px-3 py-2 flex items-center gap-3"><span class="flex-1 min-w-0"><span class="block truncate font-medium">十一月的萧邦</span><span class="block text-xs text-muted-foreground truncate">周杰伦 · 2005</span></span><span class="truncate-path text-xs text-muted-foreground font-mono">/vol1/music/周杰伦/十一月的萧邦</span></li>
+                <li class="result-item px-3 py-2 flex items-center gap-3"><span class="flex-1 min-w-0"><span class="block truncate font-medium">魔杰座</span><span class="block text-xs text-muted-foreground truncate">周杰伦 · 2008</span></span><span class="truncate-path text-xs text-muted-foreground font-mono">/vol1/music/周杰伦/魔杰座</span></li>
+              </ul>
+            </div>
+            <!-- 艺人 -->
+            <div class="border border-border rounded-md overflow-hidden">
+              <header class="px-3 py-2 bg-muted flex items-center gap-2 text-sm font-medium">
+                <i data-lucide="mic-vocal" class="w-4 h-4 text-primary"></i>艺人<span class="text-xs text-muted-foreground font-normal">Top 5</span>
+              </header>
+              <ul class="divide-y divide-border text-sm">
+                <li class="result-item px-3 py-2 flex items-center gap-3"><span class="flex-1 min-w-0"><span class="block truncate font-medium">周杰伦</span><span class="block text-xs text-muted-foreground truncate">华语流行 · 15 张专辑</span></span><span class="truncate-path text-xs text-muted-foreground font-mono">/vol1/music/周杰伦</span></li>
+                <li class="result-item px-3 py-2 flex items-center gap-3"><span class="flex-1 min-w-0"><span class="block truncate font-medium">周传雄</span><span class="block text-xs text-muted-foreground truncate">华语流行 · 6 张专辑</span></span><span class="truncate-path text-xs text-muted-foreground font-mono">/vol1/music/周传雄</span></li>
+                <li class="result-item px-3 py-2 flex items-center gap-3"><span class="flex-1 min-w-0"><span class="block truncate font-medium">周旋</span><span class="block text-xs text-muted-foreground truncate">经典老歌 · 2 张专辑</span></span><span class="truncate-path text-xs text-muted-foreground font-mono">/vol1/music/周旋</span></li>
+                <li class="result-item px-3 py-2 flex items-center gap-3"><span class="flex-1 min-w-0"><span class="block truncate font-medium">周深</span><span class="block text-xs text-muted-foreground truncate">华语流行 · 8 张专辑</span></span><span class="truncate-path text-xs text-muted-foreground font-mono">/vol1/music/周深</span></li>
+                <li class="result-item px-3 py-2 flex items-center gap-3"><span class="flex-1 min-w-0"><span class="block truncate font-medium">周华健</span><span class="block text-xs text-muted-foreground truncate">华语流行 · 10 张专辑</span></span><span class="truncate-path text-xs text-muted-foreground font-mono">/vol1/music/周华健</span></li>
+              </ul>
+            </div>
+            <!-- 歌单 -->
+            <div class="border border-border rounded-md overflow-hidden">
+              <header class="px-3 py-2 bg-muted flex items-center gap-2 text-sm font-medium">
+                <i data-lucide="list-music" class="w-4 h-4 text-primary"></i>歌单<span class="text-xs text-muted-foreground font-normal">Top 5</span>
+              </header>
+              <ul class="divide-y divide-border text-sm">
+                <li class="result-item px-3 py-2 flex items-center gap-3"><span class="flex-1 min-w-0"><span class="block truncate font-medium">周杰伦精选</span><span class="block text-xs text-muted-foreground truncate">32 首 · 最近更新 2026-09-28</span></span><span class="text-xs text-muted-foreground font-mono">pl-8f2c01</span></li>
+                <li class="result-item px-3 py-2 flex items-center gap-3"><span class="flex-1 min-w-0"><span class="block truncate font-medium">华语经典</span><span class="block text-xs text-muted-foreground truncate">58 首 · 最近更新 2026-08-15</span></span><span class="text-xs text-muted-foreground font-mono">pl-3a9d77</span></li>
+                <li class="result-item px-3 py-2 flex items-center gap-3"><span class="flex-1 min-w-0"><span class="block truncate font-medium">我的收藏</span><span class="block text-xs text-muted-foreground truncate">126 首 · 最近更新 2026-10-06</span></span><span class="text-xs text-muted-foreground font-mono">pl-0b1e52</span></li>
+                <li class="result-item px-3 py-2 flex items-center gap-3"><span class="flex-1 min-w-0"><span class="block truncate font-medium">工作专注</span><span class="block text-xs text-muted-foreground truncate">41 首 · 最近更新 2026-09-02</span></span><span class="text-xs text-muted-foreground font-mono">pl-6c4f18</span></li>
+                <li class="result-item px-3 py-2 flex items-center gap-3"><span class="flex-1 min-w-0"><span class="block truncate font-medium">跑步节奏</span><span class="block text-xs text-muted-foreground truncate">27 首 · 最近更新 2026-07-21</span></span><span class="text-xs text-muted-foreground font-mono">pl-d27b90</span></li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ fnos-playlists + playlist-detail ============ -->
+        <div class="grid grid-cols-1 xl:grid-cols-5 gap-6">
+          <section id="fnos-playlists" class="panel xl:col-span-2" data-region="fnos-playlists">
+            <header class="px-5 py-4 border-b border-border flex items-center justify-between">
+              <h2 class="text-base font-semibold flex items-center gap-2">
+                <i data-lucide="list-music" class="w-4 h-4 text-primary"></i>飞牛歌单
+              </h2>
+              <span class="text-xs text-muted-foreground">共 5 个</span>
+            </header>
+            <ul class="divide-y divide-border">
+              <li class="playlist-row is-active px-5 py-3 flex items-center gap-3" data-playlist="我的收藏">
+                <span class="inline-flex items-center justify-center w-9 h-9 rounded-md bg-muted text-muted-foreground shrink-0"><i data-lucide="heart" class="w-4 h-4"></i></span>
+                <span class="flex-1 min-w-0">
+                  <span class="block text-sm font-medium truncate">我的收藏</span>
+                  <span class="block text-xs text-muted-foreground font-mono truncate">pl-0b1e52 · 126 首</span>
+                </span>
+                <button class="btn-ghost h-8 px-3 text-xs inline-flex items-center gap-1 shrink-0"><i data-lucide="eye" class="w-3.5 h-3.5"></i>查看</button>
+              </li>
+              <li class="playlist-row px-5 py-3 flex items-center gap-3" data-playlist="周杰伦精选">
+                <span class="inline-flex items-center justify-center w-9 h-9 rounded-md bg-muted text-muted-foreground shrink-0"><i data-lucide="star" class="w-4 h-4"></i></span>
+                <span class="flex-1 min-w-0">
+                  <span class="block text-sm font-medium truncate">周杰伦精选</span>
+                  <span class="block text-xs text-muted-foreground font-mono truncate">pl-8f2c01 · 32 首</span>
+                </span>
+                <button class="btn-ghost h-8 px-3 text-xs inline-flex items-center gap-1 shrink-0"><i data-lucide="eye" class="w-3.5 h-3.5"></i>查看</button>
+              </li>
+              <li class="playlist-row px-5 py-3 flex items-center gap-3" data-playlist="华语经典">
+                <span class="inline-flex items-center justify-center w-9 h-9 rounded-md bg-muted text-muted-foreground shrink-0"><i data-lucide="library" class="w-4 h-4"></i></span>
+                <span class="flex-1 min-w-0">
+                  <span class="block text-sm font-medium truncate">华语经典</span>
+                  <span class="block text-xs text-muted-foreground font-mono truncate">pl-3a9d77 · 58 首</span>
+                </span>
+                <button class="btn-ghost h-8 px-3 text-xs inline-flex items-center gap-1 shrink-0"><i data-lucide="eye" class="w-3.5 h-3.5"></i>查看</button>
+              </li>
+              <li class="playlist-row px-5 py-3 flex items-center gap-3" data-playlist="工作专注">
+                <span class="inline-flex items-center justify-center w-9 h-9 rounded-md bg-muted text-muted-foreground shrink-0"><i data-lucide="brain" class="w-4 h-4"></i></span>
+                <span class="flex-1 min-w-0">
+                  <span class="block text-sm font-medium truncate">工作专注</span>
+                  <span class="block text-xs text-muted-foreground font-mono truncate">pl-6c4f18 · 41 首</span>
+                </span>
+                <button class="btn-ghost h-8 px-3 text-xs inline-flex items-center gap-1 shrink-0"><i data-lucide="eye" class="w-3.5 h-3.5"></i>查看</button>
+              </li>
+              <li class="playlist-row px-5 py-3 flex items-center gap-3" data-playlist="跑步节奏">
+                <span class="inline-flex items-center justify-center w-9 h-9 rounded-md bg-muted text-muted-foreground shrink-0"><i data-lucide="activity" class="w-4 h-4"></i></span>
+                <span class="flex-1 min-w-0">
+                  <span class="block text-sm font-medium truncate">跑步节奏</span>
+                  <span class="block text-xs text-muted-foreground font-mono truncate">pl-d27b90 · 27 首</span>
+                </span>
+                <button class="btn-ghost h-8 px-3 text-xs inline-flex items-center gap-1 shrink-0"><i data-lucide="eye" class="w-3.5 h-3.5"></i>查看</button>
+              </li>
+            </ul>
+          </section>
+
+          <!-- ============ playlist-detail ============ -->
+          <section id="playlist-detail" class="panel xl:col-span-3" data-region="playlist-detail">
+            <header class="px-5 py-4 border-b border-border flex items-center justify-between">
+              <div>
+                <h2 class="text-base font-semibold flex items-center gap-2">
+                  <i data-lucide="list-video" class="w-4 h-4 text-primary"></i><span id="detail-title">我的收藏</span>
+                </h2>
+                <p class="text-xs text-muted-foreground mt-1 font-mono">guid: pl-0b1e52 · 来源 task_id: fnos-sync-20260930</p>
+              </div>
+              <span class="text-xs px-2 py-1 rounded-md bg-muted text-muted-foreground">已同步</span>
+            </header>
+            <div class="overflow-x-auto">
+              <table class="detail-table w-full text-sm">
+                <thead>
+                  <tr class="border-b border-border text-xs text-muted-foreground">
+                    <th class="px-5 py-2.5 font-medium w-10">#</th>
+                    <th class="px-3 py-2.5 font-medium">标题</th>
+                    <th class="px-3 py-2.5 font-medium">艺人</th>
+                    <th class="px-3 py-2.5 font-medium">专辑</th>
+                    <th class="px-3 py-2.5 font-medium w-20">时长</th>
+                    <th class="px-5 py-2.5 font-medium">路径</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
+                  <tr class="hover:bg-muted transition-colors"><td class="px-5 py-2.5 text-muted-foreground">1</td><td class="px-3 py-2.5 font-medium">晴天</td><td class="px-3 py-2.5">周杰伦</td><td class="px-3 py-2.5 text-muted-foreground">叶惠美</td><td class="px-3 py-2.5 font-mono text-muted-foreground">04:29</td><td class="px-5 py-2.5 font-mono text-xs text-muted-foreground"><span class="truncate-path block">/vol1/music/周杰伦/叶惠美/晴天.flac</span></td></tr>
+                  <tr class="hover:bg-muted transition-colors"><td class="px-5 py-2.5 text-muted-foreground">2</td><td class="px-3 py-2.5 font-medium">平凡之路</td><td class="px-3 py-2.5">朴树</td><td class="px-3 py-2.5 text-muted-foreground">猎户星座</td><td class="px-3 py-2.5 font-mono text-muted-foreground">05:02</td><td class="px-5 py-2.5 font-mono text-xs text-muted-foreground"><span class="truncate-path block">/vol1/music/朴树/猎户星座/平凡之路.flac</span></td></tr>
+                  <tr class="hover:bg-muted transition-colors"><td class="px-5 py-2.5 text-muted-foreground">3</td><td class="px-3 py-2.5 font-medium">海阔天空</td><td class="px-3 py-2.5">Beyond</td><td class="px-3 py-2.5 text-muted-foreground">乐与怒</td><td class="px-3 py-2.5 font-mono text-muted-foreground">05:26</td><td class="px-5 py-2.5 font-mono text-xs text-muted-foreground"><span class="truncate-path block">/vol1/music/Beyond/乐与怒/海阔天空.flac</span></td></tr>
+                  <tr class="hover:bg-muted transition-colors"><td class="px-5 py-2.5 text-muted-foreground">4</td><td class="px-3 py-2.5 font-medium">富士山下</td><td class="px-3 py-2.5">陈奕迅</td><td class="px-3 py-2.5 text-muted-foreground">What's Going On…?</td><td class="px-3 py-2.5 font-mono text-muted-foreground">04:19</td><td class="px-5 py-2.5 font-mono text-xs text-muted-foreground"><span class="truncate-path block">/vol1/music/陈奕迅/Whats Going On/富士山下.flac</span></td></tr>
+                  <tr class="hover:bg-muted transition-colors"><td class="px-5 py-2.5 text-muted-foreground">5</td><td class="px-3 py-2.5 font-medium">小幸运</td><td class="px-3 py-2.5">田馥甄</td><td class="px-3 py-2.5 text-muted-foreground">我的少女时代 OST</td><td class="px-3 py-2.5 font-mono text-muted-foreground">04:26</td><td class="px-5 py-2.5 font-mono text-xs text-muted-foreground"><span class="truncate-path block">/vol1/music/田馥甄/我的少女时代/小幸运.flac</span></td></tr>
+                  <tr class="hover:bg-muted transition-colors"><td class="px-5 py-2.5 text-muted-foreground">6</td><td class="px-3 py-2.5 font-medium">夜空中最亮的星</td><td class="px-3 py-2.5">逃跑计划</td><td class="px-3 py-2.5 text-muted-foreground">世界</td><td class="px-3 py-2.5 font-mono text-muted-foreground">04:12</td><td class="px-5 py-2.5 font-mono text-xs text-muted-foreground"><span class="truncate-path block">/vol1/music/逃跑计划/世界/夜空中最亮的星.flac</span></td></tr>
+                  <tr class="hover:bg-muted transition-colors"><td class="px-5 py-2.5 text-muted-foreground">7</td><td class="px-3 py-2.5 font-medium">起风了</td><td class="px-3 py-2.5">买辣椒也用券</td><td class="px-3 py-2.5 text-muted-foreground">起风了</td><td class="px-3 py-2.5 font-mono text-muted-foreground">05:25</td><td class="px-5 py-2.5 font-mono text-xs text-muted-foreground"><span class="truncate-path block">/vol1/music/买辣椒也用券/起风了/起风了.flac</span></td></tr>
+                  <tr class="hover:bg-muted transition-colors"><td class="px-5 py-2.5 text-muted-foreground">8</td><td class="px-3 py-2.5 font-medium">山丘</td><td class="px-3 py-2.5">李宗盛</td><td class="px-3 py-2.5 text-muted-foreground">山丘</td><td class="px-3 py-2.5 font-mono text-muted-foreground">06:46</td><td class="px-5 py-2.5 font-mono text-xs text-muted-foreground"><span class="truncate-path block">/vol1/music/李宗盛/山丘/山丘.flac</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <footer class="px-5 py-3 border-t border-border text-xs text-muted-foreground flex items-center justify-between">
+              <span>显示 8 / 126 首</span>
+              <span class="inline-flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5"></i>最近同步 2026-10-06 22:14</span>
+            </footer>
+          </section>
+        </div>
+
+        <!-- ============ sync-actions ============ -->
+        <section id="sync-actions" class="panel p-5" data-region="sync-actions">
+          <h2 class="text-base font-semibold flex items-center gap-2 mb-1">
+            <i data-lucide="refresh-ccw" class="w-4 h-4 text-primary"></i>同步操作
+          </h2>
+          <p class="text-xs text-muted-foreground mb-4">创建新歌单或向既有歌单追加曲目，变更将写入 fnOS 并记录任务</p>
+          <div class="flex flex-wrap gap-3">
+            <button data-dom-id="create-playlist" id="create-playlist" class="btn-primary h-10 px-5 inline-flex items-center gap-2 text-sm font-medium" onclick="document.getElementById('modal-create').classList.remove('hidden')">
+              <i data-lucide="plus" class="w-4 h-4"></i>新建歌单
+            </button>
+            <button data-dom-id="add-tracks" id="add-tracks" class="btn-ghost h-10 px-5 inline-flex items-center gap-2 text-sm font-medium" onclick="document.getElementById('modal-add').classList.remove('hidden')">
+              <i data-lucide="list-plus" class="w-4 h-4"></i>追加曲目
+            </button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- 新建歌单弹窗 -->
+    <div id="modal-create" class="hidden fixed inset-0 z-50 modal-mask flex items-center justify-center p-6" role="dialog" aria-modal="true" aria-label="新建歌单">
+      <div class="panel w-full max-w-md p-6" onclick="event.stopPropagation()">
+        <header class="flex items-center justify-between mb-4">
+          <h3 class="text-base font-semibold flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4 text-primary"></i>新建歌单</h3>
+          <button class="btn-ghost w-8 h-8 inline-flex items-center justify-center" onclick="document.getElementById('modal-create').classList.add('hidden')" aria-label="关闭"><i data-lucide="x" class="w-4 h-4"></i></button>
+        </header>
+        <form class="space-y-4" onsubmit="event.preventDefault(); document.getElementById('modal-create').classList.add('hidden');">
+          <label class="block">
+            <span class="text-xs font-medium text-muted-foreground">歌单名称</span>
+            <input type="text" required placeholder="例如：深夜电台" class="mt-1 w-full h-10 px-3 rounded-md border border-input bg-background text-sm" />
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-muted-foreground">任务 ID（task_id）</span>
+            <input type="text" placeholder="例如：fnos-sync-20261008" class="mt-1 w-full h-10 px-3 rounded-md border border-input bg-background text-sm font-mono" />
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-muted-foreground">曲目路径（每行一条）</span>
+            <textarea rows="4" placeholder="/vol1/music/周杰伦/叶惠美/晴天.flac&#10;/vol1/music/朴树/猎户星座/平凡之路.flac" class="mt-1 w-full px-3 py-2 rounded-md border border-input bg-background text-sm font-mono"></textarea>
+          </label>
+          <div class="flex justify-end gap-3 pt-1">
+            <button type="button" class="btn-ghost h-9 px-4 text-sm" onclick="document.getElementById('modal-create').classList.add('hidden')">取消</button>
+            <button type="submit" class="btn-primary h-9 px-4 text-sm font-medium">创建</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 追加曲目弹窗 -->
+    <div id="modal-add" class="hidden fixed inset-0 z-50 modal-mask flex items-center justify-center p-6" role="dialog" aria-modal="true" aria-label="追加曲目">
+      <div class="panel w-full max-w-md p-6" onclick="event.stopPropagation()">
+        <header class="flex items-center justify-between mb-4">
+          <h3 class="text-base font-semibold flex items-center gap-2"><i data-lucide="list-plus" class="w-4 h-4 text-primary"></i>追加曲目</h3>
+          <button class="btn-ghost w-8 h-8 inline-flex items-center justify-center" onclick="document.getElementById('modal-add').classList.add('hidden')" aria-label="关闭"><i data-lucide="x" class="w-4 h-4"></i></button>
+        </header>
+        <form class="space-y-4" onsubmit="event.preventDefault(); document.getElementById('modal-add').classList.add('hidden');">
+          <label class="block">
+            <span class="text-xs font-medium text-muted-foreground">目标歌单</span>
+            <select class="mt-1 w-full h-10 px-3 rounded-md border border-input bg-background text-sm">
+              <option>我的收藏</option><option>周杰伦精选</option><option>华语经典</option><option>工作专注</option><option>跑步节奏</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-muted-foreground">曲目路径（每行一条）</span>
+            <textarea rows="3" placeholder="/vol1/music/陈奕迅/…/孤勇者.flac" class="mt-1 w-full px-3 py-2 rounded-md border border-input bg-background text-sm font-mono"></textarea>
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-muted-foreground">或曲目 GUID（每行一条）</span>
+            <textarea rows="2" placeholder="trk-9a01fe&#10;trk-77c2b4" class="mt-1 w-full px-3 py-2 rounded-md border border-input bg-background text-sm font-mono"></textarea>
+          </label>
+          <div class="flex justify-end gap-3 pt-1">
+            <button type="button" class="btn-ghost h-9 px-4 text-sm" onclick="document.getElementById('modal-add').classList.add('hidden')">取消</button>
+            <button type="submit" class="btn-primary h-9 px-4 text-sm font-medium">追加</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      lucide.createIcons();
+      // Micro-interaction: playlist row selection
+      document.querySelectorAll('.playlist-row').forEach(function (row) {
+        row.addEventListener('click', function () {
+          document.querySelectorAll('.playlist-row').forEach(function (r) { r.classList.remove('is-active'); });
+          row.classList.add('is-active');
+          var name = row.getAttribute('data-playlist');
+          if (name) document.getElementById('detail-title').textContent = name;
+        });
+      });
+    </script>
+</body>
+</html>

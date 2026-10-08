@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任务中心</title>
+    <style id="theme-vars">
+/* MediaMusicService Design Tokens - free-explore brand prefix: mm */
+:root {
+  /* Brand hue: deep teal-cyan, professional media tool */
+  --mm-brand-50: #effaf9;
+  --mm-brand-100: #d7f2f1;
+  --mm-brand-200: #b0e5e3;
+  --mm-brand-300: #7dd3d0;
+  --mm-brand-400: #44b8b5;
+  --mm-brand-500: #289c9a;
+  --mm-brand-600: #1f7f7e;
+  --mm-brand-700: #1c6665;
+  --mm-brand-800: #1a5252;
+  --mm-brand-900: #194545;
+
+  /* Neutral scale: cool slate */
+  --mm-gray-50: #f8fafc;
+  --mm-gray-100: #f1f5f9;
+  --mm-gray-200: #e2e8f0;
+  --mm-gray-300: #cbd5e1;
+  --mm-gray-400: #94a3b8;
+  --mm-gray-500: #64748b;
+  --mm-gray-600: #475569;
+  --mm-gray-700: #334155;
+  --mm-gray-800: #1e293b;
+  --mm-gray-900: #0f172a;
+
+  /* Semantic aliases required by apply-html-head-contract */
+  --mm-background: var(--mm-gray-50);
+  --mm-foreground: var(--mm-gray-900);
+  --mm-card: #ffffff;
+  --mm-card-foreground: var(--mm-gray-900);
+  --mm-popover: #ffffff;
+  --mm-popover-foreground: var(--mm-gray-900);
+  --mm-primary: var(--mm-brand-600);
+  --mm-primary-foreground: #ffffff;
+  --mm-muted: var(--mm-gray-100);
+  --mm-muted-foreground: var(--mm-gray-500);
+  --mm-border: var(--mm-gray-200);
+  --mm-input: var(--mm-gray-300);
+  --mm-ring: var(--mm-brand-500);
+
+  /* Radius */
+  --mm-radius-sm: 4px;
+  --mm-radius-md: 8px;
+  --mm-radius-lg: 16px;
+
+  /* Shadows */
+  --mm-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --mm-shadow-md: 0 8px 24px -8px rgba(15, 23, 42, 0.12);
+  --mm-shadow-lg: 0 24px 60px -20px rgba(15, 23, 42, 0.18);
+
+  /* State colors (semantic only) */
+  --state-success: #059669;
+  --state-warning: #d97706;
+  --state-error: #dc2626;
+  --state-info: #2563eb;
+
+  /* Typography */
+  --mm-font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --mm-font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--mm-background);
+    --color-foreground: var(--mm-foreground);
+    --color-card: var(--mm-card);
+    --color-card-foreground: var(--mm-card-foreground);
+    --color-popover: var(--mm-popover);
+    --color-popover-foreground: var(--mm-popover-foreground);
+    --color-primary: var(--mm-primary);
+    --color-primary-foreground: var(--mm-primary-foreground);
+    --color-muted: var(--mm-muted);
+    --color-muted-foreground: var(--mm-muted-foreground);
+    --color-border: var(--mm-border);
+    --color-input: var(--mm-input);
+    --color-ring: var(--mm-ring);
+    --radius-sm: var(--mm-radius-sm);
+    --radius-md: var(--mm-radius-md);
+    --radius-lg: var(--mm-radius-lg);
+  }
+  @layer base {
+    body { background: var(--mm-background); color: var(--mm-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--mm-background); }
+      .text-background { color: var(--mm-background); }
+      .border-background { border-color: var(--mm-background); }
+      .ring-background { --tw-ring-color: var(--mm-background); }
+      .bg-foreground { background-color: var(--mm-foreground); }
+      .text-foreground { color: var(--mm-foreground); }
+      .border-foreground { border-color: var(--mm-foreground); }
+      .ring-foreground { --tw-ring-color: var(--mm-foreground); }
+      .bg-card { background-color: var(--mm-card); }
+      .text-card { color: var(--mm-card); }
+      .border-card { border-color: var(--mm-card); }
+      .ring-card { --tw-ring-color: var(--mm-card); }
+      .bg-card-foreground { background-color: var(--mm-card-foreground); }
+      .text-card-foreground { color: var(--mm-card-foreground); }
+      .border-card-foreground { border-color: var(--mm-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--mm-card-foreground); }
+      .bg-popover { background-color: var(--mm-popover); }
+      .text-popover { color: var(--mm-popover); }
+      .border-popover { border-color: var(--mm-popover); }
+      .ring-popover { --tw-ring-color: var(--mm-popover); }
+      .bg-popover-foreground { background-color: var(--mm-popover-foreground); }
+      .text-popover-foreground { color: var(--mm-popover-foreground); }
+      .border-popover-foreground { border-color: var(--mm-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--mm-popover-foreground); }
+      .bg-primary { background-color: var(--mm-primary); }
+      .text-primary { color: var(--mm-primary); }
+      .border-primary { border-color: var(--mm-primary); }
+      .ring-primary { --tw-ring-color: var(--mm-primary); }
+      .bg-primary-foreground { background-color: var(--mm-primary-foreground); }
+      .text-primary-foreground { color: var(--mm-primary-foreground); }
+      .border-primary-foreground { border-color: var(--mm-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--mm-primary-foreground); }
+      .bg-muted { background-color: var(--mm-muted); }
+      .text-muted { color: var(--mm-muted); }
+      .border-muted { border-color: var(--mm-muted); }
+      .ring-muted { --tw-ring-color: var(--mm-muted); }
+      .bg-muted-foreground { background-color: var(--mm-muted-foreground); }
+      .text-muted-foreground { color: var(--mm-muted-foreground); }
+      .border-muted-foreground { border-color: var(--mm-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--mm-muted-foreground); }
+      .bg-border { background-color: var(--mm-border); }
+      .text-border { color: var(--mm-border); }
+      .border-border { border-color: var(--mm-border); }
+      .ring-border { --tw-ring-color: var(--mm-border); }
+      .bg-input { background-color: var(--mm-input); }
+      .text-input { color: var(--mm-input); }
+      .border-input { border-color: var(--mm-input); }
+      .ring-input { --tw-ring-color: var(--mm-input); }
+      .bg-ring { background-color: var(--mm-ring); }
+      .text-ring { color: var(--mm-ring); }
+      .border-ring { border-color: var(--mm-ring); }
+      .ring-ring { --tw-ring-color: var(--mm-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+    <style id="critical-layout">
+      /* Critical layout CSS - guarantees first-screen structure before runtime Tailwind */
+      html, body { margin: 0; padding: 0; }
+      body { min-height: 100vh; background: var(--mm-background); color: var(--mm-foreground); font-family: var(--mm-font-sans); }
+      .app-shell { min-height: 100vh; display: flex; flex-direction: column; }
+      .top-nav { position: sticky; top: 0; z-index: 40; height: 64px; background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--mm-border); }
+      .top-nav-inner { height: 64px; max-width: 1440px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; gap: 24px; }
+      .nav-links { display: flex; align-items: center; gap: 4px; height: 100%; }
+      .nav-link { display: inline-flex; align-items: center; gap: 6px; height: 64px; padding: 0 12px; font-size: 14px; color: var(--mm-muted-foreground); text-decoration: none; border-bottom: 2px solid transparent; transition: color 160ms cubic-bezier(.2,.8,.2,1), border-color 160ms cubic-bezier(.2,.8,.2,1); }
+      .nav-link:hover { color: var(--mm-foreground); }
+      .nav-link.active { color: var(--mm-primary); border-bottom: 2px solid var(--mm-primary); font-weight: 500; }
+      .page-main { flex: 1; max-width: 1440px; width: 100%; margin: 0 auto; padding: 24px; }
+      .mm-card { background: var(--mm-card); border: 1px solid var(--mm-border); border-radius: var(--mm-radius-md); box-shadow: var(--mm-shadow-sm); }
+      .mm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .mm-table th { text-align: left; padding: 10px 14px; font-size: 12px; font-weight: 500; color: var(--mm-muted-foreground); border-bottom: 1px solid var(--mm-border); background: var(--mm-gray-50); white-space: nowrap; }
+      .mm-table td { padding: 12px 14px; border-bottom: 1px solid var(--mm-border); vertical-align: middle; }
+      .mm-table tbody tr { transition: background-color 160ms cubic-bezier(.2,.8,.2,1); cursor: pointer; }
+      .mm-table tbody tr:hover { background: var(--mm-brand-50); }
+      .mm-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; line-height: 20px; white-space: nowrap; }
+      .badge-pending { background: var(--mm-gray-100); color: var(--mm-gray-600); border: 1px solid var(--mm-gray-200); }
+      .badge-running { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+      .badge-success { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+      .badge-failed { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+      .badge-canceled { background: var(--mm-gray-100); color: var(--mm-gray-500); border: 1px solid var(--mm-gray-300); }
+      .mm-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: var(--mm-radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: background-color 160ms cubic-bezier(.2,.8,.2,1), color 160ms cubic-bezier(.2,.8,.2,1), border-color 160ms cubic-bezier(.2,.8,.2,1); }
+      .btn-primary { background: var(--mm-primary); color: #ffffff; }
+      .btn-primary:hover { background: var(--mm-brand-700); }
+      .btn-ghost { background: transparent; color: var(--mm-muted-foreground); border-color: var(--mm-border); }
+      .btn-ghost:hover { color: var(--mm-foreground); background: var(--mm-muted); }
+      .btn-danger-ghost { background: transparent; color: #b91c1c; border-color: #fecaca; }
+      .btn-danger-ghost:hover { background: #fef2f2; }
+      .tab-bar { display: flex; gap: 4px; border-bottom: 1px solid var(--mm-border); }
+      .tab-item { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px; font-size: 14px; color: var(--mm-muted-foreground); border-bottom: 2px solid transparent; cursor: pointer; margin-bottom: -1px; transition: color 160ms cubic-bezier(.2,.8,.2,1), border-color 160ms cubic-bezier(.2,.8,.2,1); }
+      .tab-item:hover { color: var(--mm-foreground); }
+      .tab-item.active { color: var(--mm-primary); border-bottom-color: var(--mm-primary); font-weight: 500; }
+      .progress-track { width: 120px; height: 6px; border-radius: 999px; background: var(--mm-gray-200); overflow: hidden; }
+      .progress-fill { height: 100%; border-radius: 999px; background: var(--mm-primary); transition: width 300ms cubic-bezier(.2,.8,.2,1); }
+      .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.45); z-index: 50; display: none; align-items: center; justify-content: center; padding: 24px; }
+      .modal-overlay.open { display: flex; }
+      .modal-panel { width: 100%; max-width: 42rem; max-height: 85vh; overflow-y: auto; background: var(--mm-card); border-radius: var(--mm-radius-md); box-shadow: var(--mm-shadow-lg); border: 1px solid var(--mm-border); }
+      .mono { font-family: var(--mm-font-mono); font-size: 12px; }
+      .lucide { width: 16px; height: 16px; stroke-width: 2; }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+<div class="app-shell">
+
+    <!-- ===== top-nav (shared shell) ===== -->
+    <nav class="top-nav sticky top-0 z-40 bg-card/95 backdrop-blur border-b border-border" data-section="top-nav">
+        <div class="top-nav-inner">
+            <a href="dashboard.html" class="flex items-center gap-2 shrink-0" style="text-decoration:none;">
+                <span class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-primary text-primary-foreground">
+                    <i data-lucide="music-4" class="w-4 h-4"></i>
+                </span>
+                <span class="font-semibold text-foreground" style="font-size:15px;">MediaMusicService</span>
+            </a>
+            <div class="nav-links no-scrollbar" style="overflow-x:auto;flex:1;">
+                <a href="dashboard.html" class="nav-link" data-dom-id="nav-dashboard" data-nav-key="dashboard"><i data-lucide="layout-dashboard" class="w-4 h-4"></i>概览</a>
+                <a href="search.html" class="nav-link" data-dom-id="nav-search" data-nav-key="search"><i data-lucide="search" class="w-4 h-4"></i>搜索</a>
+                <a href="playlists.html" class="nav-link" data-dom-id="nav-playlists" data-nav-key="playlists"><i data-lucide="list-music" class="w-4 h-4"></i>歌单</a>
+                <a href="charts.html" class="nav-link" data-dom-id="nav-charts" data-nav-key="charts"><i data-lucide="bar-chart-3" class="w-4 h-4"></i>榜单</a>
+                <a href="albums.html" class="nav-link" data-dom-id="nav-albums" data-nav-key="albums"><i data-lucide="disc-3" class="w-4 h-4"></i>专辑</a>
+                <a href="tasks.html" class="nav-link active" data-dom-id="nav-tasks" data-nav-key="tasks" aria-current="page"><i data-lucide="download-cloud" class="w-4 h-4"></i>任务</a>
+                <a href="library.html" class="nav-link" data-dom-id="nav-library" data-nav-key="library"><i data-lucide="library" class="w-4 h-4"></i>媒体库</a>
+                <a href="fnos.html" class="nav-link" data-dom-id="nav-fnos" data-nav-key="fnos"><i data-lucide="server" class="w-4 h-4"></i>飞牛</a>
+                <a href="settings.html" class="nav-link" data-dom-id="nav-settings" data-nav-key="settings"><i data-lucide="settings" class="w-4 h-4"></i>设置</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="page-main">
+
+        <!-- ===== page header ===== -->
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h1 class="text-xl font-semibold text-foreground">任务中心</h1>
+                <p class="text-sm text-muted-foreground mt-1">管理下载任务：查看进行中任务、浏览历史记录、取消等待中的任务。</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" class="mm-btn btn-primary" data-dom-id="refresh-tasks" id="refresh-tasks">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>刷新
+                </button>
+            </div>
+        </div>
+
+        <!-- ===== summary strip ===== -->
+        <div class="grid gap-3 mb-4" style="grid-template-columns:repeat(4,minmax(0,1fr));">
+            <div class="mm-card p-4 flex items-center gap-3">
+                <span class="inline-flex items-center justify-center w-9 h-9 rounded-md" style="background:#eff6ff;color:#1d4ed8;"><i data-lucide="loader" class="w-4 h-4"></i></span>
+                <div>
+                    <div class="text-xs text-muted-foreground">进行中</div>
+                    <div class="text-lg font-semibold text-foreground">2</div>
+                </div>
+            </div>
+            <div class="mm-card p-4 flex items-center gap-3">
+                <span class="inline-flex items-center justify-center w-9 h-9 rounded-md" style="background:var(--mm-gray-100);color:var(--mm-gray-600);"><i data-lucide="clock" class="w-4 h-4"></i></span>
+                <div>
+                    <div class="text-xs text-muted-foreground">等待中</div>
+                    <div class="text-lg font-semibold text-foreground">2</div>
+                </div>
+            </div>
+            <div class="mm-card p-4 flex items-center gap-3">
+                <span class="inline-flex items-center justify-center w-9 h-9 rounded-md" style="background:#ecfdf5;color:#047857;"><i data-lucide="check-circle-2" class="w-4 h-4"></i></span>
+                <div>
+                    <div class="text-xs text-muted-foreground">今日成功</div>
+                    <div class="text-lg font-semibold text-foreground">6</div>
+                </div>
+            </div>
+            <div class="mm-card p-4 flex items-center gap-3">
+                <span class="inline-flex items-center justify-center w-9 h-9 rounded-md" style="background:#fef2f2;color:#b91c1c;"><i data-lucide="x-circle" class="w-4 h-4"></i></span>
+                <div>
+                    <div class="text-xs text-muted-foreground">今日失败</div>
+                    <div class="text-lg font-semibold text-foreground">1</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== task-tabs + task-table ===== -->
+        <section class="mm-card" data-section="task-tabs">
+            <div class="flex items-center justify-between px-4" style="padding-top:4px;">
+                <div class="tab-bar" style="flex:1;" role="tablist" aria-label="任务列表切换">
+                    <button type="button" role="tab" aria-selected="true" class="tab-item active" data-dom-id="tab-active" id="tab-active" data-tab="active">
+                        <i data-lucide="activity" class="w-4 h-4"></i>进行中
+                        <span class="mm-badge badge-running" style="padding:0 8px;">4</span>
+                    </button>
+                    <button type="button" role="tab" aria-selected="false" class="tab-item" data-dom-id="tab-history" id="tab-history" data-tab="history">
+                        <i data-lucide="history" class="w-4 h-4"></i>历史记录
+                    </button>
+                </div>
+                <span class="text-xs text-muted-foreground flex items-center gap-1" style="padding-right:4px;">
+                    <i data-lucide="database" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>
+                    <span id="tab-data-source">进行中任务来自内存队列</span>
+                </span>
+            </div>
+
+            <!-- active tasks table -->
+            <div id="panel-active" data-tab-panel="active" class="overflow-x-auto">
+                <table class="mm-table" id="task-table" aria-label="下载任务列表">
+                    <thead>
+                        <tr>
+                            <th>任务 ID</th>
+                            <th>类型</th>
+                            <th>名称</th>
+                            <th>状态</th>
+                            <th>进度</th>
+                            <th>当前来源</th>
+                            <th>保存目录</th>
+                            <th>创建时间</th>
+                            <th style="text-align:right;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr data-task-id="t-20261008-0041">
+                            <td class="mono text-muted-foreground">t-20261008-0041</td>
+                            <td><span class="inline-flex items-center gap-1"><i data-lucide="disc-3" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>专辑</span></td>
+                            <td class="font-medium text-foreground">周杰伦《范特西》</td>
+                            <td><span class="mm-badge badge-running"><i data-lucide="loader-2" class="w-3 h-3" style="width:12px;height:12px;"></i>下载中</span></td>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <div class="progress-track"><div class="progress-fill" style="width:60%;"></div></div>
+                                    <span class="mono text-muted-foreground">6/10</span>
+                                </div>
+                            </td>
+                            <td><span class="mm-badge" style="background:var(--mm-brand-50);color:var(--mm-brand-700);border:1px solid var(--mm-brand-200);">QQ音乐</span></td>
+                            <td class="mono text-muted-foreground">/music/JayChou/Fantasy</td>
+                            <td class="text-muted-foreground">2026-10-08 14:02:11</td>
+                            <td style="text-align:right;">
+                                <button type="button" class="mm-btn btn-ghost" data-action="detail"><i data-lucide="eye" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>详情</button>
+                            </td>
+                        </tr>
+                        <tr data-task-id="t-20261008-0042">
+                            <td class="mono text-muted-foreground">t-20261008-0042</td>
+                            <td><span class="inline-flex items-center gap-1"><i data-lucide="music" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>单曲</span></td>
+                            <td class="font-medium text-foreground">孙燕姿 - 天黑黑</td>
+                            <td><span class="mm-badge badge-pending"><i data-lucide="clock" class="w-3 h-3" style="width:12px;height:12px;"></i>等待中</span></td>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <div class="progress-track"><div class="progress-fill" style="width:0%;"></div></div>
+                                    <span class="mono text-muted-foreground">0/1</span>
+                                </div>
+                            </td>
+                            <td class="text-muted-foreground">—</td>
+                            <td class="mono text-muted-foreground">/music/StefanieSun</td>
+                            <td class="text-muted-foreground">2026-10-08 14:03:47</td>
+                            <td style="text-align:right;">
+                                <div class="inline-flex gap-2">
+                                    <button type="button" class="mm-btn btn-ghost" data-action="detail"><i data-lucide="eye" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>详情</button>
+                                    <button type="button" class="mm-btn btn-danger-ghost" data-dom-id="cancel-task" data-action="cancel"><i data-lucide="ban" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>取消</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr data-task-id="t-20261008-0038">
+                            <td class="mono text-muted-foreground">t-20261008-0038</td>
+                            <td><span class="inline-flex items-center gap-1"><i data-lucide="list-music" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>歌单</span></td>
+                            <td class="font-medium text-foreground">「华语经典 90 年代」</td>
+                            <td><span class="mm-badge badge-running"><i data-lucide="loader-2" class="w-3 h-3" style="width:12px;height:12px;"></i>下载中</span></td>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <div class="progress-track"><div class="progress-fill" style="width:32%;"></div></div>
+                                    <span class="mono text-muted-foreground">16/50</span>
+                                </div>
+                            </td>
+                            <td><span class="mm-badge" style="background:var(--mm-brand-50);color:var(--mm-brand-700);border:1px solid var(--mm-brand-200);">网易云音乐</span></td>
+                            <td class="mono text-muted-foreground">/music/playlists/90s-cn</td>
+                            <td class="text-muted-foreground">2026-10-08 13:40:05</td>
+                            <td style="text-align:right;">
+                                <button type="button" class="mm-btn btn-ghost" data-action="detail"><i data-lucide="eye" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>详情</button>
+                            </td>
+                        </tr>
+                        <tr data-task-id="t-20261008-0043">
+                            <td class="mono text-muted-foreground">t-20261008-0043</td>
+                            <td><span class="inline-flex items-center gap-1"><i data-lucide="bar-chart-3" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>榜单</span></td>
+                            <td class="font-medium text-foreground">QQ音乐 巅峰榜·流行指数</td>
+                            <td><span class="mm-badge badge-pending"><i data-lucide="clock" class="w-3 h-3" style="width:12px;height:12px;"></i>等待中</span></td>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <div class="progress-track"><div class="progress-fill" style="width:0%;"></div></div>
+                                    <span class="mono text-muted-foreground">0/100</span>
+                                </div>
+                            </td>
+                            <td class="text-muted-foreground">—</td>
+                            <td class="mono text-muted-foreground">/music/charts/qq-top</td>
+                            <td class="text-muted-foreground">2026-10-08 14:05:22</td>
+                            <td style="text-align:right;">
+                                <div class="inline-flex gap-2">
+                                    <button type="button" class="mm-btn btn-ghost" data-action="detail"><i data-lucide="eye" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>详情</button>
+                                    <button type="button" class="mm-btn btn-danger-ghost" data-action="cancel"><i data-lucide="ban" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>取消</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr data-task-id="t-20261008-0040">
+                            <td class="mono text-muted-foreground">t-20261008-0040</td>
+                            <td><span class="inline-flex items-center gap-1"><i data-lucide="music" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>单曲</span></td>
+                            <td class="font-medium text-foreground">陈奕迅 - 富士山下</td>
+                            <td><span class="mm-badge badge-success"><i data-lucide="check" class="w-3 h-3" style="width:12px;height:12px;"></i>已完成</span></td>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <div class="progress-track"><div class="progress-fill" style="width:100%;background:var(--state-success);"></div></div>
+                                    <span class="mono text-muted-foreground">1/1</span>
+                                </div>
+                            </td>
+                            <td><span class="mm-badge" style="background:var(--mm-brand-50);color:var(--mm-brand-700);border:1px solid var(--mm-brand-200);">酷狗音乐</span></td>
+                            <td class="mono text-muted-foreground">/music/EasonChan</td>
+                            <td class="text-muted-foreground">2026-10-08 13:58:30</td>
+                            <td style="text-align:right;">
+                                <button type="button" class="mm-btn btn-ghost" data-action="detail"><i data-lucide="eye" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>详情</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- history table -->
+            <div id="panel-history" data-tab-panel="history" class="overflow-x-auto" hidden>
+                <table class="mm-table" aria-label="历史任务列表">
+                    <thead>
+                        <tr>
+                            <th>任务 ID</th>
+                            <th>类型</th>
+                            <th>名称</th>
+                            <th>最终状态</th>
+                            <th>完成数</th>
+                            <th>来源</th>
+                            <th>耗时</th>
+                            <th>结束时间</th>
+                            <th style="text-align:right;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr data-task-id="h-20261007-0127">
+                            <td class="mono text-muted-foreground">h-20261007-0127</td>
+                            <td>专辑</td>
+                            <td class="font-medium text-foreground">林俊杰《伟大的渺小》</td>
+                            <td><span class="mm-badge badge-success"><i data-lucide="check" class="w-3 h-3" style="width:12px;height:12px;"></i>成功</span></td>
+                            <td class="mono text-muted-foreground">12/12</td>
+                            <td>网易云音乐</td>
+                            <td class="text-muted-foreground">4 分 12 秒</td>
+                            <td class="text-muted-foreground">2026-10-07 22:18:40</td>
+                            <td style="text-align:right;"><button type="button" class="mm-btn btn-ghost" data-action="detail"><i data-lucide="eye" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>详情</button></td>
+                        </tr>
+                        <tr data-task-id="h-20261007-0126">
+                            <td class="mono text-muted-foreground">h-20261007-0126</td>
+                            <td>单曲</td>
+                            <td class="font-medium text-foreground">邓紫棋 - 光年之外</td>
+                            <td><span class="mm-badge badge-success"><i data-lucide="check" class="w-3 h-3" style="width:12px;height:12px;"></i>成功</span></td>
+                            <td class="mono text-muted-foreground">1/1</td>
+                            <td>QQ音乐</td>
+                            <td class="text-muted-foreground">18 秒</td>
+                            <td class="text-muted-foreground">2026-10-07 21:54:02</td>
+                            <td style="text-align:right;"><button type="button" class="mm-btn btn-ghost" data-action="detail"><i data-lucide="eye" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>详情</button></td>
+                        </tr>
+                        <tr data-task-id="h-20261007-0125">
+                            <td class="mono text-muted-foreground">h-20261007-0125</td>
+                            <td>歌单</td>
+                            <td class="font-medium text-foreground">「粤语金曲精选」</td>
+                            <td><span class="mm-badge badge-failed"><i data-lucide="x" class="w-3 h-3" style="width:12px;height:12px;"></i>失败</span></td>
+                            <td class="mono text-muted-foreground">23/45</td>
+                            <td>酷狗音乐</td>
+                            <td class="text-muted-foreground">6 分 03 秒</td>
+                            <td class="text-muted-foreground">2026-10-07 20:11:37</td>
+                            <td style="text-align:right;"><button type="button" class="mm-btn btn-ghost" data-action="detail"><i data-lucide="eye" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>详情</button></td>
+                        </tr>
+                        <tr data-task-id="h-20261007-0124">
+                            <td class="mono text-muted-foreground">h-20261007-0124</td>
+                            <td>榜单</td>
+                            <td class="font-medium text-foreground">网易云 飙升榜</td>
+                            <td><span class="mm-badge badge-success"><i data-lucide="check" class="w-3 h-3" style="width:12px;height:12px;"></i>成功</span></td>
+                            <td class="mono text-muted-foreground">100/100</td>
+                            <td>网易云音乐</td>
+                            <td class="text-muted-foreground">21 分 45 秒</td>
+                            <td class="text-muted-foreground">2026-10-07 18:02:19</td>
+                            <td style="text-align:right;"><button type="button" class="mm-btn btn-ghost" data-action="detail"><i data-lucide="eye" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>详情</button></td>
+                        </tr>
+                        <tr data-task-id="h-20261006-0118">
+                            <td class="mono text-muted-foreground">h-20261006-0118</td>
+                            <td>专辑</td>
+                            <td class="font-medium text-foreground">五月天《自传》</td>
+                            <td><span class="mm-badge badge-canceled"><i data-lucide="minus-circle" class="w-3 h-3" style="width:12px;height:12px;"></i>已取消</span></td>
+                            <td class="mono text-muted-foreground">3/13</td>
+                            <td>QQ音乐</td>
+                            <td class="text-muted-foreground">1 分 30 秒</td>
+                            <td class="text-muted-foreground">2026-10-06 23:40:55</td>
+                            <td style="text-align:right;"><button type="button" class="mm-btn btn-ghost" data-action="detail"><i data-lucide="eye" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>详情</button></td>
+                        </tr>
+                        <tr data-task-id="h-20261006-0117">
+                            <td class="mono text-muted-foreground">h-20261006-0117</td>
+                            <td>单曲</td>
+                            <td class="font-medium text-foreground">田馥甄 - 小幸运</td>
+                            <td><span class="mm-badge badge-success"><i data-lucide="check" class="w-3 h-3" style="width:12px;height:12px;"></i>成功</span></td>
+                            <td class="mono text-muted-foreground">1/1</td>
+                            <td>酷我音乐</td>
+                            <td class="text-muted-foreground">15 秒</td>
+                            <td class="text-muted-foreground">2026-10-06 22:07:12</td>
+                            <td style="text-align:right;"><button type="button" class="mm-btn btn-ghost" data-action="detail"><i data-lucide="eye" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>详情</button></td>
+                        </tr>
+                        <tr data-task-id="h-20261006-0116">
+                            <td class="mono text-muted-foreground">h-20261006-0116</td>
+                            <td>专辑</td>
+                            <td class="font-medium text-foreground">Taylor Swift《Midnights》</td>
+                            <td><span class="mm-badge badge-success"><i data-lucide="check" class="w-3 h-3" style="width:12px;height:12px;"></i>成功</span></td>
+                            <td class="mono text-muted-foreground">13/13</td>
+                            <td>Spotify</td>
+                            <td class="text-muted-foreground">5 分 48 秒</td>
+                            <td class="text-muted-foreground">2026-10-06 20:31:09</td>
+                            <td style="text-align:right;"><button type="button" class="mm-btn btn-ghost" data-action="detail"><i data-lucide="eye" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>详情</button></td>
+                        </tr>
+                        <tr data-task-id="h-20261006-0115">
+                            <td class="mono text-muted-foreground">h-20261006-0115</td>
+                            <td>歌单</td>
+                            <td class="font-medium text-foreground">「独立民谣 · 深夜电台」</td>
+                            <td><span class="mm-badge badge-failed"><i data-lucide="x" class="w-3 h-3" style="width:12px;height:12px;"></i>失败</span></td>
+                            <td class="mono text-muted-foreground">0/32</td>
+                            <td>网易云音乐</td>
+                            <td class="text-muted-foreground">42 秒</td>
+                            <td class="text-muted-foreground">2026-10-06 19:12:44</td>
+                            <td style="text-align:right;"><button type="button" class="mm-btn btn-ghost" data-action="detail"><i data-lucide="eye" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>详情</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex items-center justify-between px-4 py-3" style="border-top:1px solid var(--mm-border);">
+                <span class="text-xs text-muted-foreground" id="table-summary">共 5 条进行中任务</span>
+                <span class="text-xs text-muted-foreground flex items-center gap-1">
+                    <i data-lucide="info" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>
+                    点击行或「详情」查看任务详情
+                </span>
+            </div>
+        </section>
+    </main>
+</div>
+
+<!-- ===== task-detail-modal ===== -->
+<div class="modal-overlay" id="modal-task-detail" role="dialog" aria-modal="true" aria-labelledby="modal-task-title" data-section="task-detail-modal">
+    <div class="modal-panel">
+        <div class="flex items-center justify-between px-5 py-4" style="border-bottom:1px solid var(--mm-border);">
+            <div class="flex items-center gap-2">
+                <span class="inline-flex items-center justify-center w-8 h-8 rounded-md" style="background:var(--mm-brand-50);color:var(--mm-primary);">
+                    <i data-lucide="file-down" class="w-4 h-4"></i>
+                </span>
+                <div>
+                    <h2 id="modal-task-title" class="font-semibold text-foreground" style="font-size:15px;">任务详情</h2>
+                    <p class="mono text-muted-foreground" id="modal-task-id">t-20261008-0041</p>
+                </div>
+            </div>
+            <button type="button" class="mm-btn btn-ghost" id="modal-close" aria-label="关闭">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <div class="px-5 py-4 flex flex-col gap-5">
+            <!-- status overview -->
+            <div class="grid gap-3" style="grid-template-columns:repeat(3,minmax(0,1fr));">
+                <div class="p-3 rounded-md" style="background:var(--mm-gray-50);border:1px solid var(--mm-border);">
+                    <div class="text-xs text-muted-foreground mb-1">状态</div>
+                    <span class="mm-badge badge-running"><i data-lucide="loader-2" class="w-3 h-3" style="width:12px;height:12px;"></i>下载中</span>
+                </div>
+                <div class="p-3 rounded-md" style="background:var(--mm-gray-50);border:1px solid var(--mm-border);">
+                    <div class="text-xs text-muted-foreground mb-1">类型</div>
+                    <div class="text-sm font-medium text-foreground">专辑</div>
+                </div>
+                <div class="p-3 rounded-md" style="background:var(--mm-gray-50);border:1px solid var(--mm-border);">
+                    <div class="text-xs text-muted-foreground mb-1">媒体库</div>
+                    <div class="text-sm font-medium text-foreground">默认库 (default)</div>
+                </div>
+            </div>
+
+            <!-- progress -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-foreground">整体进度</span>
+                    <span class="mono text-muted-foreground">6 / 10 (60%)</span>
+                </div>
+                <div class="progress-track" style="width:100%;height:8px;">
+                    <div class="progress-fill" style="width:60%;"></div>
+                </div>
+            </div>
+
+            <!-- results list -->
+            <div>
+                <div class="flex items-center gap-2 mb-2">
+                    <i data-lucide="list-checks" class="w-4 h-4 text-primary"></i>
+                    <span class="text-sm font-medium text-foreground">下载结果</span>
+                    <span class="text-xs text-muted-foreground">已完成 6 项</span>
+                </div>
+                <div class="rounded-md overflow-hidden" style="border:1px solid var(--mm-border);">
+                    <table class="mm-table">
+                        <thead>
+                            <tr><th>标题</th><th>艺人</th><th>专辑</th><th>格式</th><th>文件</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>爱在西元前</td><td class="text-muted-foreground">周杰伦</td><td class="text-muted-foreground">范特西</td><td><span class="mm-badge badge-success" style="padding:0 8px;">FLAC</span></td><td class="mono text-muted-foreground">01.flac</td></tr>
+                            <tr><td>爸我回来了</td><td class="text-muted-foreground">周杰伦</td><td class="text-muted-foreground">范特西</td><td><span class="mm-badge badge-success" style="padding:0 8px;">FLAC</span></td><td class="mono text-muted-foreground">02.flac</td></tr>
+                            <tr><td>简单爱</td><td class="text-muted-foreground">周杰伦</td><td class="text-muted-foreground">范特西</td><td><span class="mm-badge badge-success" style="padding:0 8px;">FLAC</span></td><td class="mono text-muted-foreground">03.flac</td></tr>
+                            <tr><td>忍者</td><td class="text-muted-foreground">周杰伦</td><td class="text-muted-foreground">范特西</td><td><span class="mm-badge badge-success" style="padding:0 8px;">MP3</span></td><td class="mono text-muted-foreground">04.mp3</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- errors list -->
+            <div>
+                <div class="flex items-center gap-2 mb-2">
+                    <i data-lucide="alert-triangle" class="w-4 h-4" style="color:var(--state-error);"></i>
+                    <span class="text-sm font-medium text-foreground">错误记录</span>
+                    <span class="text-xs text-muted-foreground">1 条</span>
+                </div>
+                <div class="rounded-md p-3 text-xs" style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;">
+                    <div class="mono">[上海一九四三] 所有来源均无 FLAC 资源，已按策略降级至 MP3 重试队列。</div>
+                </div>
+            </div>
+
+            <!-- paths & playlist result -->
+            <div class="grid gap-3" style="grid-template-columns:1fr 1fr;">
+                <div class="p-3 rounded-md" style="background:var(--mm-gray-50);border:1px solid var(--mm-border);">
+                    <div class="text-xs text-muted-foreground mb-1 flex items-center gap-1"><i data-lucide="file-json" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>manifest 路径</div>
+                    <div class="mono text-foreground" style="word-break:break-all;">/data/manifests/t-20261008-0041.json</div>
+                </div>
+                <div class="p-3 rounded-md" style="background:var(--mm-gray-50);border:1px solid var(--mm-border);">
+                    <div class="text-xs text-muted-foreground mb-1 flex items-center gap-1"><i data-lucide="list-plus" class="w-3.5 h-3.5" style="width:14px;height:14px;"></i>歌单生成结果</div>
+                    <div class="mono text-muted-foreground">不适用（非歌单任务）</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 px-5 py-4" style="border-top:1px solid var(--mm-border);">
+            <button type="button" class="mm-btn btn-ghost" id="modal-footer-close">关闭</button>
+            <button type="button" class="mm-btn btn-primary"><i data-lucide="folder-open" class="w-4 h-4"></i>打开目录</button>
+        </div>
+    </div>
+</div>
+
+<script>
+  lucide.createIcons();
+
+  // Tab switching
+  var tabs = document.querySelectorAll('.tab-item');
+  var panels = {
+    active: document.getElementById('panel-active'),
+    history: document.getElementById('panel-history')
+  };
+  var summary = document.getElementById('table-summary');
+  var sourceHint = document.getElementById('tab-data-source');
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      tabs.forEach(function (t) { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
+      var key = tab.getAttribute('data-tab');
+      Object.keys(panels).forEach(function (k) { panels[k].hidden = (k !== key); });
+      summary.textContent = key === 'active' ? '共 5 条进行中任务' : '共 8 条历史记录（SQLite 持久化）';
+      sourceHint.textContent = key === 'active' ? '进行中任务来自内存队列' : '历史记录来自 SQLite 持久化存储';
+    });
+  });
+
+  // Modal open/close
+  var modal = document.getElementById('modal-task-detail');
+  function openModal(taskId) {
+    var idEl = document.getElementById('modal-task-id');
+    if (taskId && idEl) idEl.textContent = taskId;
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal() {
+    modal.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  document.querySelectorAll('[data-action="detail"]').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var row = btn.closest('tr');
+      openModal(row ? row.getAttribute('data-task-id') : null);
+    });
+  });
+  document.querySelectorAll('#task-table tbody tr, #panel-history tbody tr').forEach(function (row) {
+    row.addEventListener('click', function () { openModal(row.getAttribute('data-task-id')); });
+  });
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('modal-footer-close').addEventListener('click', closeModal);
+  modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+
+  // Cancel (demo: switch badge to canceled)
+  document.querySelectorAll('[data-action="cancel"]').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var row = btn.closest('tr');
+      var badgeCell = row.querySelectorAll('td')[3];
+      badgeCell.innerHTML = '<span class="mm-badge badge-canceled">已取消</span>';
+      btn.remove();
+    });
+  });
+
+  // Refresh (demo micro-interaction: spin icon)
+  var refreshBtn = document.getElementById('refresh-tasks');
+  refreshBtn.addEventListener('click', function () {
+    var icon = refreshBtn.querySelector('svg, i');
+    if (icon) {
+      icon.style.transition = 'transform 600ms cubic-bezier(.2,.8,.2,1)';
+      icon.style.transform = 'rotate(360deg)';
+      setTimeout(function () { icon.style.transform = 'rotate(0deg)'; }, 620);
+    }
+  });
+</script>
+</body>
+</html>

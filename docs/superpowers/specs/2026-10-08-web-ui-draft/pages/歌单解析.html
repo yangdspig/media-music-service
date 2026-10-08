@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>歌单解析</title>
+    <style id="theme-vars">
+/* MediaMusicService Design Tokens - free-explore brand prefix: mm */
+:root {
+  /* Brand hue: deep teal-cyan, professional media tool */
+  --mm-brand-50: #effaf9;
+  --mm-brand-100: #d7f2f1;
+  --mm-brand-200: #b0e5e3;
+  --mm-brand-300: #7dd3d0;
+  --mm-brand-400: #44b8b5;
+  --mm-brand-500: #289c9a;
+  --mm-brand-600: #1f7f7e;
+  --mm-brand-700: #1c6665;
+  --mm-brand-800: #1a5252;
+  --mm-brand-900: #194545;
+
+  /* Neutral scale: cool slate */
+  --mm-gray-50: #f8fafc;
+  --mm-gray-100: #f1f5f9;
+  --mm-gray-200: #e2e8f0;
+  --mm-gray-300: #cbd5e1;
+  --mm-gray-400: #94a3b8;
+  --mm-gray-500: #64748b;
+  --mm-gray-600: #475569;
+  --mm-gray-700: #334155;
+  --mm-gray-800: #1e293b;
+  --mm-gray-900: #0f172a;
+
+  /* Semantic aliases required by apply-html-head-contract */
+  --mm-background: var(--mm-gray-50);
+  --mm-foreground: var(--mm-gray-900);
+  --mm-card: #ffffff;
+  --mm-card-foreground: var(--mm-gray-900);
+  --mm-popover: #ffffff;
+  --mm-popover-foreground: var(--mm-gray-900);
+  --mm-primary: var(--mm-brand-600);
+  --mm-primary-foreground: #ffffff;
+  --mm-muted: var(--mm-gray-100);
+  --mm-muted-foreground: var(--mm-gray-500);
+  --mm-border: var(--mm-gray-200);
+  --mm-input: var(--mm-gray-300);
+  --mm-ring: var(--mm-brand-500);
+
+  /* Radius */
+  --mm-radius-sm: 4px;
+  --mm-radius-md: 8px;
+  --mm-radius-lg: 16px;
+
+  /* Shadows */
+  --mm-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --mm-shadow-md: 0 8px 24px -8px rgba(15, 23, 42, 0.12);
+  --mm-shadow-lg: 0 24px 60px -20px rgba(15, 23, 42, 0.18);
+
+  /* State colors (semantic only) */
+  --state-success: #059669;
+  --state-warning: #d97706;
+  --state-error: #dc2626;
+  --state-info: #2563eb;
+
+  /* Typography */
+  --mm-font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --mm-font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--mm-background);
+    --color-foreground: var(--mm-foreground);
+    --color-card: var(--mm-card);
+    --color-card-foreground: var(--mm-card-foreground);
+    --color-popover: var(--mm-popover);
+    --color-popover-foreground: var(--mm-popover-foreground);
+    --color-primary: var(--mm-primary);
+    --color-primary-foreground: var(--mm-primary-foreground);
+    --color-muted: var(--mm-muted);
+    --color-muted-foreground: var(--mm-muted-foreground);
+    --color-border: var(--mm-border);
+    --color-input: var(--mm-input);
+    --color-ring: var(--mm-ring);
+    --radius-sm: var(--mm-radius-sm);
+    --radius-md: var(--mm-radius-md);
+    --radius-lg: var(--mm-radius-lg);
+  }
+  @layer base {
+    body { background: var(--mm-background); color: var(--mm-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--mm-background); }
+      .text-background { color: var(--mm-background); }
+      .border-background { border-color: var(--mm-background); }
+      .ring-background { --tw-ring-color: var(--mm-background); }
+      .bg-foreground { background-color: var(--mm-foreground); }
+      .text-foreground { color: var(--mm-foreground); }
+      .border-foreground { border-color: var(--mm-foreground); }
+      .ring-foreground { --tw-ring-color: var(--mm-foreground); }
+      .bg-card { background-color: var(--mm-card); }
+      .text-card { color: var(--mm-card); }
+      .border-card { border-color: var(--mm-card); }
+      .ring-card { --tw-ring-color: var(--mm-card); }
+      .bg-card-foreground { background-color: var(--mm-card-foreground); }
+      .text-card-foreground { color: var(--mm-card-foreground); }
+      .border-card-foreground { border-color: var(--mm-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--mm-card-foreground); }
+      .bg-popover { background-color: var(--mm-popover); }
+      .text-popover { color: var(--mm-popover); }
+      .border-popover { border-color: var(--mm-popover); }
+      .ring-popover { --tw-ring-color: var(--mm-popover); }
+      .bg-popover-foreground { background-color: var(--mm-popover-foreground); }
+      .text-popover-foreground { color: var(--mm-popover-foreground); }
+      .border-popover-foreground { border-color: var(--mm-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--mm-popover-foreground); }
+      .bg-primary { background-color: var(--mm-primary); }
+      .text-primary { color: var(--mm-primary); }
+      .border-primary { border-color: var(--mm-primary); }
+      .ring-primary { --tw-ring-color: var(--mm-primary); }
+      .bg-primary-foreground { background-color: var(--mm-primary-foreground); }
+      .text-primary-foreground { color: var(--mm-primary-foreground); }
+      .border-primary-foreground { border-color: var(--mm-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--mm-primary-foreground); }
+      .bg-muted { background-color: var(--mm-muted); }
+      .text-muted { color: var(--mm-muted); }
+      .border-muted { border-color: var(--mm-muted); }
+      .ring-muted { --tw-ring-color: var(--mm-muted); }
+      .bg-muted-foreground { background-color: var(--mm-muted-foreground); }
+      .text-muted-foreground { color: var(--mm-muted-foreground); }
+      .border-muted-foreground { border-color: var(--mm-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--mm-muted-foreground); }
+      .bg-border { background-color: var(--mm-border); }
+      .text-border { color: var(--mm-border); }
+      .border-border { border-color: var(--mm-border); }
+      .ring-border { --tw-ring-color: var(--mm-border); }
+      .bg-input { background-color: var(--mm-input); }
+      .text-input { color: var(--mm-input); }
+      .border-input { border-color: var(--mm-input); }
+      .ring-input { --tw-ring-color: var(--mm-input); }
+      .bg-ring { background-color: var(--mm-ring); }
+      .text-ring { color: var(--mm-ring); }
+      .border-ring { border-color: var(--mm-ring); }
+      .ring-ring { --tw-ring-color: var(--mm-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+    <style id="critical-layout">
+      /* Critical layout to avoid FOUC before Tailwind runtime compiles */
+      html, body { margin: 0; padding: 0; }
+      body { background: var(--mm-background); color: var(--mm-foreground); font-family: var(--mm-font-sans); }
+      .app-shell { min-height: 100vh; display: flex; flex-direction: column; }
+      .nav-sticky { position: sticky; top: 0; z-index: 40; height: 64px; background: rgba(255,255,255,.95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--mm-border); }
+      .nav-inner { max-width: 1400px; margin: 0 auto; height: 64px; display: flex; align-items: center; gap: 4px; padding: 0 24px; }
+      .nav-item { display: inline-flex; align-items: center; gap: 6px; height: 64px; padding: 0 14px; font-size: 14px; text-decoration: none; color: var(--mm-muted-foreground); border-bottom: 2px solid transparent; transition: color .16s cubic-bezier(.2,.8,.2,1), border-color .16s cubic-bezier(.2,.8,.2,1); }
+      .nav-item:hover { color: var(--mm-foreground); }
+      .nav-item[data-active="true"] { color: var(--mm-primary); border-bottom: 2px solid var(--mm-primary); font-weight: 500; }
+      .page-wrap { flex: 1; max-width: 1400px; width: 100%; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+      .card { background: var(--mm-card); border: 1px solid var(--mm-border); border-radius: var(--mm-radius-md); box-shadow: var(--mm-shadow-sm); }
+      .card-pad { padding: 20px; }
+      .btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; font-size: 13px; font-weight: 500; border-radius: var(--mm-radius-sm); border: 1px solid transparent; cursor: pointer; transition: all .16s cubic-bezier(.2,.8,.2,1); white-space: nowrap; }
+      .btn-primary { background: var(--mm-primary); color: var(--mm-primary-foreground); }
+      .btn-primary:hover { background: var(--mm-brand-700); transform: translateY(-1px); box-shadow: var(--mm-shadow-md); }
+      .btn-primary:active { transform: translateY(0); }
+      .btn-outline { background: var(--mm-card); color: var(--mm-foreground); border-color: var(--mm-border); }
+      .btn-outline:hover { border-color: var(--mm-brand-400); color: var(--mm-primary); }
+      .btn:focus-visible { outline: 2px solid var(--mm-ring); outline-offset: 2px; }
+      .input, .select { height: 40px; padding: 0 12px; font-size: 14px; border: 1px solid var(--mm-input); border-radius: var(--mm-radius-sm); background: var(--mm-card); color: var(--mm-foreground); transition: border-color .16s, box-shadow .16s; }
+      .input:focus, .select:focus { outline: none; border-color: var(--mm-ring); box-shadow: 0 0 0 3px rgba(40,156,154,.15); }
+      .table-base { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .table-base th { text-align: left; padding: 10px 12px; font-weight: 500; color: var(--mm-muted-foreground); border-bottom: 1px solid var(--mm-border); background: var(--mm-muted); white-space: nowrap; }
+      .table-base td { padding: 10px 12px; border-bottom: 1px solid var(--mm-border); vertical-align: middle; }
+      .table-base tbody tr { transition: background .12s; }
+      .table-base tbody tr:hover { background: var(--mm-muted); }
+      .checkbox { width: 16px; height: 16px; accent-color: var(--mm-primary); cursor: pointer; }
+      .badge { display: inline-flex; align-items: center; padding: 2px 8px; font-size: 11px; font-weight: 500; border-radius: 999px; }
+      .badge-quality { background: var(--mm-brand-50); color: var(--mm-brand-700); }
+      .badge-src { background: var(--mm-gray-100); color: var(--mm-gray-600); }
+      .cover-thumb { width: 96px; height: 96px; border-radius: var(--mm-radius-md); background: linear-gradient(135deg, var(--mm-brand-100), var(--mm-brand-300)); display: flex; align-items: center; justify-content: center; color: var(--mm-brand-700); flex-shrink: 0; }
+      .mono { font-family: var(--mm-font-mono); font-size: 12px; color: var(--mm-muted-foreground); }
+      @media (max-width: 900px) { .page-wrap { padding: 16px; } }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <div class="app-shell">
+        <!-- top-nav (shared shell) -->
+        <nav class="nav-sticky" data-fragment="top-nav">
+            <div class="nav-inner">
+                <div class="flex items-center gap-2 mr-6">
+                    <span data-lucide="music" class="w-5 h-5 text-primary"></span>
+                    <span class="text-[15px] font-semibold text-foreground">MediaMusicService</span>
+                </div>
+                <a class="nav-item" data-dom-id="nav-dashboard" data-nav-key="dashboard" href="dashboard.html"><span data-lucide="layout-dashboard" class="w-4 h-4"></span>概览</a>
+                <a class="nav-item" data-dom-id="nav-search" data-nav-key="search" href="search.html"><span data-lucide="search" class="w-4 h-4"></span>搜索</a>
+                <a class="nav-item" data-dom-id="nav-playlists" data-nav-key="playlists" data-active="true" href="playlists.html"><span data-lucide="list-music" class="w-4 h-4"></span>歌单</a>
+                <a class="nav-item" data-dom-id="nav-charts" data-nav-key="charts" href="charts.html"><span data-lucide="bar-chart-3" class="w-4 h-4"></span>榜单</a>
+                <a class="nav-item" data-dom-id="nav-albums" data-nav-key="albums" href="albums.html"><span data-lucide="disc-3" class="w-4 h-4"></span>专辑</a>
+                <a class="nav-item" data-dom-id="nav-tasks" data-nav-key="tasks" href="tasks.html"><span data-lucide="list-checks" class="w-4 h-4"></span>任务</a>
+                <a class="nav-item" data-dom-id="nav-library" data-nav-key="library" href="library.html"><span data-lucide="library" class="w-4 h-4"></span>媒体库</a>
+                <a class="nav-item" data-dom-id="nav-fnos" data-nav-key="fnos" href="fnos.html"><span data-lucide="server" class="w-4 h-4"></span>飞牛</a>
+                <a class="nav-item" data-dom-id="nav-settings" data-nav-key="settings" href="settings.html"><span data-lucide="settings" class="w-4 h-4"></span>设置</a>
+            </div>
+        </nav>
+
+        <main class="page-wrap">
+            <!-- url-input section -->
+            <section class="card card-pad" data-section="url-input" aria-label="歌单链接输入">
+                <div class="flex items-start justify-between gap-4 flex-wrap">
+                    <div>
+                        <h1 class="text-lg font-semibold text-foreground">歌单解析</h1>
+                        <p class="mt-1 text-sm text-muted-foreground">粘贴支持解析的音乐平台歌单链接，系统将同步获取完整曲目列表。</p>
+                    </div>
+                    <span class="badge badge-src mono">GET /api/v1/playlist</span>
+                </div>
+
+                <div class="mt-4 flex items-start gap-3 rounded-md border px-3 py-2.5 text-[13px]" style="border-color: rgba(217,119,6,.4); background: #fffbeb; color: #92400e;">
+                    <span data-lucide="alert-triangle" class="w-4 h-4 mt-0.5 shrink-0"></span>
+                    <span>歌单解析为同步接口，大歌单可能需要 1-10 分钟，请耐心等待。解析期间请勿重复提交或关闭页面。</span>
+                </div>
+
+                <div class="mt-4 flex gap-3 flex-wrap">
+                    <div class="relative flex-1 min-w-[320px]">
+                        <span data-lucide="link" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"></span>
+                        <input id="playlist-url-input" data-dom-id="playlist-url-input" type="url" class="input w-full pl-9" placeholder="https://music.163.com/playlist?id=24381616" value="https://music.163.com/playlist?id=24381616" />
+                    </div>
+                    <select id="playlist-source" class="select" aria-label="来源平台">
+                        <option value="auto" selected>自动识别来源</option>
+                        <option value="netease">网易云音乐</option>
+                        <option value="qq">QQ 音乐</option>
+                        <option value="kugou">酷狗音乐</option>
+                        <option value="kuwo">酷我音乐</option>
+                    </select>
+                    <button id="parse-submit" data-dom-id="parse-submit" class="btn btn-primary h-10 px-5 text-sm">
+                        <span data-lucide="wand-2" class="w-4 h-4"></span>解析歌单
+                    </button>
+                </div>
+                <p class="mt-2 text-xs text-muted-foreground">仅支持 supports_playlist=true 的平台；当前识别为 <span class="text-primary font-medium">网易云音乐</span>。</p>
+            </section>
+
+            <!-- playlist-info section -->
+            <section class="card card-pad" data-section="playlist-info" aria-label="歌单信息">
+                <div class="flex gap-5 flex-wrap">
+                    <div class="cover-thumb" aria-hidden="true">
+                        <span data-lucide="disc" class="w-10 h-10"></span>
+                    </div>
+                    <div class="flex-1 min-w-[280px]">
+                        <div class="flex items-center gap-3 flex-wrap">
+                            <h2 class="text-base font-semibold text-foreground">周杰伦热门50首</h2>
+                            <span class="badge badge-src">网易云音乐</span>
+                            <span class="badge badge-quality">VIP 歌单</span>
+                        </div>
+                        <p class="mt-2 text-sm text-muted-foreground leading-relaxed">收录周杰伦出道以来最受欢迎的经典曲目，涵盖《范特西》《叶惠美》《七里香》等代表专辑，含早期 Demo 与现场版本。</p>
+                        <dl class="mt-4 grid grid-cols-3 gap-4 max-w-md">
+                            <div>
+                                <dt class="text-xs text-muted-foreground">曲目数量</dt>
+                                <dd class="mt-0.5 text-sm font-medium text-foreground">50 首</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs text-muted-foreground">创建者</dt>
+                                <dd class="mt-0.5 text-sm font-medium text-foreground">云音乐官方</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs text-muted-foreground">播放量</dt>
+                                <dd class="mt-0.5 text-sm font-medium text-foreground">3.2 亿</dd>
+                            </div>
+                        </dl>
+                    </div>
+                </div>
+            </section>
+
+            <!-- playlist-tracks section (required visible region) -->
+            <section id="playlist-tracks" class="card" data-section="playlist-tracks" aria-label="歌单曲目">
+                <div class="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border">
+                    <div class="flex items-center gap-2">
+                        <span data-lucide="list-music" class="w-4 h-4 text-primary"></span>
+                        <h3 class="text-sm font-semibold text-foreground">曲目列表</h3>
+                        <span class="text-xs text-muted-foreground">共 50 首，当前显示 1-10</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span data-lucide="clock" class="w-3.5 h-3.5"></span>
+                        解析耗时 48.6s
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="table-base">
+                        <thead>
+                            <tr>
+                                <th class="w-10"><input type="checkbox" class="checkbox" id="check-all" aria-label="全选" checked></th>
+                                <th class="w-12">序号</th>
+                                <th>标题</th>
+                                <th>歌手</th>
+                                <th>专辑</th>
+                                <th class="w-16">时长</th>
+                                <th class="w-20">音质</th>
+                                <th class="w-24">来源</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><input type="checkbox" class="checkbox track-check" checked></td>
+                                <td class="mono">01</td>
+                                <td class="font-medium text-foreground">晴天</td>
+                                <td class="text-muted-foreground">周杰伦</td>
+                                <td class="text-muted-foreground">叶惠美</td>
+                                <td class="mono">04:29</td>
+                                <td><span class="badge badge-quality">无损</span></td>
+                                <td><span class="badge badge-src">网易云</span></td>
+                            </tr>
+                            <tr>
+                                <td><input type="checkbox" class="checkbox track-check" checked></td>
+                                <td class="mono">02</td>
+                                <td class="font-medium text-foreground">稻香</td>
+                                <td class="text-muted-foreground">周杰伦</td>
+                                <td class="text-muted-foreground">魔杰座</td>
+                                <td class="mono">03:43</td>
+                                <td><span class="badge badge-quality">无损</span></td>
+                                <td><span class="badge badge-src">网易云</span></td>
+                            </tr>
+                            <tr>
+                                <td><input type="checkbox" class="checkbox track-check" checked></td>
+                                <td class="mono">03</td>
+                                <td class="font-medium text-foreground">七里香</td>
+                                <td class="text-muted-foreground">周杰伦</td>
+                                <td class="text-muted-foreground">七里香</td>
+                                <td class="mono">04:57</td>
+                                <td><span class="badge badge-quality">极高</span></td>
+                                <td><span class="badge badge-src">网易云</span></td>
+                            </tr>
+                            <tr>
+                                <td><input type="checkbox" class="checkbox track-check" checked></td>
+                                <td class="mono">04</td>
+                                <td class="font-medium text-foreground">青花瓷</td>
+                                <td class="text-muted-foreground">周杰伦</td>
+                                <td class="text-muted-foreground">我很忙</td>
+                                <td class="mono">03:55</td>
+                                <td><span class="badge badge-quality">无损</span></td>
+                                <td><span class="badge badge-src">网易云</span></td>
+                            </tr>
+                            <tr>
+                                <td><input type="checkbox" class="checkbox track-check" checked></td>
+                                <td class="mono">05</td>
+                                <td class="font-medium text-foreground">夜曲</td>
+                                <td class="text-muted-foreground">周杰伦</td>
+                                <td class="text-muted-foreground">十一月的萧邦</td>
+                                <td class="mono">03:46</td>
+                                <td><span class="badge badge-quality">极高</span></td>
+                                <td><span class="badge badge-src">网易云</span></td>
+                            </tr>
+                            <tr>
+                                <td><input type="checkbox" class="checkbox track-check" checked></td>
+                                <td class="mono">06</td>
+                                <td class="font-medium text-foreground">告白气球</td>
+                                <td class="text-muted-foreground">周杰伦</td>
+                                <td class="text-muted-foreground">周杰伦的床边故事</td>
+                                <td class="mono">03:35</td>
+                                <td><span class="badge badge-quality">无损</span></td>
+                                <td><span class="badge badge-src">网易云</span></td>
+                            </tr>
+                            <tr>
+                                <td><input type="checkbox" class="checkbox track-check"></td>
+                                <td class="mono">07</td>
+                                <td class="font-medium text-foreground">简单爱</td>
+                                <td class="text-muted-foreground">周杰伦</td>
+                                <td class="text-muted-foreground">范特西</td>
+                                <td class="mono">04:30</td>
+                                <td><span class="badge badge-quality">标准</span></td>
+                                <td><span class="badge badge-src">网易云</span></td>
+                            </tr>
+                            <tr>
+                                <td><input type="checkbox" class="checkbox track-check" checked></td>
+                                <td class="mono">08</td>
+                                <td class="font-medium text-foreground">以父之名</td>
+                                <td class="text-muted-foreground">周杰伦</td>
+                                <td class="text-muted-foreground">叶惠美</td>
+                                <td class="mono">05:42</td>
+                                <td><span class="badge badge-quality">极高</span></td>
+                                <td><span class="badge badge-src">网易云</span></td>
+                            </tr>
+                            <tr>
+                                <td><input type="checkbox" class="checkbox track-check"></td>
+                                <td class="mono">09</td>
+                                <td class="font-medium text-foreground">东风破</td>
+                                <td class="text-muted-foreground">周杰伦</td>
+                                <td class="text-muted-foreground">叶惠美</td>
+                                <td class="mono">05:14</td>
+                                <td><span class="badge badge-quality">标准</span></td>
+                                <td><span class="badge badge-src">网易云</span></td>
+                            </tr>
+                            <tr>
+                                <td><input type="checkbox" class="checkbox track-check" checked></td>
+                                <td class="mono">10</td>
+                                <td class="font-medium text-foreground">菊花台</td>
+                                <td class="text-muted-foreground">周杰伦</td>
+                                <td class="text-muted-foreground">依然范特西</td>
+                                <td class="mono">04:53</td>
+                                <td><span class="badge badge-quality">无损</span></td>
+                                <td><span class="badge badge-src">网易云</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="flex items-center justify-between px-5 py-3">
+                    <span class="text-xs text-muted-foreground">已加载 10 / 50 首</span>
+                    <button class="btn btn-outline h-8 text-xs">
+                        <span data-lucide="chevrons-down" class="w-3.5 h-3.5"></span>加载更多
+                    </button>
+                </div>
+            </section>
+
+            <!-- playlist-actions section -->
+            <section class="card px-5 py-3 flex items-center justify-between gap-4 flex-wrap" data-section="playlist-actions" aria-label="操作栏">
+                <div class="flex items-center gap-2 text-sm">
+                    <span data-lucide="check-square" class="w-4 h-4 text-primary"></span>
+                    <span class="text-muted-foreground">已选 <span id="selected-count" class="font-semibold text-foreground">8</span> 首</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="download-selected" data-dom-id="download-selected" class="btn btn-primary">
+                        <span data-lucide="download" class="w-4 h-4"></span>下载所选
+                    </button>
+                    <button id="download-all" class="btn btn-outline">
+                        <span data-lucide="download-cloud" class="w-4 h-4"></span>下载全部
+                    </button>
+                    <button id="export-list" class="btn btn-outline">
+                        <span data-lucide="file-text" class="w-4 h-4"></span>导出列表
+                    </button>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script>
+        lucide.createIcons();
+        // Selected count micro-state
+        (function () {
+            var checks = document.querySelectorAll('.track-check');
+            var countEl = document.getElementById('selected-count');
+            var allEl = document.getElementById('check-all');
+            function refresh() {
+                var n = 0;
+                checks.forEach(function (c) { if (c.checked) n++; });
+                countEl.textContent = n;
+            }
+            checks.forEach(function (c) { c.addEventListener('change', refresh); });
+            if (allEl) {
+                allEl.addEventListener('change', function () {
+                    checks.forEach(function (c) { c.checked = allEl.checked; });
+                    refresh();
+                });
+            }
+            refresh();
+        })();
+        // Parse button demo feedback
+        (function () {
+            var btn = document.getElementById('parse-submit');
+            btn.addEventListener('click', function () {
+                btn.disabled = true;
+                btn.innerHTML = '<span data-lucide="loader-2" class="w-4 h-4 animate-spin"></span>解析中...';
+                lucide.createIcons();
+                setTimeout(function () {
+                    btn.disabled = false;
+                    btn.innerHTML = '<span data-lucide="wand-2" class="w-4 h-4"></span>解析歌单';
+                    lucide.createIcons();
+                }, 1800);
+            });
+        })();
+    </script>
+</body>
+</html>

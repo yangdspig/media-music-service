@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>榜单浏览</title>
+    <style id="theme-vars">
+/* MediaMusicService Design Tokens - free-explore brand prefix: mm */
+:root {
+  /* Brand hue: deep teal-cyan, professional media tool */
+  --mm-brand-50: #effaf9;
+  --mm-brand-100: #d7f2f1;
+  --mm-brand-200: #b0e5e3;
+  --mm-brand-300: #7dd3d0;
+  --mm-brand-400: #44b8b5;
+  --mm-brand-500: #289c9a;
+  --mm-brand-600: #1f7f7e;
+  --mm-brand-700: #1c6665;
+  --mm-brand-800: #1a5252;
+  --mm-brand-900: #194545;
+
+  /* Neutral scale: cool slate */
+  --mm-gray-50: #f8fafc;
+  --mm-gray-100: #f1f5f9;
+  --mm-gray-200: #e2e8f0;
+  --mm-gray-300: #cbd5e1;
+  --mm-gray-400: #94a3b8;
+  --mm-gray-500: #64748b;
+  --mm-gray-600: #475569;
+  --mm-gray-700: #334155;
+  --mm-gray-800: #1e293b;
+  --mm-gray-900: #0f172a;
+
+  /* Semantic aliases required by apply-html-head-contract */
+  --mm-background: var(--mm-gray-50);
+  --mm-foreground: var(--mm-gray-900);
+  --mm-card: #ffffff;
+  --mm-card-foreground: var(--mm-gray-900);
+  --mm-popover: #ffffff;
+  --mm-popover-foreground: var(--mm-gray-900);
+  --mm-primary: var(--mm-brand-600);
+  --mm-primary-foreground: #ffffff;
+  --mm-muted: var(--mm-gray-100);
+  --mm-muted-foreground: var(--mm-gray-500);
+  --mm-border: var(--mm-gray-200);
+  --mm-input: var(--mm-gray-300);
+  --mm-ring: var(--mm-brand-500);
+
+  /* Radius */
+  --mm-radius-sm: 4px;
+  --mm-radius-md: 8px;
+  --mm-radius-lg: 16px;
+
+  /* Shadows */
+  --mm-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --mm-shadow-md: 0 8px 24px -8px rgba(15, 23, 42, 0.12);
+  --mm-shadow-lg: 0 24px 60px -20px rgba(15, 23, 42, 0.18);
+
+  /* State colors (semantic only) */
+  --state-success: #059669;
+  --state-warning: #d97706;
+  --state-error: #dc2626;
+  --state-info: #2563eb;
+
+  /* Typography */
+  --mm-font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --mm-font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--mm-background);
+    --color-foreground: var(--mm-foreground);
+    --color-card: var(--mm-card);
+    --color-card-foreground: var(--mm-card-foreground);
+    --color-popover: var(--mm-popover);
+    --color-popover-foreground: var(--mm-popover-foreground);
+    --color-primary: var(--mm-primary);
+    --color-primary-foreground: var(--mm-primary-foreground);
+    --color-muted: var(--mm-muted);
+    --color-muted-foreground: var(--mm-muted-foreground);
+    --color-border: var(--mm-border);
+    --color-input: var(--mm-input);
+    --color-ring: var(--mm-ring);
+    --radius-sm: var(--mm-radius-sm);
+    --radius-md: var(--mm-radius-md);
+    --radius-lg: var(--mm-radius-lg);
+  }
+  @layer base {
+    body { background: var(--mm-background); color: var(--mm-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--mm-background); }
+      .text-background { color: var(--mm-background); }
+      .border-background { border-color: var(--mm-background); }
+      .ring-background { --tw-ring-color: var(--mm-background); }
+      .bg-foreground { background-color: var(--mm-foreground); }
+      .text-foreground { color: var(--mm-foreground); }
+      .border-foreground { border-color: var(--mm-foreground); }
+      .ring-foreground { --tw-ring-color: var(--mm-foreground); }
+      .bg-card { background-color: var(--mm-card); }
+      .text-card { color: var(--mm-card); }
+      .border-card { border-color: var(--mm-card); }
+      .ring-card { --tw-ring-color: var(--mm-card); }
+      .bg-card-foreground { background-color: var(--mm-card-foreground); }
+      .text-card-foreground { color: var(--mm-card-foreground); }
+      .border-card-foreground { border-color: var(--mm-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--mm-card-foreground); }
+      .bg-popover { background-color: var(--mm-popover); }
+      .text-popover { color: var(--mm-popover); }
+      .border-popover { border-color: var(--mm-popover); }
+      .ring-popover { --tw-ring-color: var(--mm-popover); }
+      .bg-popover-foreground { background-color: var(--mm-popover-foreground); }
+      .text-popover-foreground { color: var(--mm-popover-foreground); }
+      .border-popover-foreground { border-color: var(--mm-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--mm-popover-foreground); }
+      .bg-primary { background-color: var(--mm-primary); }
+      .text-primary { color: var(--mm-primary); }
+      .border-primary { border-color: var(--mm-primary); }
+      .ring-primary { --tw-ring-color: var(--mm-primary); }
+      .bg-primary-foreground { background-color: var(--mm-primary-foreground); }
+      .text-primary-foreground { color: var(--mm-primary-foreground); }
+      .border-primary-foreground { border-color: var(--mm-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--mm-primary-foreground); }
+      .bg-muted { background-color: var(--mm-muted); }
+      .text-muted { color: var(--mm-muted); }
+      .border-muted { border-color: var(--mm-muted); }
+      .ring-muted { --tw-ring-color: var(--mm-muted); }
+      .bg-muted-foreground { background-color: var(--mm-muted-foreground); }
+      .text-muted-foreground { color: var(--mm-muted-foreground); }
+      .border-muted-foreground { border-color: var(--mm-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--mm-muted-foreground); }
+      .bg-border { background-color: var(--mm-border); }
+      .text-border { color: var(--mm-border); }
+      .border-border { border-color: var(--mm-border); }
+      .ring-border { --tw-ring-color: var(--mm-border); }
+      .bg-input { background-color: var(--mm-input); }
+      .text-input { color: var(--mm-input); }
+      .border-input { border-color: var(--mm-input); }
+      .ring-input { --tw-ring-color: var(--mm-input); }
+      .bg-ring { background-color: var(--mm-ring); }
+      .text-ring { color: var(--mm-ring); }
+      .border-ring { border-color: var(--mm-ring); }
+      .ring-ring { --tw-ring-color: var(--mm-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <style id="critical-layout">
+      /* Critical layout CSS: static rendering without Tailwind CDN */
+      .app-shell-root { min-height: 100vh; background: var(--mm-background); color: var(--mm-foreground); }
+      .app-nav { position: sticky; top: 0; z-index: 40; height: 64px; background: rgba(255,255,255,.95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--mm-border); }
+      .app-nav-inner { max-width: 1400px; margin: 0 auto; height: 64px; display: flex; align-items: center; gap: 24px; padding: 0 24px; }
+      .app-nav-items { display: flex; align-items: center; gap: 4px; height: 100%; }
+      .app-nav-item { display: inline-flex; align-items: center; gap: 6px; height: 100%; padding: 0 12px; font-size: 14px; border-bottom: 2px solid transparent; color: var(--mm-muted-foreground); text-decoration: none; transition: color 160ms cubic-bezier(.2,.8,.2,1); }
+      .app-nav-item:hover { color: var(--mm-foreground); }
+      .app-nav-item.is-active { color: var(--mm-primary); border-bottom-color: var(--mm-primary); font-weight: 500; }
+      .app-main { max-width: 1400px; margin: 0 auto; padding: 24px; }
+      .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+      @media (min-width: 1024px) { .chart-grid { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+      .chart-card { background: var(--mm-card); border: 1px solid var(--mm-border); border-radius: var(--mm-radius-md); box-shadow: var(--mm-shadow-sm); padding: 16px; cursor: pointer; transition: transform 160ms cubic-bezier(.2,.8,.2,1), box-shadow 160ms cubic-bezier(.2,.8,.2,1), border-color 160ms cubic-bezier(.2,.8,.2,1); }
+      .chart-card:hover { transform: translateY(-2px); box-shadow: var(--mm-shadow-md); }
+      .chart-card.is-selected { border-color: var(--mm-primary); box-shadow: var(--mm-shadow-md); }
+      .chart-cover { width: 100%; aspect-ratio: 1 / 1; border-radius: var(--mm-radius-sm); display: flex; align-items: center; justify-content: center; color: #fff; }
+      .detail-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .detail-table th { text-align: left; padding: 8px 12px; color: var(--mm-muted-foreground); font-weight: 500; border-bottom: 1px solid var(--mm-border); white-space: nowrap; }
+      .detail-table td { padding: 8px 12px; border-bottom: 1px solid var(--mm-border); }
+      .detail-table tbody tr { transition: background 160ms cubic-bezier(.2,.8,.2,1); }
+      .detail-table tbody tr:hover { background: var(--mm-muted); }
+      .btn-primary { display: inline-flex; align-items: center; gap: 6px; background: var(--mm-primary); color: var(--mm-primary-foreground); font-size: 14px; font-weight: 500; padding: 8px 16px; border-radius: var(--mm-radius-md); border: 1px solid var(--mm-primary); cursor: pointer; transition: filter 160ms cubic-bezier(.2,.8,.2,1); }
+      .btn-primary:hover { filter: brightness(1.05); }
+      .btn-primary:focus-visible { outline: 2px solid var(--mm-ring); outline-offset: 2px; }
+      .tab-btn { padding: 10px 16px; font-size: 14px; color: var(--mm-muted-foreground); border-bottom: 2px solid transparent; cursor: pointer; background: none; border-top: 0; border-left: 0; border-right: 0; transition: color 160ms cubic-bezier(.2,.8,.2,1); }
+      .tab-btn:hover { color: var(--mm-foreground); }
+      .tab-btn.is-active { color: var(--mm-primary); border-bottom-color: var(--mm-primary); font-weight: 500; }
+      .select-input { font-size: 13px; padding: 6px 10px; border: 1px solid var(--mm-input); border-radius: var(--mm-radius-sm); background: var(--mm-card); color: var(--mm-foreground); }
+    </style>
+    <div class="app-shell-root">
+      <nav class="app-nav sticky top-0 z-40 bg-card/95 backdrop-blur border-b border-border">
+        <div class="app-nav-inner max-w-[1400px] mx-auto px-6 flex items-center gap-6">
+          <div class="flex items-center gap-2 shrink-0">
+            <i data-lucide="music-4" class="w-5 h-5 text-primary"></i>
+            <span class="font-semibold text-[15px] tracking-tight">MediaMusicService</span>
+          </div>
+          <div class="app-nav-items flex-1">
+            <a href="dashboard.html" class="app-nav-item text-muted-foreground hover:text-foreground" data-dom-id="nav-dashboard" data-nav-key="dashboard"><i data-lucide="layout-dashboard" class="w-4 h-4"></i>概览</a>
+            <a href="search.html" class="app-nav-item text-muted-foreground hover:text-foreground" data-dom-id="nav-search" data-nav-key="search"><i data-lucide="search" class="w-4 h-4"></i>搜索</a>
+            <a href="playlists.html" class="app-nav-item text-muted-foreground hover:text-foreground" data-dom-id="nav-playlists" data-nav-key="playlists"><i data-lucide="list-music" class="w-4 h-4"></i>歌单</a>
+            <a href="charts.html" class="app-nav-item is-active text-primary border-b-2 border-primary font-medium" data-dom-id="nav-charts" data-nav-key="charts"><i data-lucide="bar-chart-3" class="w-4 h-4"></i>榜单</a>
+            <a href="albums.html" class="app-nav-item text-muted-foreground hover:text-foreground" data-dom-id="nav-albums" data-nav-key="albums"><i data-lucide="disc-3" class="w-4 h-4"></i>专辑</a>
+            <a href="tasks.html" class="app-nav-item text-muted-foreground hover:text-foreground" data-dom-id="nav-tasks" data-nav-key="tasks"><i data-lucide="list-checks" class="w-4 h-4"></i>任务</a>
+            <a href="library.html" class="app-nav-item text-muted-foreground hover:text-foreground" data-dom-id="nav-library" data-nav-key="library"><i data-lucide="library" class="w-4 h-4"></i>媒体库</a>
+            <a href="fnos.html" class="app-nav-item text-muted-foreground hover:text-foreground" data-dom-id="nav-fnos" data-nav-key="fnos"><i data-lucide="hard-drive" class="w-4 h-4"></i>飞牛</a>
+            <a href="settings.html" class="app-nav-item text-muted-foreground hover:text-foreground" data-dom-id="nav-settings" data-nav-key="settings"><i data-lucide="settings" class="w-4 h-4"></i>设置</a>
+          </div>
+          <div class="flex items-center gap-2 text-muted-foreground text-xs shrink-0">
+            <i data-lucide="user-round" class="w-4 h-4"></i><span>admin</span>
+          </div>
+        </div>
+      </nav>
+
+      <main class="app-main max-w-[1400px] mx-auto px-6 py-6">
+        <!-- Page header -->
+        <div class="flex items-end justify-between mb-5">
+          <div>
+            <h1 class="text-xl font-semibold tracking-tight">榜单浏览</h1>
+            <p class="text-sm text-muted-foreground mt-1">浏览 QQ音乐 / 网易云 官方榜单，曲目可直接提交下载。</p>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-muted-foreground">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i><span>缓存更新于 10 分钟前</span>
+          </div>
+        </div>
+
+        <!-- Chart source tabs -->
+        <div class="flex border-b border-border mb-5" role="tablist">
+          <button id="tab-qq" data-dom-id="tab-qq" class="tab-btn is-active text-primary border-b-2 border-primary font-medium" role="tab" aria-selected="true">
+            <span class="inline-flex items-center gap-2"><i data-lucide="circle-dot" class="w-4 h-4"></i>QQ音乐</span>
+          </button>
+          <button id="tab-netease" data-dom-id="tab-netease" class="tab-btn text-muted-foreground hover:text-foreground" role="tab" aria-selected="false">
+            <span class="inline-flex items-center gap-2"><i data-lucide="cloud" class="w-4 h-4"></i>网易云</span>
+          </button>
+        </div>
+
+        <!-- Chart list -->
+        <section id="chart-list" class="chart-grid grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <article class="chart-card is-selected bg-card border border-border rounded-md shadow-sm" data-chart-id="pop-index">
+            <div class="chart-cover mb-3" style="background: linear-gradient(135deg, var(--mm-brand-600), var(--mm-brand-800));">
+              <i data-lucide="flame" class="w-8 h-8"></i>
+            </div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-sm bg-primary text-primary-foreground text-[11px] font-semibold">1</span>
+              <h3 class="text-sm font-medium truncate">巅峰榜·流行指数</h3>
+            </div>
+            <div class="flex items-center justify-between text-xs text-muted-foreground">
+              <span class="inline-flex items-center gap-1"><i data-lucide="music" class="w-3 h-3"></i>100 首</span>
+              <span class="inline-flex items-center gap-1"><i data-lucide="calendar-clock" class="w-3 h-3"></i>每日更新</span>
+            </div>
+          </article>
+          <article class="chart-card bg-card border border-border rounded-md shadow-sm" data-chart-id="hot">
+            <div class="chart-cover mb-3" style="background: linear-gradient(135deg, #b45309, #78350f);">
+              <i data-lucide="trending-up" class="w-8 h-8"></i>
+            </div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-sm bg-muted text-muted-foreground text-[11px] font-semibold">2</span>
+              <h3 class="text-sm font-medium truncate">巅峰榜·热歌</h3>
+            </div>
+            <div class="flex items-center justify-between text-xs text-muted-foreground">
+              <span class="inline-flex items-center gap-1"><i data-lucide="music" class="w-3 h-3"></i>300 首</span>
+              <span class="inline-flex items-center gap-1"><i data-lucide="calendar-clock" class="w-3 h-3"></i>每周四更新</span>
+            </div>
+          </article>
+          <article class="chart-card bg-card border border-border rounded-md shadow-sm" data-chart-id="new">
+            <div class="chart-cover mb-3" style="background: linear-gradient(135deg, #2563eb, #1e3a8a);">
+              <i data-lucide="sparkles" class="w-8 h-8"></i>
+            </div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-sm bg-muted text-muted-foreground text-[11px] font-semibold">3</span>
+              <h3 class="text-sm font-medium truncate">巅峰榜·新歌</h3>
+            </div>
+            <div class="flex items-center justify-between text-xs text-muted-foreground">
+              <span class="inline-flex items-center gap-1"><i data-lucide="music" class="w-3 h-3"></i>100 首</span>
+              <span class="inline-flex items-center gap-1"><i data-lucide="calendar-clock" class="w-3 h-3"></i>每日更新</span>
+            </div>
+          </article>
+          <article class="chart-card bg-card border border-border rounded-md shadow-sm" data-chart-id="mainland">
+            <div class="chart-cover mb-3" style="background: linear-gradient(135deg, #059669, #064e3b);">
+              <i data-lucide="landmark" class="w-8 h-8"></i>
+            </div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-sm bg-muted text-muted-foreground text-[11px] font-semibold">4</span>
+              <h3 class="text-sm font-medium truncate">巅峰榜·内地</h3>
+            </div>
+            <div class="flex items-center justify-between text-xs text-muted-foreground">
+              <span class="inline-flex items-center gap-1"><i data-lucide="music" class="w-3 h-3"></i>100 首</span>
+              <span class="inline-flex items-center gap-1"><i data-lucide="calendar-clock" class="w-3 h-3"></i>每周更新</span>
+            </div>
+          </article>
+          <article class="chart-card bg-card border border-border rounded-md shadow-sm" data-chart-id="hktw">
+            <div class="chart-cover mb-3" style="background: linear-gradient(135deg, #7c3aed, #4c1d95);">
+              <i data-lucide="radio-tower" class="w-8 h-8"></i>
+            </div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-sm bg-muted text-muted-foreground text-[11px] font-semibold">5</span>
+              <h3 class="text-sm font-medium truncate">巅峰榜·港台</h3>
+            </div>
+            <div class="flex items-center justify-between text-xs text-muted-foreground">
+              <span class="inline-flex items-center gap-1"><i data-lucide="music" class="w-3 h-3"></i>100 首</span>
+              <span class="inline-flex items-center gap-1"><i data-lucide="calendar-clock" class="w-3 h-3"></i>每周更新</span>
+            </div>
+          </article>
+          <article class="chart-card bg-card border border-border rounded-md shadow-sm" data-chart-id="west">
+            <div class="chart-cover mb-3" style="background: linear-gradient(135deg, #dc2626, #7f1d1d);">
+              <i data-lucide="globe-2" class="w-8 h-8"></i>
+            </div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-sm bg-muted text-muted-foreground text-[11px] font-semibold">6</span>
+              <h3 class="text-sm font-medium truncate">巅峰榜·欧美</h3>
+            </div>
+            <div class="flex items-center justify-between text-xs text-muted-foreground">
+              <span class="inline-flex items-center gap-1"><i data-lucide="music" class="w-3 h-3"></i>100 首</span>
+              <span class="inline-flex items-center gap-1"><i data-lucide="calendar-clock" class="w-3 h-3"></i>每周更新</span>
+            </div>
+          </article>
+          <article class="chart-card bg-card border border-border rounded-md shadow-sm" data-chart-id="soar">
+            <div class="chart-cover mb-3" style="background: linear-gradient(135deg, #0891b2, #164e63);">
+              <i data-lucide="rocket" class="w-8 h-8"></i>
+            </div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-sm bg-muted text-muted-foreground text-[11px] font-semibold">7</span>
+              <h3 class="text-sm font-medium truncate">飙升榜</h3>
+            </div>
+            <div class="flex items-center justify-between text-xs text-muted-foreground">
+              <span class="inline-flex items-center gap-1"><i data-lucide="music" class="w-3 h-3"></i>100 首</span>
+              <span class="inline-flex items-center gap-1"><i data-lucide="calendar-clock" class="w-3 h-3"></i>每日更新</span>
+            </div>
+          </article>
+          <article class="chart-card bg-card border border-border rounded-md shadow-sm" data-chart-id="newsong">
+            <div class="chart-cover mb-3" style="background: linear-gradient(135deg, #db2777, #831843);">
+              <i data-lucide="badge-plus" class="w-8 h-8"></i>
+            </div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-sm bg-muted text-muted-foreground text-[11px] font-semibold">8</span>
+              <h3 class="text-sm font-medium truncate">新歌榜</h3>
+            </div>
+            <div class="flex items-center justify-between text-xs text-muted-foreground">
+              <span class="inline-flex items-center gap-1"><i data-lucide="music" class="w-3 h-3"></i>100 首</span>
+              <span class="inline-flex items-center gap-1"><i data-lucide="calendar-clock" class="w-3 h-3"></i>每日更新</span>
+            </div>
+          </article>
+        </section>
+
+        <!-- Chart detail -->
+        <section class="bg-card border border-border rounded-md shadow-sm">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-border">
+            <div class="flex items-center gap-3">
+              <span class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 text-primary"><i data-lucide="flame" class="w-4 h-4"></i></span>
+              <div>
+                <h2 class="text-sm font-semibold">巅峰榜·流行指数</h2>
+                <p class="text-xs text-muted-foreground mt-0.5">来源：QQ音乐 · 共 100 首 · 每日更新</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <label class="flex items-center gap-2 text-xs text-muted-foreground">
+                显示数量
+                <select class="select-input" aria-label="显示数量">
+                  <option selected>10</option>
+                  <option>20</option>
+                  <option>50</option>
+                  <option>100</option>
+                </select>
+              </label>
+              <button id="download-chart" data-dom-id="download-chart" class="btn-primary">
+                <i data-lucide="download" class="w-4 h-4"></i>下载榜单
+              </button>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="detail-table">
+              <thead>
+                <tr>
+                  <th class="w-10">#</th>
+                  <th>歌曲</th>
+                  <th>歌手</th>
+                  <th>专辑</th>
+                  <th class="w-20">时长</th>
+                  <th class="w-24">音质</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td class="text-muted-foreground">1</td><td class="font-medium">光影之间</td><td>林晨</td><td class="text-muted-foreground">光影之间</td><td class="text-muted-foreground">03:42</td><td><span class="inline-flex px-1.5 py-0.5 rounded-sm bg-primary/10 text-primary text-[11px] font-medium">无损</span></td></tr>
+                <tr><td class="text-muted-foreground">2</td><td class="font-medium">落日航班</td><td>许晚舟</td><td class="text-muted-foreground">城市漫游</td><td class="text-muted-foreground">04:05</td><td><span class="inline-flex px-1.5 py-0.5 rounded-sm bg-primary/10 text-primary text-[11px] font-medium">无损</span></td></tr>
+                <tr><td class="text-muted-foreground">3</td><td class="font-medium">晚风电台</td><td>陈屿</td><td class="text-muted-foreground">晚风电台</td><td class="text-muted-foreground">03:28</td><td><span class="inline-flex px-1.5 py-0.5 rounded-sm bg-muted text-muted-foreground text-[11px] font-medium">高品质</span></td></tr>
+                <tr><td class="text-muted-foreground">4</td><td class="font-medium">山海来信</td><td>苏黎</td><td class="text-muted-foreground">山海来信</td><td class="text-muted-foreground">04:31</td><td><span class="inline-flex px-1.5 py-0.5 rounded-sm bg-primary/10 text-primary text-[11px] font-medium">无损</span></td></tr>
+                <tr><td class="text-muted-foreground">5</td><td class="font-medium">霓虹雨</td><td>MOON乐队</td><td class="text-muted-foreground">夜行记</td><td class="text-muted-foreground">03:56</td><td><span class="inline-flex px-1.5 py-0.5 rounded-sm bg-muted text-muted-foreground text-[11px] font-medium">高品质</span></td></tr>
+                <tr><td class="text-muted-foreground">6</td><td class="font-medium">慢慢</td><td>周栎</td><td class="text-muted-foreground">慢慢</td><td class="text-muted-foreground">04:12</td><td><span class="inline-flex px-1.5 py-0.5 rounded-sm bg-primary/10 text-primary text-[11px] font-medium">无损</span></td></tr>
+                <tr><td class="text-muted-foreground">7</td><td class="font-medium">无名之辈</td><td>陆一鸣</td><td class="text-muted-foreground">无名之辈</td><td class="text-muted-foreground">03:47</td><td><span class="inline-flex px-1.5 py-0.5 rounded-sm bg-muted text-muted-foreground text-[11px] font-medium">标准</span></td></tr>
+                <tr><td class="text-muted-foreground">8</td><td class="font-medium">云端漫步</td><td>白鹭合唱团</td><td class="text-muted-foreground">云端漫步</td><td class="text-muted-foreground">05:02</td><td><span class="inline-flex px-1.5 py-0.5 rounded-sm bg-primary/10 text-primary text-[11px] font-medium">无损</span></td></tr>
+                <tr><td class="text-muted-foreground">9</td><td class="font-medium">旧城故事</td><td>方鹤年</td><td class="text-muted-foreground">旧城故事</td><td class="text-muted-foreground">04:18</td><td><span class="inline-flex px-1.5 py-0.5 rounded-sm bg-muted text-muted-foreground text-[11px] font-medium">高品质</span></td></tr>
+                <tr><td class="text-muted-foreground">10</td><td class="font-medium">星河入梦</td><td>安琪拉</td><td class="text-muted-foreground">星河入梦</td><td class="text-muted-foreground">03:59</td><td><span class="inline-flex px-1.5 py-0.5 rounded-sm bg-primary/10 text-primary text-[11px] font-medium">无损</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="flex items-center justify-between px-4 py-3 border-t border-border text-xs text-muted-foreground">
+            <span class="inline-flex items-center gap-1"><i data-lucide="database" class="w-3.5 h-3.5"></i>数据来自本地缓存 · GET /api/v1/charts/qq/pop-index</span>
+            <span>第 1-10 条 / 共 100 条</span>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script>
+      lucide.createIcons();
+      document.querySelectorAll('.chart-card').forEach(function (card) {
+        card.addEventListener('click', function () {
+          document.querySelectorAll('.chart-card').forEach(function (c) { c.classList.remove('is-selected'); });
+          card.classList.add('is-selected');
+        });
+      });
+      document.getElementById('tab-qq').addEventListener('click', function () {
+        this.classList.add('is-active', 'text-primary', 'border-b-2', 'border-primary', 'font-medium');
+        this.classList.remove('text-muted-foreground');
+        var other = document.getElementById('tab-netease');
+        other.classList.remove('is-active', 'text-primary', 'border-b-2', 'border-primary', 'font-medium');
+        other.classList.add('text-muted-foreground');
+      });
+      document.getElementById('tab-netease').addEventListener('click', function () {
+        this.classList.add('is-active', 'text-primary', 'border-b-2', 'border-primary', 'font-medium');
+        this.classList.remove('text-muted-foreground');
+        var other = document.getElementById('tab-qq');
+        other.classList.remove('is-active', 'text-primary', 'border-b-2', 'border-primary', 'font-medium');
+        other.classList.add('text-muted-foreground');
+      });
+    </script>
+</body>
+</html>

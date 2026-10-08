@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>搜索下载</title>
+    <style id="theme-vars">
+/* MediaMusicService Design Tokens - free-explore brand prefix: mm */
+:root {
+  /* Brand hue: deep teal-cyan, professional media tool */
+  --mm-brand-50: #effaf9;
+  --mm-brand-100: #d7f2f1;
+  --mm-brand-200: #b0e5e3;
+  --mm-brand-300: #7dd3d0;
+  --mm-brand-400: #44b8b5;
+  --mm-brand-500: #289c9a;
+  --mm-brand-600: #1f7f7e;
+  --mm-brand-700: #1c6665;
+  --mm-brand-800: #1a5252;
+  --mm-brand-900: #194545;
+
+  /* Neutral scale: cool slate */
+  --mm-gray-50: #f8fafc;
+  --mm-gray-100: #f1f5f9;
+  --mm-gray-200: #e2e8f0;
+  --mm-gray-300: #cbd5e1;
+  --mm-gray-400: #94a3b8;
+  --mm-gray-500: #64748b;
+  --mm-gray-600: #475569;
+  --mm-gray-700: #334155;
+  --mm-gray-800: #1e293b;
+  --mm-gray-900: #0f172a;
+
+  /* Semantic aliases required by apply-html-head-contract */
+  --mm-background: var(--mm-gray-50);
+  --mm-foreground: var(--mm-gray-900);
+  --mm-card: #ffffff;
+  --mm-card-foreground: var(--mm-gray-900);
+  --mm-popover: #ffffff;
+  --mm-popover-foreground: var(--mm-gray-900);
+  --mm-primary: var(--mm-brand-600);
+  --mm-primary-foreground: #ffffff;
+  --mm-muted: var(--mm-gray-100);
+  --mm-muted-foreground: var(--mm-gray-500);
+  --mm-border: var(--mm-gray-200);
+  --mm-input: var(--mm-gray-300);
+  --mm-ring: var(--mm-brand-500);
+
+  /* Radius */
+  --mm-radius-sm: 4px;
+  --mm-radius-md: 8px;
+  --mm-radius-lg: 16px;
+
+  /* Shadows */
+  --mm-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --mm-shadow-md: 0 8px 24px -8px rgba(15, 23, 42, 0.12);
+  --mm-shadow-lg: 0 24px 60px -20px rgba(15, 23, 42, 0.18);
+
+  /* State colors (semantic only) */
+  --state-success: #059669;
+  --state-warning: #d97706;
+  --state-error: #dc2626;
+  --state-info: #2563eb;
+
+  /* Typography */
+  --mm-font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --mm-font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--mm-background);
+    --color-foreground: var(--mm-foreground);
+    --color-card: var(--mm-card);
+    --color-card-foreground: var(--mm-card-foreground);
+    --color-popover: var(--mm-popover);
+    --color-popover-foreground: var(--mm-popover-foreground);
+    --color-primary: var(--mm-primary);
+    --color-primary-foreground: var(--mm-primary-foreground);
+    --color-muted: var(--mm-muted);
+    --color-muted-foreground: var(--mm-muted-foreground);
+    --color-border: var(--mm-border);
+    --color-input: var(--mm-input);
+    --color-ring: var(--mm-ring);
+    --radius-sm: var(--mm-radius-sm);
+    --radius-md: var(--mm-radius-md);
+    --radius-lg: var(--mm-radius-lg);
+  }
+  @layer base {
+    body { background: var(--mm-background); color: var(--mm-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--mm-background); }
+      .text-background { color: var(--mm-background); }
+      .border-background { border-color: var(--mm-background); }
+      .ring-background { --tw-ring-color: var(--mm-background); }
+      .bg-foreground { background-color: var(--mm-foreground); }
+      .text-foreground { color: var(--mm-foreground); }
+      .border-foreground { border-color: var(--mm-foreground); }
+      .ring-foreground { --tw-ring-color: var(--mm-foreground); }
+      .bg-card { background-color: var(--mm-card); }
+      .text-card { color: var(--mm-card); }
+      .border-card { border-color: var(--mm-card); }
+      .ring-card { --tw-ring-color: var(--mm-card); }
+      .bg-card-foreground { background-color: var(--mm-card-foreground); }
+      .text-card-foreground { color: var(--mm-card-foreground); }
+      .border-card-foreground { border-color: var(--mm-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--mm-card-foreground); }
+      .bg-popover { background-color: var(--mm-popover); }
+      .text-popover { color: var(--mm-popover); }
+      .border-popover { border-color: var(--mm-popover); }
+      .ring-popover { --tw-ring-color: var(--mm-popover); }
+      .bg-popover-foreground { background-color: var(--mm-popover-foreground); }
+      .text-popover-foreground { color: var(--mm-popover-foreground); }
+      .border-popover-foreground { border-color: var(--mm-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--mm-popover-foreground); }
+      .bg-primary { background-color: var(--mm-primary); }
+      .text-primary { color: var(--mm-primary); }
+      .border-primary { border-color: var(--mm-primary); }
+      .ring-primary { --tw-ring-color: var(--mm-primary); }
+      .bg-primary-foreground { background-color: var(--mm-primary-foreground); }
+      .text-primary-foreground { color: var(--mm-primary-foreground); }
+      .border-primary-foreground { border-color: var(--mm-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--mm-primary-foreground); }
+      .bg-muted { background-color: var(--mm-muted); }
+      .text-muted { color: var(--mm-muted); }
+      .border-muted { border-color: var(--mm-muted); }
+      .ring-muted { --tw-ring-color: var(--mm-muted); }
+      .bg-muted-foreground { background-color: var(--mm-muted-foreground); }
+      .text-muted-foreground { color: var(--mm-muted-foreground); }
+      .border-muted-foreground { border-color: var(--mm-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--mm-muted-foreground); }
+      .bg-border { background-color: var(--mm-border); }
+      .text-border { color: var(--mm-border); }
+      .border-border { border-color: var(--mm-border); }
+      .ring-border { --tw-ring-color: var(--mm-border); }
+      .bg-input { background-color: var(--mm-input); }
+      .text-input { color: var(--mm-input); }
+      .border-input { border-color: var(--mm-input); }
+      .ring-input { --tw-ring-color: var(--mm-input); }
+      .bg-ring { background-color: var(--mm-ring); }
+      .text-ring { color: var(--mm-ring); }
+      .border-ring { border-color: var(--mm-ring); }
+      .ring-ring { --tw-ring-color: var(--mm-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+      /* Critical layout - app-shell stability */
+      #app-shell { display: flex; flex-direction: column; min-height: 100vh; }
+      #top-nav { position: sticky; top: 0; z-index: 40; height: 64px; }
+      #page-content { flex: 1; }
+      /* Micro-interaction */
+      .btn-lift {
+        transition: transform 160ms cubic-bezier(.2,.8,.2,1), box-shadow 160ms cubic-bezier(.2,.8,.2,1);
+      }
+      .btn-lift:hover { transform: translateY(-1px); box-shadow: var(--mm-shadow-md); }
+      .btn-lift:active { transform: translateY(0); box-shadow: var(--mm-shadow-sm); }
+      .source-chip {
+        transition: all 160ms cubic-bezier(.2,.8,.2,1);
+      }
+      .source-chip[data-active="true"] {
+        background: var(--mm-primary);
+        color: var(--mm-primary-foreground);
+        border-color: var(--mm-primary);
+      }
+      .source-chip:hover {
+        border-color: var(--mm-primary);
+        color: var(--mm-primary);
+      }
+      .source-chip[data-active="true"]:hover {
+        color: var(--mm-primary-foreground);
+        opacity: 0.9;
+      }
+      .row-check:checked + td { background: var(--mm-brand-50); }
+      table tr:hover td { background: var(--mm-muted); }
+      .table-container {
+        overflow-y: auto;
+      }
+      .table-container thead th {
+        position: sticky;
+        top: 0;
+        background: var(--mm-card);
+        z-index: 10;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+<div id="app-shell">
+    <!-- Top Navigation -->
+    <nav id="top-nav" class="sticky top-0 z-40 bg-card/95 backdrop-blur border-b border-border">
+        <div class="max-w-[1440px] mx-auto h-16 px-6 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+                    <i data-lucide="music" class="w-4 h-4 text-primary-foreground"></i>
+                </div>
+                <span class="font-semibold text-lg tracking-tight">MediaMusicService</span>
+            </div>
+            <div class="flex items-center gap-1">
+                <a href="#" data-dom-id="nav-dashboard" data-nav-key="dashboard" class="px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors">概览</a>
+                <a href="#" data-dom-id="nav-search" data-nav-key="search" class="px-3 py-2 text-sm text-primary border-b-2 border-primary font-medium rounded-md transition-colors">搜索</a>
+                <a href="#" data-dom-id="nav-playlists" data-nav-key="playlists" class="px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors">歌单</a>
+                <a href="#" data-dom-id="nav-charts" data-nav-key="charts" class="px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors">榜单</a>
+                <a href="#" data-dom-id="nav-albums" data-nav-key="albums" class="px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors">专辑</a>
+                <a href="#" data-dom-id="nav-tasks" data-nav-key="tasks" class="px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors">任务</a>
+                <a href="#" data-dom-id="nav-library" data-nav-key="library" class="px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors">媒体库</a>
+                <a href="#" data-dom-id="nav-fnos" data-nav-key="fnos" class="px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors">飞牛</a>
+                <a href="#" data-dom-id="nav-settings" data-nav-key="settings" class="px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors">设置</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Content -->
+    <main id="page-content" class="flex-1">
+        <div class="max-w-[1440px] mx-auto px-6 py-6 space-y-5">
+
+            <!-- Search Bar Section -->
+            <section class="bg-card rounded-lg border border-border p-5 space-y-4" style="box-shadow: var(--mm-shadow-sm);">
+                <div class="flex items-center gap-3">
+                    <div class="relative flex-1">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"></i>
+                        <input id="search-input" type="text" placeholder="输入歌曲名、歌手或专辑关键词..." class="w-full h-10 pl-10 pr-4 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground" />
+                    </div>
+                    <select id="limit-select" class="h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                        <option value="20">20 条</option>
+                        <option value="50" selected>50 条</option>
+                        <option value="100">100 条</option>
+                    </select>
+                    <button id="search-submit" class="btn-lift h-10 px-6 rounded-md bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2">
+                        <i data-lucide="search" class="w-4 h-4"></i>
+                        搜索
+                    </button>
+                </div>
+
+                <!-- Source Filter -->
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs text-muted-foreground mr-1">数据源：</span>
+                    <button class="source-chip px-3 py-1.5 rounded-full border border-border text-xs font-medium bg-background" data-active="true" data-source="MiguMusicClient">咪咕音乐</button>
+                    <button class="source-chip px-3 py-1.5 rounded-full border border-border text-xs font-medium bg-background" data-active="true" data-source="NeteaseMusicClient">网易云音乐</button>
+                    <button class="source-chip px-3 py-1.5 rounded-full border border-border text-xs font-medium bg-background" data-active="true" data-source="QQMusicClient">QQ音乐</button>
+                    <button class="source-chip px-3 py-1.5 rounded-full border border-border text-xs font-medium bg-background" data-active="true" data-source="KuwoMusicClient">酷我音乐</button>
+                    <button class="source-chip px-3 py-1.5 rounded-full border border-border text-xs font-medium bg-background" data-active="false" data-source="QianqianMusicClient">千千音乐</button>
+                </div>
+            </section>
+
+            <!-- Failed Sources Notice -->
+            <div class="flex items-start gap-2 px-4 py-3 rounded-md border border-[var(--state-warning)]/30 bg-[var(--state-warning)]/5">
+                <i data-lucide="alert-triangle" class="w-4 h-4 text-[var(--state-warning)] mt-0.5 shrink-0"></i>
+                <div class="text-sm">
+                    <span class="font-medium text-[var(--state-warning)]">部分数据源搜索失败：</span>
+                    <span class="text-muted-foreground">TIDALMusicClient 搜索失败：未配置 cookies；SpotifyMusicClient 搜索失败：API 密钥已过期</span>
+                </div>
+            </div>
+
+            <!-- Search Results -->
+            <section id="search-results" class="bg-card rounded-lg border border-border" style="box-shadow: var(--mm-shadow-sm); display: block;">
+                <div class="px-5 py-4 border-b border-border flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-sm font-semibold">搜索结果</h2>
+                        <span class="text-xs text-muted-foreground">共 12 条结果，来自 4 个数据源</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button class="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                            刷新
+                        </button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-border">
+                                <th class="w-10 px-4 py-3 text-left">
+                                    <input id="select-all" type="checkbox" class="w-4 h-4 rounded border-input text-primary focus:ring-ring accent-[var(--mm-primary)]" />
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground">标题</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground">歌手</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground">专辑</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground">时长</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground">音质</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground">格式</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground">大小</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground">来源</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border">
+                            <tr class="transition-colors">
+                                <td class="px-4 py-3"><input type="checkbox" class="row-check w-4 h-4 rounded border-input text-primary focus:ring-ring accent-[var(--mm-primary)]" /></td>
+                                <td class="px-4 py-3 font-medium">晴天</td>
+                                <td class="px-4 py-3 text-muted-foreground">周杰伦</td>
+                                <td class="px-4 py-3 text-muted-foreground">叶惠美</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">4:29</td>
+                                <td class="px-4 py-3"><span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--state-success)]/10 text-[var(--state-success)]">无损</span></td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">FLAC</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">28.4 MB</td>
+                                <td class="px-4 py-3"><span class="text-xs text-muted-foreground">咪咕音乐</span></td>
+                            </tr>
+                            <tr class="transition-colors">
+                                <td class="px-4 py-3"><input type="checkbox" class="row-check w-4 h-4 rounded border-input text-primary focus:ring-ring accent-[var(--mm-primary)]" /></td>
+                                <td class="px-4 py-3 font-medium">七里香</td>
+                                <td class="px-4 py-3 text-muted-foreground">周杰伦</td>
+                                <td class="px-4 py-3 text-muted-foreground">七里香</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">4:55</td>
+                                <td class="px-4 py-3"><span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--state-success)]/10 text-[var(--state-success)]">无损</span></td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">FLAC</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">31.2 MB</td>
+                                <td class="px-4 py-3"><span class="text-xs text-muted-foreground">网易云音乐</span></td>
+                            </tr>
+                            <tr class="transition-colors">
+                                <td class="px-4 py-3"><input type="checkbox" class="row-check w-4 h-4 rounded border-input text-primary focus:ring-ring accent-[var(--mm-primary)]" /></td>
+                                <td class="px-4 py-3 font-medium">稻香</td>
+                                <td class="px-4 py-3 text-muted-foreground">周杰伦</td>
+                                <td class="px-4 py-3 text-muted-foreground">魔杰座</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">3:43</td>
+                                <td class="px-4 py-3"><span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--state-info)]/10 text-[var(--state-info)]">高品质</span></td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">MP3</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">8.9 MB</td>
+                                <td class="px-4 py-3"><span class="text-xs text-muted-foreground">QQ音乐</span></td>
+                            </tr>
+                            <tr class="transition-colors">
+                                <td class="px-4 py-3"><input type="checkbox" class="row-check w-4 h-4 rounded border-input text-primary focus:ring-ring accent-[var(--mm-primary)]" /></td>
+                                <td class="px-4 py-3 font-medium">青花瓷</td>
+                                <td class="px-4 py-3 text-muted-foreground">周杰伦</td>
+                                <td class="px-4 py-3 text-muted-foreground">我很忙</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">3:54</td>
+                                <td class="px-4 py-3"><span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--state-success)]/10 text-[var(--state-success)]">无损</span></td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">FLAC</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">24.7 MB</td>
+                                <td class="px-4 py-3"><span class="text-xs text-muted-foreground">酷我音乐</span></td>
+                            </tr>
+                            <tr class="transition-colors">
+                                <td class="px-4 py-3"><input type="checkbox" class="row-check w-4 h-4 rounded border-input text-primary focus:ring-ring accent-[var(--mm-primary)]" /></td>
+                                <td class="px-4 py-3 font-medium">夜曲</td>
+                                <td class="px-4 py-3 text-muted-foreground">周杰伦</td>
+                                <td class="px-4 py-3 text-muted-foreground">十一月的萧邦</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">3:46</td>
+                                <td class="px-4 py-3"><span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--state-info)]/10 text-[var(--state-info)]">高品质</span></td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">MP3</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">9.1 MB</td>
+                                <td class="px-4 py-3"><span class="text-xs text-muted-foreground">咪咕音乐</span></td>
+                            </tr>
+                            <tr class="transition-colors">
+                                <td class="px-4 py-3"><input type="checkbox" class="row-check w-4 h-4 rounded border-input text-primary focus:ring-ring accent-[var(--mm-primary)]" /></td>
+                                <td class="px-4 py-3 font-medium">以父之名</td>
+                                <td class="px-4 py-3 text-muted-foreground">周杰伦</td>
+                                <td class="px-4 py-3 text-muted-foreground">叶惠美</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">5:42</td>
+                                <td class="px-4 py-3"><span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--state-success)]/10 text-[var(--state-success)]">无损</span></td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">FLAC</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">36.8 MB</td>
+                                <td class="px-4 py-3"><span class="text-xs text-muted-foreground">网易云音乐</span></td>
+                            </tr>
+                            <tr class="transition-colors">
+                                <td class="px-4 py-3"><input type="checkbox" class="row-check w-4 h-4 rounded border-input text-primary focus:ring-ring accent-[var(--mm-primary)]" /></td>
+                                <td class="px-4 py-3 font-medium">简单爱</td>
+                                <td class="px-4 py-3 text-muted-foreground">周杰伦</td>
+                                <td class="px-4 py-3 text-muted-foreground">范特西</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">4:30</td>
+                                <td class="px-4 py-3"><span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--state-warning)]/10 text-[var(--state-warning)]">标准</span></td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">MP3</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">4.2 MB</td>
+                                <td class="px-4 py-3"><span class="text-xs text-muted-foreground">QQ音乐</span></td>
+                            </tr>
+                            <tr class="transition-colors">
+                                <td class="px-4 py-3"><input type="checkbox" class="row-check w-4 h-4 rounded border-input text-primary focus:ring-ring accent-[var(--mm-primary)]" /></td>
+                                <td class="px-4 py-3 font-medium">告白气球</td>
+                                <td class="px-4 py-3 text-muted-foreground">周杰伦</td>
+                                <td class="px-4 py-3 text-muted-foreground">周杰伦的床边故事</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">3:35</td>
+                                <td class="px-4 py-3"><span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--state-success)]/10 text-[var(--state-success)]">无损</span></td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">FLAC</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">22.3 MB</td>
+                                <td class="px-4 py-3"><span class="text-xs text-muted-foreground">酷我音乐</span></td>
+                            </tr>
+                            <tr class="transition-colors">
+                                <td class="px-4 py-3"><input type="checkbox" class="row-check w-4 h-4 rounded border-input text-primary focus:ring-ring accent-[var(--mm-primary)]" /></td>
+                                <td class="px-4 py-3 font-medium">东风破</td>
+                                <td class="px-4 py-3 text-muted-foreground">周杰伦</td>
+                                <td class="px-4 py-3 text-muted-foreground">叶惠美</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">5:14</td>
+                                <td class="px-4 py-3"><span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--state-info)]/10 text-[var(--state-info)]">高品质</span></td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">MP3</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">12.5 MB</td>
+                                <td class="px-4 py-3"><span class="text-xs text-muted-foreground">咪咕音乐</span></td>
+                            </tr>
+                            <tr class="transition-colors">
+                                <td class="px-4 py-3"><input type="checkbox" class="row-check w-4 h-4 rounded border-input text-primary focus:ring-ring accent-[var(--mm-primary)]" /></td>
+                                <td class="px-4 py-3 font-medium">菊花台</td>
+                                <td class="px-4 py-3 text-muted-foreground">周杰伦</td>
+                                <td class="px-4 py-3 text-muted-foreground">依然范特西</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">4:53</td>
+                                <td class="px-4 py-3"><span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--state-warning)]/10 text-[var(--state-warning)]">标准</span></td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">MP3</td>
+                                <td class="px-4 py-3 text-muted-foreground font-mono text-xs">4.6 MB</td>
+                                <td class="px-4 py-3"><span class="text-xs text-muted-foreground">千千音乐</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Selected Actions Bar -->
+            <section id="selected-actions" class="bg-card rounded-lg border border-border px-5 py-4 flex items-center justify-between" style="box-shadow: var(--mm-shadow-sm);">
+                <div class="flex items-center gap-3">
+                    <span class="text-sm text-muted-foreground">已选 <span id="selected-count" class="font-semibold text-foreground">0</span> 首</span>
+                    <span class="text-xs text-muted-foreground">|</span>
+                    <span class="text-xs text-muted-foreground">总计约 0 MB</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="clear-selection" class="h-9 px-4 rounded-md border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                        清空选择
+                    </button>
+                    <button id="add-to-queue" class="h-9 px-4 rounded-md border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-1.5">
+                        <i data-lucide="list-plus" class="w-4 h-4"></i>
+                        加入下载队列
+                    </button>
+                    <button id="download-submit" class="btn-lift h-9 px-5 rounded-md bg-primary text-primary-foreground text-sm font-medium flex items-center gap-1.5">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        提交下载
+                    </button>
+                </div>
+            </section>
+        </div>
+    </main>
+</div>
+
+<!-- Download Modal (hidden by default) -->
+<div id="download-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" id="modal-overlay"></div>
+    <div class="relative bg-card rounded-lg border border-border w-full max-w-md mx-4" style="box-shadow: var(--mm-shadow-lg);">
+        <div class="px-6 py-4 border-b border-border flex items-center justify-between">
+            <h3 class="text-sm font-semibold">提交下载任务</h3>
+            <button id="modal-close" class="text-muted-foreground hover:text-foreground transition-colors">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+        <div class="px-6 py-5 space-y-4">
+            <div>
+                <label class="text-xs font-medium text-muted-foreground block mb-1.5">保存子目录</label>
+                <input type="text" placeholder="例如：周杰伦/叶惠美" class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground" />
+            </div>
+            <div>
+                <label class="text-xs font-medium text-muted-foreground block mb-1.5">目标媒体库</label>
+                <select class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                    <option>默认媒体库</option>
+                    <option>华语流行</option>
+                    <option>欧美经典</option>
+                    <option>日韩精选</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-muted-foreground block mb-1.5">关联歌单</label>
+                <select class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                    <option>不关联歌单</option>
+                    <option>我的收藏</option>
+                    <option>经典老歌</option>
+                    <option>最近常听</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-muted-foreground block mb-1.5">单文件大小上限 (MB)</label>
+                <input type="number" placeholder="50" min="1" max="500" class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground" />
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-border flex items-center justify-end gap-2">
+            <button id="modal-cancel" class="h-9 px-4 rounded-md border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">取消</button>
+            <button id="modal-confirm" class="btn-lift h-9 px-5 rounded-md bg-primary text-primary-foreground text-sm font-medium">确认提交</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    lucide.createIcons();
+
+    // Source chip toggle
+    document.querySelectorAll('.source-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const active = chip.dataset.active === 'true';
+            chip.dataset.active = active ? 'false' : 'true';
+        });
+    });
+
+    // Select all
+    const selectAll = document.getElementById('select-all');
+    const rowChecks = document.querySelectorAll('.row-check');
+    const selectedCount = document.getElementById('selected-count');
+
+    function updateCount() {
+        const checked = document.querySelectorAll('.row-check:checked').length;
+        selectedCount.textContent = checked;
+    }
+
+    selectAll.addEventListener('change', () => {
+        rowChecks.forEach(cb => cb.checked = selectAll.checked);
+        updateCount();
+    });
+
+    rowChecks.forEach(cb => {
+        cb.addEventListener('change', () => {
+            selectAll.checked = document.querySelectorAll('.row-check:checked').length === rowChecks.length;
+            updateCount();
+        });
+    });
+
+    // Clear selection
+    document.getElementById('clear-selection').addEventListener('click', () => {
+        rowChecks.forEach(cb => cb.checked = false);
+        selectAll.checked = false;
+        updateCount();
+    });
+
+    // Modal
+    const modal = document.getElementById('download-modal');
+    document.getElementById('download-submit').addEventListener('click', () => {
+        modal.classList.remove('hidden');
+    });
+    document.getElementById('modal-close').addEventListener('click', () => modal.classList.add('hidden'));
+    document.getElementById('modal-cancel').addEventListener('click', () => modal.classList.add('hidden'));
+    document.getElementById('modal-overlay').addEventListener('click', () => modal.classList.add('hidden'));
+</script>
+</body>
+</html>

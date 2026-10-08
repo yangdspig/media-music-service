@@ -86,7 +86,7 @@
 2k. **独立 Web UI（进行中，2026-10-08 立项）**
    - 背景：补齐浏览器操作入口，配置修改与全部业务功能前端化，PC/手机双端响应式
    - 方案：可行性与方案已审核（[2026-10-08-web-ui-feasibility.md](docs/superpowers/specs/2026-10-08-web-ui-feasibility.md)，方案 A：Vue 3 + Vuetify 3 SPA + FastAPI StaticFiles 同源托管）；后端仅新增 config 读写 + system/status 端点（配置热更新已核可实现：全局 settings 各模块调用时现读）
-   - 原型：设计文稿 [2026-10-08-web-ui-design.md](docs/superpowers/specs/2026-10-08-web-ui-design.md)（9 页 + 扫码登录 + 借鉴 go-music-dl 视觉语言），可交互 HTML 原型 `docs/superpowers/specs/2026-10-08-web-ui-prototype.html`（单文件双击即开）
+   - 原型：设计文稿 [2026-10-08-web-ui-design.md](docs/superpowers/specs/2026-10-08-web-ui-design.md)（9 页 + 扫码登录；视觉基线以用户提供的设计稿为准：`docs/superpowers/specs/2026-10-08-web-ui-draft/pages/` 九页 HTML，深青 teal + 顶栏导航 + Tailwind tokens）；可交互 HTML 原型 `docs/superpowers/specs/2026-10-08-web-ui-prototype.html`（单文件双击即开，早期 Vue+Vuetify 验证稿）
    - 分期：P1 后端补能 + 骨架 + 仪表盘/搜索/任务中心 → P2 榜单/专辑/歌单/媒体库 → P3 设置 + 飞牛 + 移动端打磨
    - 借鉴调研：[2026-10-08-go-music-dl-comparison.md](docs/superpowers/specs/2026-10-08-go-music-dl-comparison.md)（含扫码登录设计、镜像瘦身方案）
 

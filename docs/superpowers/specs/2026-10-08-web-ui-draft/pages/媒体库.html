@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>媒体库</title>
+    <style id="theme-vars">
+/* MediaMusicService Design Tokens - free-explore brand prefix: mm */
+:root {
+  /* Brand hue: deep teal-cyan, professional media tool */
+  --mm-brand-50: #effaf9;
+  --mm-brand-100: #d7f2f1;
+  --mm-brand-200: #b0e5e3;
+  --mm-brand-300: #7dd3d0;
+  --mm-brand-400: #44b8b5;
+  --mm-brand-500: #289c9a;
+  --mm-brand-600: #1f7f7e;
+  --mm-brand-700: #1c6665;
+  --mm-brand-800: #1a5252;
+  --mm-brand-900: #194545;
+
+  /* Neutral scale: cool slate */
+  --mm-gray-50: #f8fafc;
+  --mm-gray-100: #f1f5f9;
+  --mm-gray-200: #e2e8f0;
+  --mm-gray-300: #cbd5e1;
+  --mm-gray-400: #94a3b8;
+  --mm-gray-500: #64748b;
+  --mm-gray-600: #475569;
+  --mm-gray-700: #334155;
+  --mm-gray-800: #1e293b;
+  --mm-gray-900: #0f172a;
+
+  /* Semantic aliases required by apply-html-head-contract */
+  --mm-background: var(--mm-gray-50);
+  --mm-foreground: var(--mm-gray-900);
+  --mm-card: #ffffff;
+  --mm-card-foreground: var(--mm-gray-900);
+  --mm-popover: #ffffff;
+  --mm-popover-foreground: var(--mm-gray-900);
+  --mm-primary: var(--mm-brand-600);
+  --mm-primary-foreground: #ffffff;
+  --mm-muted: var(--mm-gray-100);
+  --mm-muted-foreground: var(--mm-gray-500);
+  --mm-border: var(--mm-gray-200);
+  --mm-input: var(--mm-gray-300);
+  --mm-ring: var(--mm-brand-500);
+
+  /* Radius */
+  --mm-radius-sm: 4px;
+  --mm-radius-md: 8px;
+  --mm-radius-lg: 16px;
+
+  /* Shadows */
+  --mm-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --mm-shadow-md: 0 8px 24px -8px rgba(15, 23, 42, 0.12);
+  --mm-shadow-lg: 0 24px 60px -20px rgba(15, 23, 42, 0.18);
+
+  /* State colors (semantic only) */
+  --state-success: #059669;
+  --state-warning: #d97706;
+  --state-error: #dc2626;
+  --state-info: #2563eb;
+
+  /* Typography */
+  --mm-font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --mm-font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--mm-background);
+    --color-foreground: var(--mm-foreground);
+    --color-card: var(--mm-card);
+    --color-card-foreground: var(--mm-card-foreground);
+    --color-popover: var(--mm-popover);
+    --color-popover-foreground: var(--mm-popover-foreground);
+    --color-primary: var(--mm-primary);
+    --color-primary-foreground: var(--mm-primary-foreground);
+    --color-muted: var(--mm-muted);
+    --color-muted-foreground: var(--mm-muted-foreground);
+    --color-border: var(--mm-border);
+    --color-input: var(--mm-input);
+    --color-ring: var(--mm-ring);
+    --radius-sm: var(--mm-radius-sm);
+    --radius-md: var(--mm-radius-md);
+    --radius-lg: var(--mm-radius-lg);
+  }
+  @layer base {
+    body { background: var(--mm-background); color: var(--mm-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--mm-background); }
+      .text-background { color: var(--mm-background); }
+      .border-background { border-color: var(--mm-background); }
+      .ring-background { --tw-ring-color: var(--mm-background); }
+      .bg-foreground { background-color: var(--mm-foreground); }
+      .text-foreground { color: var(--mm-foreground); }
+      .border-foreground { border-color: var(--mm-foreground); }
+      .ring-foreground { --tw-ring-color: var(--mm-foreground); }
+      .bg-card { background-color: var(--mm-card); }
+      .text-card { color: var(--mm-card); }
+      .border-card { border-color: var(--mm-card); }
+      .ring-card { --tw-ring-color: var(--mm-card); }
+      .bg-card-foreground { background-color: var(--mm-card-foreground); }
+      .text-card-foreground { color: var(--mm-card-foreground); }
+      .border-card-foreground { border-color: var(--mm-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--mm-card-foreground); }
+      .bg-popover { background-color: var(--mm-popover); }
+      .text-popover { color: var(--mm-popover); }
+      .border-popover { border-color: var(--mm-popover); }
+      .ring-popover { --tw-ring-color: var(--mm-popover); }
+      .bg-popover-foreground { background-color: var(--mm-popover-foreground); }
+      .text-popover-foreground { color: var(--mm-popover-foreground); }
+      .border-popover-foreground { border-color: var(--mm-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--mm-popover-foreground); }
+      .bg-primary { background-color: var(--mm-primary); }
+      .text-primary { color: var(--mm-primary); }
+      .border-primary { border-color: var(--mm-primary); }
+      .ring-primary { --tw-ring-color: var(--mm-primary); }
+      .bg-primary-foreground { background-color: var(--mm-primary-foreground); }
+      .text-primary-foreground { color: var(--mm-primary-foreground); }
+      .border-primary-foreground { border-color: var(--mm-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--mm-primary-foreground); }
+      .bg-muted { background-color: var(--mm-muted); }
+      .text-muted { color: var(--mm-muted); }
+      .border-muted { border-color: var(--mm-muted); }
+      .ring-muted { --tw-ring-color: var(--mm-muted); }
+      .bg-muted-foreground { background-color: var(--mm-muted-foreground); }
+      .text-muted-foreground { color: var(--mm-muted-foreground); }
+      .border-muted-foreground { border-color: var(--mm-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--mm-muted-foreground); }
+      .bg-border { background-color: var(--mm-border); }
+      .text-border { color: var(--mm-border); }
+      .border-border { border-color: var(--mm-border); }
+      .ring-border { --tw-ring-color: var(--mm-border); }
+      .bg-input { background-color: var(--mm-input); }
+      .text-input { color: var(--mm-input); }
+      .border-input { border-color: var(--mm-input); }
+      .ring-input { --tw-ring-color: var(--mm-input); }
+      .bg-ring { background-color: var(--mm-ring); }
+      .text-ring { color: var(--mm-ring); }
+      .border-ring { border-color: var(--mm-ring); }
+      .ring-ring { --tw-ring-color: var(--mm-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased bg-background text-foreground">
+    <style id="critical-layout">
+      /* Critical layout: stable first paint before runtime CSS */
+      .app-shell-root { min-height: 100vh; display: flex; flex-direction: column; }
+      .op-card { transition: transform 160ms cubic-bezier(.2,.8,.2,1), box-shadow 160ms cubic-bezier(.2,.8,.2,1); }
+      .op-card:hover { transform: translateY(-2px); box-shadow: var(--mm-shadow-md); }
+      .tree-row { transition: background-color 120ms ease; }
+      .tree-row:hover { background-color: var(--mm-muted); }
+      .tree-toggle { transition: transform 160ms cubic-bezier(.2,.8,.2,1); }
+      details[open] > summary .tree-toggle { transform: rotate(90deg); }
+      .op-result { display: none; }
+      .op-card[data-expanded="true"] .op-result { display: block; }
+      input:focus-visible, select:focus-visible, button:focus-visible {
+        outline: 2px solid var(--mm-ring); outline-offset: 1px;
+      }
+    </style>
+
+    <div class="app-shell-root">
+      <!-- ============ Top Navigation ============ -->
+      <nav class="sticky top-0 z-40 bg-card/95 backdrop-blur border-b border-border" data-region="top-nav">
+        <div class="mx-auto max-w-[1440px] px-6 h-16 flex items-center justify-between gap-6">
+          <div class="flex items-center gap-3 shrink-0">
+            <span class="inline-flex items-center justify-center w-9 h-9 rounded-md bg-primary text-primary-foreground">
+              <i data-lucide="library" class="w-5 h-5"></i>
+            </span>
+            <div class="leading-tight">
+              <div class="text-sm font-semibold">MediaMusicService</div>
+              <div class="text-xs text-muted-foreground">媒体库管理控制台</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-1 overflow-x-auto no-scrollbar">
+            <a href="#" data-dom-id="nav-dashboard" data-nav-key="dashboard" class="px-3 h-16 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground whitespace-nowrap">
+              <i data-lucide="layout-dashboard" class="w-4 h-4"></i>概览
+            </a>
+            <a href="#" data-dom-id="nav-search" data-nav-key="search" class="px-3 h-16 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground whitespace-nowrap">
+              <i data-lucide="search" class="w-4 h-4"></i>搜索
+            </a>
+            <a href="#" data-dom-id="nav-playlists" data-nav-key="playlists" class="px-3 h-16 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground whitespace-nowrap">
+              <i data-lucide="list-music" class="w-4 h-4"></i>歌单
+            </a>
+            <a href="#" data-dom-id="nav-charts" data-nav-key="charts" class="px-3 h-16 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground whitespace-nowrap">
+              <i data-lucide="bar-chart-3" class="w-4 h-4"></i>榜单
+            </a>
+            <a href="#" data-dom-id="nav-albums" data-nav-key="albums" class="px-3 h-16 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground whitespace-nowrap">
+              <i data-lucide="disc-3" class="w-4 h-4"></i>专辑
+            </a>
+            <a href="#" data-dom-id="nav-tasks" data-nav-key="tasks" class="px-3 h-16 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground whitespace-nowrap">
+              <i data-lucide="list-checks" class="w-4 h-4"></i>任务
+            </a>
+            <a href="#" data-dom-id="nav-library" data-nav-key="library" class="px-3 h-16 inline-flex items-center gap-1.5 text-sm text-primary border-b-2 border-primary font-medium whitespace-nowrap">
+              <i data-lucide="folder-open" class="w-4 h-4"></i>媒体库
+            </a>
+            <a href="#" data-dom-id="nav-fnos" data-nav-key="fnos" class="px-3 h-16 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground whitespace-nowrap">
+              <i data-lucide="server" class="w-4 h-4"></i>飞牛
+            </a>
+            <a href="#" data-dom-id="nav-settings" data-nav-key="settings" class="px-3 h-16 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground whitespace-nowrap">
+              <i data-lucide="settings" class="w-4 h-4"></i>设置
+            </a>
+          </div>
+        </div>
+      </nav>
+
+      <!-- ============ Content Workspace ============ -->
+      <main class="flex-1">
+        <div class="mx-auto max-w-[1440px] px-6 py-6 flex flex-col gap-6">
+
+          <!-- Library Selector -->
+          <section data-region="library-selector" class="bg-card border border-border rounded-md shadow-sm p-4">
+            <div class="flex flex-wrap items-center gap-4">
+              <div class="flex items-center gap-2">
+                <i data-lucide="database" class="w-5 h-5 text-primary"></i>
+                <h1 class="text-base font-semibold">媒体库</h1>
+              </div>
+              <div class="flex items-center gap-3 flex-1 min-w-[320px]">
+                <label for="library-select" class="text-sm text-muted-foreground shrink-0">当前库</label>
+                <select id="library-select" class="h-9 px-3 rounded-md border border-input bg-card text-sm min-w-[220px]">
+                  <option selected>默认库（default）</option>
+                  <option>单曲库（singles）</option>
+                </select>
+                <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
+                  <i data-lucide="folder" class="w-3.5 h-3.5"></i>
+                  /vol1/1000/media/music
+                </span>
+              </div>
+              <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                <span class="inline-flex items-center gap-1"><i data-lucide="users" class="w-3.5 h-3.5"></i>3 艺人</span>
+                <span class="inline-flex items-center gap-1"><i data-lucide="disc" class="w-3.5 h-3.5"></i>8 专辑</span>
+                <span class="inline-flex items-center gap-1"><i data-lucide="music" class="w-3.5 h-3.5"></i>31 曲目</span>
+                <span class="inline-flex items-center gap-1"><i data-lucide="hard-drive" class="w-3.5 h-3.5"></i>1.24 GB</span>
+              </div>
+            </div>
+          </section>
+
+          <div class="grid grid-cols-1 xl:grid-cols-5 gap-6 items-start">
+
+            <!-- Library Tree -->
+            <section id="library-tree" data-region="library-tree" class="xl:col-span-2 bg-card border border-border rounded-md shadow-sm">
+              <header class="flex items-center justify-between px-4 py-3 border-b border-border">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="folder-tree" class="w-4 h-4 text-primary"></i>
+                  <h2 class="text-sm font-semibold">库结构</h2>
+                </div>
+                <button class="h-8 px-2.5 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground rounded-md hover:bg-muted">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>刷新
+                </button>
+              </header>
+              <div class="p-2 max-h-[560px] overflow-y-auto text-sm">
+
+                <!-- Artist 1 -->
+                <details open class="group">
+                  <summary class="tree-row flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer list-none">
+                    <i data-lucide="chevron-right" class="tree-toggle w-4 h-4 text-muted-foreground"></i>
+                    <i data-lucide="mic-2" class="w-4 h-4 text-primary"></i>
+                    <span class="font-medium">周杰伦</span>
+                    <span class="ml-auto text-xs text-muted-foreground">3 专辑</span>
+                  </summary>
+                  <div class="ml-4 pl-4 border-l border-border flex flex-col gap-0.5 py-1">
+                    <details open>
+                      <summary class="tree-row flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer list-none">
+                        <i data-lucide="chevron-right" class="tree-toggle w-4 h-4 text-muted-foreground"></i>
+                        <i data-lucide="disc-3" class="w-4 h-4 text-muted-foreground"></i>
+                        <span>范特西</span>
+                        <span class="ml-auto text-xs text-muted-foreground">5 曲</span>
+                      </summary>
+                      <div class="ml-4 pl-4 border-l border-border flex flex-col gap-0.5 py-1">
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>01 爱在西元前.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">32.1 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>02 爸我回来了.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">28.6 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>03 简单爱.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">30.4 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>04 忍者.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">27.9 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-image" class="w-4 h-4 text-muted-foreground"></i><span>cover.jpg</span><span class="ml-auto text-xs text-muted-foreground font-mono">1.2 MB</span></div>
+                      </div>
+                    </details>
+                    <details>
+                      <summary class="tree-row flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer list-none">
+                        <i data-lucide="chevron-right" class="tree-toggle w-4 h-4 text-muted-foreground"></i>
+                        <i data-lucide="disc-3" class="w-4 h-4 text-muted-foreground"></i>
+                        <span>叶惠美</span>
+                        <span class="ml-auto text-xs text-muted-foreground">4 曲</span>
+                      </summary>
+                      <div class="ml-4 pl-4 border-l border-border flex flex-col gap-0.5 py-1">
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>01 以父之名.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">41.3 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>02 晴天.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">33.8 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>03 东风破.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">35.2 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>04 你听得到.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">29.7 MB</span></div>
+                      </div>
+                    </details>
+                    <details>
+                      <summary class="tree-row flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer list-none">
+                        <i data-lucide="chevron-right" class="tree-toggle w-4 h-4 text-muted-foreground"></i>
+                        <i data-lucide="disc-3" class="w-4 h-4 text-muted-foreground"></i>
+                        <span>七里香</span>
+                        <span class="ml-auto text-xs text-muted-foreground">3 曲</span>
+                      </summary>
+                      <div class="ml-4 pl-4 border-l border-border flex flex-col gap-0.5 py-1">
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>01 七里香.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">34.5 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>02 借口.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">31.0 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>03 外婆.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">28.3 MB</span></div>
+                      </div>
+                    </details>
+                  </div>
+                </details>
+
+                <!-- Artist 2 -->
+                <details class="group">
+                  <summary class="tree-row flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer list-none">
+                    <i data-lucide="chevron-right" class="tree-toggle w-4 h-4 text-muted-foreground"></i>
+                    <i data-lucide="mic-2" class="w-4 h-4 text-primary"></i>
+                    <span class="font-medium">陈奕迅</span>
+                    <span class="ml-auto text-xs text-muted-foreground">3 专辑</span>
+                  </summary>
+                  <div class="ml-4 pl-4 border-l border-border flex flex-col gap-0.5 py-1">
+                    <details>
+                      <summary class="tree-row flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer list-none">
+                        <i data-lucide="chevron-right" class="tree-toggle w-4 h-4 text-muted-foreground"></i>
+                        <i data-lucide="disc-3" class="w-4 h-4 text-muted-foreground"></i>
+                        <span>U87</span>
+                        <span class="ml-auto text-xs text-muted-foreground">4 曲</span>
+                      </summary>
+                      <div class="ml-4 pl-4 border-l border-border flex flex-col gap-0.5 py-1">
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>01 浮夸.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">36.2 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>02 葡萄成熟时.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">33.1 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>03 夕阳无限好.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">30.8 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>04 三个人的探戈.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">29.4 MB</span></div>
+                      </div>
+                    </details>
+                    <details>
+                      <summary class="tree-row flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer list-none">
+                        <i data-lucide="chevron-right" class="tree-toggle w-4 h-4 text-muted-foreground"></i>
+                        <i data-lucide="disc-3" class="w-4 h-4 text-muted-foreground"></i>
+                        <span>认了吧</span>
+                        <span class="ml-auto text-xs text-muted-foreground">3 曲</span>
+                      </summary>
+                      <div class="ml-4 pl-4 border-l border-border flex flex-col gap-0.5 py-1">
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>01 爱情转移.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">32.7 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>02 好久不见.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">31.5 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>03 红玫瑰.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">33.9 MB</span></div>
+                      </div>
+                    </details>
+                    <details>
+                      <summary class="tree-row flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer list-none">
+                        <i data-lucide="chevron-right" class="tree-toggle w-4 h-4 text-muted-foreground"></i>
+                        <i data-lucide="disc-3" class="w-4 h-4 text-muted-foreground"></i>
+                        <span>不想放手</span>
+                        <span class="ml-auto text-xs text-muted-foreground">3 曲</span>
+                      </summary>
+                      <div class="ml-4 pl-4 border-l border-border flex flex-col gap-0.5 py-1">
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>01 不要说话.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">30.2 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>02 路...一直都在.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">28.8 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-image" class="w-4 h-4 text-muted-foreground"></i><span>cover.jpg</span><span class="ml-auto text-xs text-muted-foreground font-mono">0.9 MB</span></div>
+                      </div>
+                    </details>
+                  </div>
+                </details>
+
+                <!-- Artist 3 -->
+                <details class="group">
+                  <summary class="tree-row flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer list-none">
+                    <i data-lucide="chevron-right" class="tree-toggle w-4 h-4 text-muted-foreground"></i>
+                    <i data-lucide="mic-2" class="w-4 h-4 text-primary"></i>
+                    <span class="font-medium">林俊杰</span>
+                    <span class="ml-auto text-xs text-muted-foreground">2 专辑</span>
+                  </summary>
+                  <div class="ml-4 pl-4 border-l border-border flex flex-col gap-0.5 py-1">
+                    <details>
+                      <summary class="tree-row flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer list-none">
+                        <i data-lucide="chevron-right" class="tree-toggle w-4 h-4 text-muted-foreground"></i>
+                        <i data-lucide="disc-3" class="w-4 h-4 text-muted-foreground"></i>
+                        <span>曹操</span>
+                        <span class="ml-auto text-xs text-muted-foreground">3 曲</span>
+                      </summary>
+                      <div class="ml-4 pl-4 border-l border-border flex flex-col gap-0.5 py-1">
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>01 曹操.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">29.6 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>02 原来.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">31.4 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>03 熟能生巧.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">27.5 MB</span></div>
+                      </div>
+                    </details>
+                    <details>
+                      <summary class="tree-row flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer list-none">
+                        <i data-lucide="chevron-right" class="tree-toggle w-4 h-4 text-muted-foreground"></i>
+                        <i data-lucide="disc-3" class="w-4 h-4 text-muted-foreground"></i>
+                        <span>JJ陆</span>
+                        <span class="ml-auto text-xs text-muted-foreground">3 曲</span>
+                      </summary>
+                      <div class="ml-4 pl-4 border-l border-border flex flex-col gap-0.5 py-1">
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>01 小酒窝.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">26.9 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>02 不潮不用花钱.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">25.8 MB</span></div>
+                        <div class="tree-row flex items-center gap-2 px-2 py-1 rounded-md"><i data-lucide="file-audio" class="w-4 h-4 text-muted-foreground"></i><span>03 醉赤壁.flac</span><span class="ml-auto text-xs text-muted-foreground font-mono">30.1 MB</span></div>
+                      </div>
+                    </details>
+                  </div>
+                </details>
+              </div>
+            </section>
+
+            <!-- Library Operations -->
+            <section data-region="library-operations" class="xl:col-span-3 flex flex-col gap-4">
+              <div class="flex items-center gap-2">
+                <i data-lucide="wrench" class="w-4 h-4 text-primary"></i>
+                <h2 class="text-sm font-semibold">库操作</h2>
+              </div>
+
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+                <!-- Replace Track -->
+                <article class="op-card bg-card border border-border rounded-md shadow-sm" data-dom-id="replace-track">
+                  <header class="px-4 py-3 border-b border-border flex items-center gap-2">
+                    <i data-lucide="repeat" class="w-4 h-4 text-primary"></i>
+                    <h3 class="text-sm font-semibold">替换曲目</h3>
+                  </header>
+                  <div class="p-4 flex flex-col gap-3">
+                    <p class="text-xs text-muted-foreground">重搜替换专辑中指定曲目，音质更高时才替换</p>
+                    <div class="flex flex-col gap-3">
+                      <label class="flex flex-col gap-1"><span class="text-xs font-medium">库</span>
+                        <select class="h-8 px-2 rounded-md border border-input bg-card text-sm"><option>default</option><option>singles</option></select>
+                      </label>
+                      <div class="grid grid-cols-2 gap-3">
+                        <label class="flex flex-col gap-1"><span class="text-xs font-medium">艺人</span>
+                          <input class="h-8 px-2 rounded-md border border-input bg-card text-sm" value="周杰伦"></label>
+                        <label class="flex flex-col gap-1"><span class="text-xs font-medium">专辑</span>
+                          <input class="h-8 px-2 rounded-md border border-input bg-card text-sm" value="范特西"></label>
+                      </div>
+                      <label class="flex flex-col gap-1"><span class="text-xs font-medium">曲目</span>
+                        <input class="h-8 px-2 rounded-md border border-input bg-card text-sm" value="02 爸我回来了"></label>
+                      <label class="flex flex-col gap-1"><span class="text-xs font-medium">音源</span>
+                        <select class="h-8 px-2 rounded-md border border-input bg-card text-sm" multiple size="2">
+                          <option selected>酷我</option><option selected>QQ音乐</option><option>网易云</option>
+                        </select></label>
+                      <div class="grid grid-cols-2 gap-3">
+                        <label class="flex items-center gap-2 h-8"><input type="checkbox" class="accent-[var(--mm-primary)]">
+                          <span class="text-xs font-medium">强制替换</span></label>
+                        <label class="flex flex-col gap-1"><span class="text-xs font-medium">最大体积 (MB)</span>
+                          <input type="number" class="h-8 px-2 rounded-md border border-input bg-card text-sm" value="60"></label>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2 pt-1">
+                      <button class="op-run h-8 px-4 inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90">
+                        <i data-lucide="play" class="w-3.5 h-3.5"></i>执行
+                      </button>
+                    </div>
+                    <div class="op-result rounded-md bg-muted border border-border p-3 text-xs font-mono text-muted-foreground">
+                      [dry-run] 找到候选: 爸我回来了 FLAC 48.2MB &gt; 当前 28.6MB<br>
+                      [ok] 已替换，原文件移至 .trash/
+                    </div>
+                  </div>
+                </article>
+
+                <!-- Cleanup Library -->
+                <article class="op-card bg-card border border-border rounded-md shadow-sm" data-dom-id="cleanup-library">
+                  <header class="px-4 py-3 border-b border-border flex items-center gap-2">
+                    <i data-lucide="trash-2" class="w-4 h-4 text-[var(--state-warning)]"></i>
+                    <h3 class="text-sm font-semibold">清理库</h3>
+                  </header>
+                  <div class="p-4 flex flex-col gap-3">
+                    <p class="text-xs text-muted-foreground">清理媒体库中的专辑/曲目文件，空目录自动清理</p>
+                    <p class="text-xs text-[var(--state-warning)] inline-flex items-start gap-1.5">
+                      <i data-lucide="alert-triangle" class="w-3.5 h-3.5 mt-0.5 shrink-0"></i>
+                      整艺人/整专辑删除不可恢复，需显式确认
+                    </p>
+                    <div class="flex flex-col gap-3">
+                      <label class="flex flex-col gap-1"><span class="text-xs font-medium">库</span>
+                        <select class="h-8 px-2 rounded-md border border-input bg-card text-sm"><option>default</option><option>singles</option></select>
+                      </label>
+                      <div class="grid grid-cols-2 gap-3">
+                        <label class="flex flex-col gap-1"><span class="text-xs font-medium">艺人</span>
+                          <input class="h-8 px-2 rounded-md border border-input bg-card text-sm" placeholder="留空则全库"></label>
+                        <label class="flex flex-col gap-1"><span class="text-xs font-medium">专辑</span>
+                          <input class="h-8 px-2 rounded-md border border-input bg-card text-sm" placeholder="留空则整艺人"></label>
+                      </div>
+                      <label class="flex flex-col gap-1"><span class="text-xs font-medium">曲目（可选）</span>
+                        <input class="h-8 px-2 rounded-md border border-input bg-card text-sm" placeholder="例: 01, 03"></label>
+                      <div class="grid grid-cols-2 gap-3">
+                        <label class="flex items-center gap-2 h-8"><input type="checkbox" checked class="accent-[var(--mm-primary)]">
+                          <span class="text-xs font-medium">试运行 (dry_run)</span></label>
+                        <label class="flex items-center gap-2 h-8"><input type="checkbox" class="accent-[var(--mm-primary)]">
+                          <span class="text-xs font-medium text-[var(--state-error)]">我已确认 (confirm)</span></label>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2 pt-1">
+                      <button class="op-run h-8 px-4 inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90">
+                        <i data-lucide="play" class="w-3.5 h-3.5"></i>执行
+                      </button>
+                    </div>
+                    <div class="op-result rounded-md bg-muted border border-border p-3 text-xs font-mono text-muted-foreground">
+                      [dry-run] 将删除 4 个文件, 释放 142.6MB<br>
+                      [dry-run] 空目录: /vol1/1000/media/music/陈奕迅/认了吧
+                    </div>
+                  </div>
+                </article>
+
+                <!-- Migrate Singles -->
+                <article class="op-card bg-card border border-border rounded-md shadow-sm" data-dom-id="migrate-singles">
+                  <header class="px-4 py-3 border-b border-border flex items-center gap-2">
+                    <i data-lucide="move-right" class="w-4 h-4 text-primary"></i>
+                    <h3 class="text-sm font-semibold">迁移单曲</h3>
+                  </header>
+                  <div class="p-4 flex flex-col gap-3">
+                    <p class="text-xs text-muted-foreground">把只有一个音频文件的专辑目录迁移到 singles 库</p>
+                    <div class="flex flex-col gap-3">
+                      <div class="grid grid-cols-2 gap-3">
+                        <label class="flex flex-col gap-1"><span class="text-xs font-medium">源库</span>
+                          <select class="h-8 px-2 rounded-md border border-input bg-card text-sm"><option>default</option></select></label>
+                        <label class="flex flex-col gap-1"><span class="text-xs font-medium">目标库</span>
+                          <select class="h-8 px-2 rounded-md border border-input bg-card text-sm"><option>singles</option></select></label>
+                      </div>
+                      <label class="flex flex-col gap-1"><span class="text-xs font-medium">艺人（可选）</span>
+                        <input class="h-8 px-2 rounded-md border border-input bg-card text-sm" placeholder="留空则全库扫描"></label>
+                      <label class="flex items-center gap-2 h-8"><input type="checkbox" checked class="accent-[var(--mm-primary)]">
+                        <span class="text-xs font-medium">试运行 (dry_run)</span></label>
+                    </div>
+                    <div class="flex items-center gap-2 pt-1">
+                      <button class="op-run h-8 px-4 inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90">
+                        <i data-lucide="play" class="w-3.5 h-3.5"></i>执行
+                      </button>
+                    </div>
+                    <div class="op-result rounded-md bg-muted border border-border p-3 text-xs font-mono text-muted-foreground">
+                      [dry-run] 扫描到 2 个单曲目录:<br>
+                      &nbsp;&nbsp;林俊杰/她说 (1 音频)<br>
+                      &nbsp;&nbsp;周杰伦/等你下课 (1 音频)
+                    </div>
+                  </div>
+                </article>
+
+                <!-- Backfill Lyrics -->
+                <article class="op-card bg-card border border-border rounded-md shadow-sm" data-dom-id="backfill-lyrics">
+                  <header class="px-4 py-3 border-b border-border flex items-center gap-2">
+                    <i data-lucide="file-text" class="w-4 h-4 text-primary"></i>
+                    <h3 class="text-sm font-semibold">回填歌词</h3>
+                  </header>
+                  <div class="p-4 flex flex-col gap-3">
+                    <p class="text-xs text-muted-foreground">扫描库内无歌词音频，搜索匹配后写同名 .lrc sidecar</p>
+                    <div class="flex flex-col gap-3">
+                      <label class="flex flex-col gap-1"><span class="text-xs font-medium">库</span>
+                        <select class="h-8 px-2 rounded-md border border-input bg-card text-sm"><option>default</option><option>singles</option></select>
+                      </label>
+                      <div class="grid grid-cols-2 gap-3">
+                        <label class="flex flex-col gap-1"><span class="text-xs font-medium">艺人</span>
+                          <input class="h-8 px-2 rounded-md border border-input bg-card text-sm" placeholder="留空则全库"></label>
+                        <label class="flex flex-col gap-1"><span class="text-xs font-medium">专辑</span>
+                          <input class="h-8 px-2 rounded-md border border-input bg-card text-sm" placeholder="留空则整艺人"></label>
+                      </div>
+                      <label class="flex flex-col gap-1"><span class="text-xs font-medium">歌词源</span>
+                        <select class="h-8 px-2 rounded-md border border-input bg-card text-sm" multiple size="2">
+                          <option selected>网易云</option><option selected>QQ音乐</option><option>酷狗</option>
+                        </select></label>
+                      <div class="grid grid-cols-2 gap-3">
+                        <label class="flex flex-col gap-1"><span class="text-xs font-medium">数量上限</span>
+                          <input type="number" class="h-8 px-2 rounded-md border border-input bg-card text-sm" value="50"></label>
+                        <label class="flex items-center gap-2 h-8 mt-4"><input type="checkbox" checked class="accent-[var(--mm-primary)]">
+                          <span class="text-xs font-medium">试运行 (dry_run)</span></label>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2 pt-1">
+                      <button class="op-run h-8 px-4 inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90">
+                        <i data-lucide="play" class="w-3.5 h-3.5"></i>执行
+                      </button>
+                    </div>
+                    <div class="op-result rounded-md bg-muted border border-border p-3 text-xs font-mono text-muted-foreground">
+                      [dry-run] 无歌词音频: 7 首<br>
+                      [dry-run] 命中 6 首, 将写入 6 个 .lrc sidecar
+                    </div>
+                  </div>
+                </article>
+              </div>
+
+              <!-- Maintenance Tools -->
+              <section data-region="maintenance-tools" class="bg-card border border-border rounded-md shadow-sm p-4">
+                <div class="flex items-center gap-2 mb-3">
+                  <i data-lucide="toolbox" class="w-4 h-4 text-primary"></i>
+                  <h2 class="text-sm font-semibold">维护工具</h2>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <button class="h-8 px-3 inline-flex items-center gap-1.5 rounded-md border border-border bg-card text-xs hover:bg-muted">
+                    <i data-lucide="scan-search" class="w-3.5 h-3.5"></i>扫描空目录
+                  </button>
+                  <button class="h-8 px-3 inline-flex items-center gap-1.5 rounded-md border border-border bg-card text-xs hover:bg-muted">
+                    <i data-lucide="badge-check" class="w-3.5 h-3.5"></i>校验封面完整性
+                  </button>
+                  <button class="h-8 px-3 inline-flex items-center gap-1.5 rounded-md border border-border bg-card text-xs hover:bg-muted">
+                    <i data-lucide="file-search" class="w-3.5 h-3.5"></i>查找缺失 album_info.txt
+                  </button>
+                  <button class="h-8 px-3 inline-flex items-center gap-1.5 rounded-md border border-border bg-card text-xs hover:bg-muted">
+                    <i data-lucide="tags" class="w-3.5 h-3.5"></i>重建标签索引
+                  </button>
+                  <button class="h-8 px-3 inline-flex items-center gap-1.5 rounded-md border border-border bg-card text-xs hover:bg-muted">
+                    <i data-lucide="download" class="w-3.5 h-3.5"></i>导出库清单
+                  </button>
+                </div>
+              </section>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      lucide.createIcons();
+      // Micro-interaction: toggle mock result area on 执行 click
+      document.querySelectorAll('.op-run').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var card = btn.closest('.op-card');
+          var expanded = card.getAttribute('data-expanded') === 'true';
+          card.setAttribute('data-expanded', expanded ? 'false' : 'true');
+        });
+      });
+    </script>
+</body>
+</html>

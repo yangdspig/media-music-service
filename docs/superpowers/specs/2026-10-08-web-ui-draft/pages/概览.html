@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>概览</title>
+    <style id="theme-vars">
+/* MediaMusicService Design Tokens - free-explore brand prefix: mm */
+:root {
+  /* Brand hue: deep teal-cyan, professional media tool */
+  --mm-brand-50: #effaf9;
+  --mm-brand-100: #d7f2f1;
+  --mm-brand-200: #b0e5e3;
+  --mm-brand-300: #7dd3d0;
+  --mm-brand-400: #44b8b5;
+  --mm-brand-500: #289c9a;
+  --mm-brand-600: #1f7f7e;
+  --mm-brand-700: #1c6665;
+  --mm-brand-800: #1a5252;
+  --mm-brand-900: #194545;
+
+  /* Neutral scale: cool slate */
+  --mm-gray-50: #f8fafc;
+  --mm-gray-100: #f1f5f9;
+  --mm-gray-200: #e2e8f0;
+  --mm-gray-300: #cbd5e1;
+  --mm-gray-400: #94a3b8;
+  --mm-gray-500: #64748b;
+  --mm-gray-600: #475569;
+  --mm-gray-700: #334155;
+  --mm-gray-800: #1e293b;
+  --mm-gray-900: #0f172a;
+
+  /* Semantic aliases required by apply-html-head-contract */
+  --mm-background: var(--mm-gray-50);
+  --mm-foreground: var(--mm-gray-900);
+  --mm-card: #ffffff;
+  --mm-card-foreground: var(--mm-gray-900);
+  --mm-popover: #ffffff;
+  --mm-popover-foreground: var(--mm-gray-900);
+  --mm-primary: var(--mm-brand-600);
+  --mm-primary-foreground: #ffffff;
+  --mm-muted: var(--mm-gray-100);
+  --mm-muted-foreground: var(--mm-gray-500);
+  --mm-border: var(--mm-gray-200);
+  --mm-input: var(--mm-gray-300);
+  --mm-ring: var(--mm-brand-500);
+
+  /* Radius */
+  --mm-radius-sm: 4px;
+  --mm-radius-md: 8px;
+  --mm-radius-lg: 16px;
+
+  /* Shadows */
+  --mm-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --mm-shadow-md: 0 8px 24px -8px rgba(15, 23, 42, 0.12);
+  --mm-shadow-lg: 0 24px 60px -20px rgba(15, 23, 42, 0.18);
+
+  /* State colors (semantic only) */
+  --state-success: #059669;
+  --state-warning: #d97706;
+  --state-error: #dc2626;
+  --state-info: #2563eb;
+
+  /* Typography */
+  --mm-font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --mm-font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--mm-background);
+    --color-foreground: var(--mm-foreground);
+    --color-card: var(--mm-card);
+    --color-card-foreground: var(--mm-card-foreground);
+    --color-popover: var(--mm-popover);
+    --color-popover-foreground: var(--mm-popover-foreground);
+    --color-primary: var(--mm-primary);
+    --color-primary-foreground: var(--mm-primary-foreground);
+    --color-muted: var(--mm-muted);
+    --color-muted-foreground: var(--mm-muted-foreground);
+    --color-border: var(--mm-border);
+    --color-input: var(--mm-input);
+    --color-ring: var(--mm-ring);
+    --radius-sm: var(--mm-radius-sm);
+    --radius-md: var(--mm-radius-md);
+    --radius-lg: var(--mm-radius-lg);
+  }
+  @layer base {
+    body { background: var(--mm-background); color: var(--mm-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--mm-background); }
+      .text-background { color: var(--mm-background); }
+      .border-background { border-color: var(--mm-background); }
+      .ring-background { --tw-ring-color: var(--mm-background); }
+      .bg-foreground { background-color: var(--mm-foreground); }
+      .text-foreground { color: var(--mm-foreground); }
+      .border-foreground { border-color: var(--mm-foreground); }
+      .ring-foreground { --tw-ring-color: var(--mm-foreground); }
+      .bg-card { background-color: var(--mm-card); }
+      .text-card { color: var(--mm-card); }
+      .border-card { border-color: var(--mm-card); }
+      .ring-card { --tw-ring-color: var(--mm-card); }
+      .bg-card-foreground { background-color: var(--mm-card-foreground); }
+      .text-card-foreground { color: var(--mm-card-foreground); }
+      .border-card-foreground { border-color: var(--mm-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--mm-card-foreground); }
+      .bg-popover { background-color: var(--mm-popover); }
+      .text-popover { color: var(--mm-popover); }
+      .border-popover { border-color: var(--mm-popover); }
+      .ring-popover { --tw-ring-color: var(--mm-popover); }
+      .bg-popover-foreground { background-color: var(--mm-popover-foreground); }
+      .text-popover-foreground { color: var(--mm-popover-foreground); }
+      .border-popover-foreground { border-color: var(--mm-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--mm-popover-foreground); }
+      .bg-primary { background-color: var(--mm-primary); }
+      .text-primary { color: var(--mm-primary); }
+      .border-primary { border-color: var(--mm-primary); }
+      .ring-primary { --tw-ring-color: var(--mm-primary); }
+      .bg-primary-foreground { background-color: var(--mm-primary-foreground); }
+      .text-primary-foreground { color: var(--mm-primary-foreground); }
+      .border-primary-foreground { border-color: var(--mm-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--mm-primary-foreground); }
+      .bg-muted { background-color: var(--mm-muted); }
+      .text-muted { color: var(--mm-muted); }
+      .border-muted { border-color: var(--mm-muted); }
+      .ring-muted { --tw-ring-color: var(--mm-muted); }
+      .bg-muted-foreground { background-color: var(--mm-muted-foreground); }
+      .text-muted-foreground { color: var(--mm-muted-foreground); }
+      .border-muted-foreground { border-color: var(--mm-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--mm-muted-foreground); }
+      .bg-border { background-color: var(--mm-border); }
+      .text-border { color: var(--mm-border); }
+      .border-border { border-color: var(--mm-border); }
+      .ring-border { --tw-ring-color: var(--mm-border); }
+      .bg-input { background-color: var(--mm-input); }
+      .text-input { color: var(--mm-input); }
+      .border-input { border-color: var(--mm-input); }
+      .ring-input { --tw-ring-color: var(--mm-input); }
+      .bg-ring { background-color: var(--mm-ring); }
+      .text-ring { color: var(--mm-ring); }
+      .border-ring { border-color: var(--mm-ring); }
+      .ring-ring { --tw-ring-color: var(--mm-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased bg-background text-foreground">
+    <style>
+      .app-shell-root { min-height: 100vh; display: flex; flex-direction: column; }
+      .app-shell-main { flex: 1; width: 100%; max-width: 1400px; margin: 0 auto; padding: 24px; }
+      .top-nav { position: sticky; top: 0; z-index: 40; height: 64px; background-color: rgba(255,255,255,0.95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--mm-border); }
+      .kpi-card { transition: transform 160ms cubic-bezier(.2,.8,.2,1), box-shadow 160ms cubic-bezier(.2,.8,.2,1); }
+      .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--mm-shadow-md); }
+      .source-chip { transition: border-color 160ms cubic-bezier(.2,.8,.2,1), background-color 160ms cubic-bezier(.2,.8,.2,1); }
+      .source-chip:hover { border-color: var(--mm-brand-400); background-color: var(--mm-brand-50); }
+      .btn-primary { background-color: var(--mm-primary); color: var(--mm-primary-foreground); transition: background-color 160ms cubic-bezier(.2,.8,.2,1); }
+      .btn-primary:hover { background-color: var(--mm-brand-700); }
+      .btn-secondary { background-color: var(--mm-muted); color: var(--mm-foreground); transition: background-color 160ms cubic-bezier(.2,.8,.2,1); }
+      .btn-secondary:hover { background-color: var(--mm-gray-200); }
+      .btn-outline { border: 1px solid var(--mm-border); background-color: var(--mm-card); color: var(--mm-foreground); transition: border-color 160ms cubic-bezier(.2,.8,.2,1), background-color 160ms cubic-bezier(.2,.8,.2,1); }
+      .btn-outline:hover { border-color: var(--mm-brand-400); background-color: var(--mm-brand-50); }
+      .status-dot { width: 8px; height: 8px; border-radius: 9999px; display: inline-block; }
+      .status-dot--on { background-color: var(--state-success); }
+      .status-dot--off { background-color: var(--mm-gray-400); }
+      .task-status { padding: 2px 8px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
+      .task-status--running { background-color: var(--mm-brand-100); color: var(--mm-brand-700); }
+      .task-status--success { background-color: var(--mm-gray-100); color: var(--mm-gray-700); }
+      .task-status--failed { background-color: var(--mm-gray-100); color: var(--state-error); }
+      .task-status--pending { background-color: var(--mm-gray-100); color: var(--mm-gray-500); }
+      .progress-bar { height: 6px; border-radius: 9999px; background-color: var(--mm-gray-200); overflow: hidden; }
+      .progress-bar-fill { height: 100%; border-radius: 9999px; background-color: var(--mm-primary); transition: width 200ms ease; }
+      .nav-link { display: inline-flex; align-items: center; height: 64px; padding: 0 12px; font-size: 14px; border-bottom: 2px solid transparent; transition: color 160ms cubic-bezier(.2,.8,.2,1), border-color 160ms cubic-bezier(.2,.8,.2,1); }
+      .nav-link:hover { color: var(--mm-foreground); }
+      .nav-link--active { color: var(--mm-primary); border-bottom-color: var(--mm-primary); font-weight: 500; }
+      .nav-link--inactive { color: var(--mm-muted-foreground); }
+      .table-row-hover:hover { background-color: var(--mm-muted); }
+    </style>
+    <div class="app-shell-root">
+      <nav class="top-nav" aria-label="主导航">
+        <div class="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-6">
+          <div class="flex items-center gap-6">
+            <a href="#" class="flex items-center gap-2 text-lg font-semibold text-foreground">
+              <i data-lucide="music-4" class="h-5 w-5 text-primary"></i>
+              <span>MediaMusicService</span>
+            </a>
+            <div class="hidden items-center gap-1 md:flex">
+              <a href="#" data-dom-id="nav-dashboard" data-nav-key="dashboard" class="nav-link nav-link--active">概览</a>
+              <a href="#" data-dom-id="nav-search" data-nav-key="search" class="nav-link nav-link--inactive">搜索</a>
+              <a href="#" data-dom-id="nav-playlists" data-nav-key="playlists" class="nav-link nav-link--inactive">歌单</a>
+              <a href="#" data-dom-id="nav-charts" data-nav-key="charts" class="nav-link nav-link--inactive">榜单</a>
+              <a href="#" data-dom-id="nav-albums" data-nav-key="albums" class="nav-link nav-link--inactive">专辑</a>
+              <a href="#" data-dom-id="nav-tasks" data-nav-key="tasks" class="nav-link nav-link--inactive">任务</a>
+              <a href="#" data-dom-id="nav-library" data-nav-key="library" class="nav-link nav-link--inactive">媒体库</a>
+              <a href="#" data-dom-id="nav-fnos" data-nav-key="fnos" class="nav-link nav-link--inactive">飞牛</a>
+              <a href="#" data-dom-id="nav-settings" data-nav-key="settings" class="nav-link nav-link--inactive">设置</a>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-sm text-muted-foreground">v2.4.1</span>
+            <button class="btn-outline flex h-9 w-9 items-center justify-center rounded-md" aria-label="通知">
+              <i data-lucide="bell" class="h-4 w-4"></i>
+            </button>
+          </div>
+        </div>
+      </nav>
+      <main class="app-shell-main">
+        <div class="mb-6 flex items-center justify-between">
+          <div>
+            <h1 class="text-2xl font-semibold text-foreground">概览</h1>
+            <p class="mt-1 text-sm text-muted-foreground">系统运行状态与最近任务总览</p>
+          </div>
+          <button class="btn-primary flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium">
+            <i data-lucide="refresh-cw" class="h-4 w-4"></i>
+            刷新状态
+          </button>
+        </div>
+
+        <!-- Stats Row -->
+        <section class="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4" aria-label="统计指标">
+          <div class="kpi-card rounded-lg border border-border bg-card p-5 shadow-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-muted-foreground">可用源数量</span>
+              <i data-lucide="radio-tower" class="h-4 w-4 text-muted-foreground"></i>
+            </div>
+            <div class="mt-2 flex items-baseline gap-2">
+              <span class="text-2xl font-semibold text-foreground">42</span>
+              <span class="text-sm text-muted-foreground">/ 54</span>
+            </div>
+            <p class="mt-1 text-xs text-muted-foreground">覆盖 78% 的音乐源</p>
+          </div>
+          <div class="kpi-card rounded-lg border border-border bg-card p-5 shadow-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-muted-foreground">进行中任务</span>
+              <i data-lucide="loader-2" class="h-4 w-4 text-muted-foreground"></i>
+            </div>
+            <div class="mt-2 flex items-baseline gap-2">
+              <span class="text-2xl font-semibold text-foreground">7</span>
+              <span class="text-sm text-muted-foreground">个任务</span>
+            </div>
+            <p class="mt-1 text-xs text-muted-foreground">3 个下载中，4 个排队</p>
+          </div>
+          <div class="kpi-card rounded-lg border border-border bg-card p-5 shadow-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-muted-foreground">今日下载</span>
+              <i data-lucide="download" class="h-4 w-4 text-muted-foreground"></i>
+            </div>
+            <div class="mt-2 flex items-baseline gap-2">
+              <span class="text-2xl font-semibold text-foreground">128</span>
+              <span class="text-sm text-muted-foreground">首</span>
+            </div>
+            <p class="mt-1 text-xs text-muted-foreground">较昨日 +12%</p>
+          </div>
+          <div class="kpi-card rounded-lg border border-border bg-card p-5 shadow-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-muted-foreground">媒体库占用</span>
+              <i data-lucide="hard-drive" class="h-4 w-4 text-muted-foreground"></i>
+            </div>
+            <div class="mt-2 flex items-baseline gap-2">
+              <span class="text-2xl font-semibold text-foreground">1.8</span>
+              <span class="text-sm text-muted-foreground">TB</span>
+            </div>
+            <p class="mt-1 text-xs text-muted-foreground">已用 62%，剩余 1.1 TB</p>
+          </div>
+        </section>
+
+        <!-- Source Status Grid -->
+        <section class="mb-6 rounded-lg border border-border bg-card p-5 shadow-sm" aria-label="源状态">
+          <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-lg font-medium text-foreground">源状态</h2>
+            <button class="btn-secondary flex items-center gap-2 rounded-md px-3 py-1.5 text-sm">
+              <i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i>
+              刷新状态
+            </button>
+          </div>
+          <div id="source-status-grid" class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+            <!-- China -->
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">网易云音乐</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">QQ音乐</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">酷狗音乐</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">酷我音乐</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">咪咕音乐</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">千千音乐</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">汽水音乐</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--off"></span>
+              <span class="truncate text-sm text-muted-foreground">5sing</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">喜马拉雅</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">荔枝FM</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--off"></span>
+              <span class="truncate text-sm text-muted-foreground">蜻蜓FM</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">猫耳FM</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">豆瓣FM</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--off"></span>
+              <span class="truncate text-sm text-muted-foreground">音悦台</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">B站音频</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">全民K歌</span>
+            </div>
+            <!-- Global -->
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">Spotify</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">Apple Music</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">YouTube Music</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--off"></span>
+              <span class="truncate text-sm text-muted-foreground">Tidal</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">Deezer</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">Amazon Music</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--off"></span>
+              <span class="truncate text-sm text-muted-foreground">Pandora</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">SoundCloud</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">Last.fm</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--off"></span>
+              <span class="truncate text-sm text-muted-foreground">Qobuz</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">Napster</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">Audiomack</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--off"></span>
+              <span class="truncate text-sm text-muted-foreground">Bandcamp</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">Genius</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">Musixmatch</span>
+            </div>
+            <!-- Audiobook -->
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">懒人听书</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">番茄畅听</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--off"></span>
+              <span class="truncate text-sm text-muted-foreground">微信听书</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">得到</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">十点读书</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--off"></span>
+              <span class="truncate text-sm text-muted-foreground">樊登读书</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">Audible</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">Storytel</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--off"></span>
+              <span class="truncate text-sm text-muted-foreground">LibriVox</span>
+            </div>
+            <!-- Aggregator -->
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">音乐搜索器</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">Listen1</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">洛雪音乐</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--off"></span>
+              <span class="truncate text-sm text-muted-foreground">YesPlayMusic</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">MusicFree</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">歌词适配</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--off"></span>
+              <span class="truncate text-sm text-muted-foreground">MyFreeMP3</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">音乐解锁</span>
+            </div>
+            <!-- Third-party -->
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">音源A</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">音源B</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--off"></span>
+              <span class="truncate text-sm text-muted-foreground">音源C</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">音源D</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--on"></span>
+              <span class="truncate text-sm">音源E</span>
+            </div>
+            <div class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2">
+              <span class="status-dot status-dot--off"></span>
+              <span class="truncate text-sm text-muted-foreground">音源F</span>
+            </div>
+          </div>
+          <p class="mt-4 text-xs text-muted-foreground">共 54 个源，42 个可用，12 个不可用。不可用源已自动降级或移除。</p>
+        </section>
+
+        <!-- Recent Tasks -->
+        <section class="mb-6 rounded-lg border border-border bg-card p-5 shadow-sm" aria-label="最近任务">
+          <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-lg font-medium text-foreground">最近任务</h2>
+            <a href="#" class="text-sm text-primary hover:underline">查看全部</a>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead>
+                <tr class="border-b border-border text-muted-foreground">
+                  <th class="pb-3 pr-4 font-medium">任务ID</th>
+                  <th class="pb-3 pr-4 font-medium">类型</th>
+                  <th class="pb-3 pr-4 font-medium">内容</th>
+                  <th class="pb-3 pr-4 font-medium">状态</th>
+                  <th class="pb-3 pr-4 font-medium">进度</th>
+                  <th class="pb-3 font-medium">创建时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="table-row-hover border-b border-border">
+                  <td class="py-3 pr-4 font-mono text-xs">task_20261008_001</td>
+                  <td class="py-3 pr-4">单曲下载</td>
+                  <td class="py-3 pr-4">周杰伦 - 晴天</td>
+                  <td class="py-3 pr-4"><span class="task-status task-status--running">下载中</span></td>
+                  <td class="py-3 pr-4">
+                    <div class="flex items-center gap-2">
+                      <div class="progress-bar w-24"><div class="progress-bar-fill" style="width: 68%"></div></div>
+                      <span class="text-xs text-muted-foreground">68%</span>
+                    </div>
+                  </td>
+                  <td class="py-3 text-muted-foreground">10:23:41</td>
+                </tr>
+                <tr class="table-row-hover border-b border-border">
+                  <td class="py-3 pr-4 font-mono text-xs">task_20261008_002</td>
+                  <td class="py-3 pr-4">专辑下载</td>
+                  <td class="py-3 pr-4">林俊杰 - 伟大的渺小</td>
+                  <td class="py-3 pr-4"><span class="task-status task-status--pending">排队中</span></td>
+                  <td class="py-3 pr-4">
+                    <div class="flex items-center gap-2">
+                      <div class="progress-bar w-24"><div class="progress-bar-fill" style="width: 0%"></div></div>
+                      <span class="text-xs text-muted-foreground">0%</span>
+                    </div>
+                  </td>
+                  <td class="py-3 text-muted-foreground">10:21:15</td>
+                </tr>
+                <tr class="table-row-hover border-b border-border">
+                  <td class="py-3 pr-4 font-mono text-xs">task_20261008_003</td>
+                  <td class="py-3 pr-4">歌单解析</td>
+                  <td class="py-3 pr-4">华语经典流行 100 首</td>
+                  <td class="py-3 pr-4"><span class="task-status task-status--success">已完成</span></td>
+                  <td class="py-3 pr-4">
+                    <div class="flex items-center gap-2">
+                      <div class="progress-bar w-24"><div class="progress-bar-fill" style="width: 100%"></div></div>
+                      <span class="text-xs text-muted-foreground">100%</span>
+                    </div>
+                  </td>
+                  <td class="py-3 text-muted-foreground">10:15:02</td>
+                </tr>
+                <tr class="table-row-hover border-b border-border">
+                  <td class="py-3 pr-4 font-mono text-xs">task_20261008_004</td>
+                  <td class="py-3 pr-4">单曲下载</td>
+                  <td class="py-3 pr-4">王菲 - 红豆</td>
+                  <td class="py-3 pr-4"><span class="task-status task-status--failed">失败</span></td>
+                  <td class="py-3 pr-4">
+                    <div class="flex items-center gap-2">
+                      <div class="progress-bar w-24"><div class="progress-bar-fill" style="width: 34%"></div></div>
+                      <span class="text-xs text-muted-foreground">34%</span>
+                    </div>
+                  </td>
+                  <td class="py-3 text-muted-foreground">10:08:47</td>
+                </tr>
+                <tr class="table-row-hover border-b border-border">
+                  <td class="py-3 pr-4 font-mono text-xs">task_20261008_005</td>
+                  <td class="py-3 pr-4">媒体库归档</td>
+                  <td class="py-3 pr-4">2025 华语新碟合集</td>
+                  <td class="py-3 pr-4"><span class="task-status task-status--running">运行中</span></td>
+                  <td class="py-3 pr-4">
+                    <div class="flex items-center gap-2">
+                      <div class="progress-bar w-24"><div class="progress-bar-fill" style="width: 45%"></div></div>
+                      <span class="text-xs text-muted-foreground">45%</span>
+                    </div>
+                  </td>
+                  <td class="py-3 text-muted-foreground">09:52:30</td>
+                </tr>
+                <tr class="table-row-hover border-b border-border">
+                  <td class="py-3 pr-4 font-mono text-xs">task_20261008_006</td>
+                  <td class="py-3 pr-4">单曲下载</td>
+                  <td class="py-3 pr-4">陈奕迅 - 富士山下</td>
+                  <td class="py-3 pr-4"><span class="task-status task-status--success">已完成</span></td>
+                  <td class="py-3 pr-4">
+                    <div class="flex items-center gap-2">
+                      <div class="progress-bar w-24"><div class="progress-bar-fill" style="width: 100%"></div></div>
+                      <span class="text-xs text-muted-foreground">100%</span>
+                    </div>
+                  </td>
+                  <td class="py-3 text-muted-foreground">09:41:12</td>
+                </tr>
+                <tr class="table-row-hover border-b border-border">
+                  <td class="py-3 pr-4 font-mono text-xs">task_20261008_007</td>
+                  <td class="py-3 pr-4">专辑下载</td>
+                  <td class="py-3 pr-4">孙燕姿 - 逆光</td>
+                  <td class="py-3 pr-4"><span class="task-status task-status--success">已完成</span></td>
+                  <td class="py-3 pr-4">
+                    <div class="flex items-center gap-2">
+                      <div class="progress-bar w-24"><div class="progress-bar-fill" style="width: 100%"></div></div>
+                      <span class="text-xs text-muted-foreground">100%</span>
+                    </div>
+                  </td>
+                  <td class="py-3 text-muted-foreground">09:30:05</td>
+                </tr>
+                <tr class="table-row-hover">
+                  <td class="py-3 pr-4 font-mono text-xs">task_20261008_008</td>
+                  <td class="py-3 pr-4">飞牛同步</td>
+                  <td class="py-3 pr-4">每日推荐歌单同步</td>
+                  <td class="py-3 pr-4"><span class="task-status task-status--pending">排队中</span></td>
+                  <td class="py-3 pr-4">
+                    <div class="flex items-center gap-2">
+                      <div class="progress-bar w-24"><div class="progress-bar-fill" style="width: 0%"></div></div>
+                      <span class="text-xs text-muted-foreground">0%</span>
+                    </div>
+                  </td>
+                  <td class="py-3 text-muted-foreground">09:12:44</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Quick Actions -->
+        <section class="rounded-lg border border-border bg-card p-5 shadow-sm" aria-label="快捷操作">
+          <h2 class="mb-4 text-lg font-medium text-foreground">快捷操作</h2>
+          <div class="flex flex-wrap gap-3">
+            <button class="btn-primary flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium">
+              <i data-lucide="search" class="h-4 w-4"></i>
+              快速搜索
+            </button>
+            <button class="btn-secondary flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium">
+              <i data-lucide="list-music" class="h-4 w-4"></i>
+              解析歌单
+            </button>
+            <button class="btn-secondary flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium">
+              <i data-lucide="bar-chart-3" class="h-4 w-4"></i>
+              查看榜单
+            </button>
+            <button class="btn-secondary flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium">
+              <i data-lucide="settings" class="h-4 w-4"></i>
+              系统设置
+            </button>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

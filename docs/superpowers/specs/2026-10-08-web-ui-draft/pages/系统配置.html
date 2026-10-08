@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统配置</title>
+    <style id="theme-vars">
+/* MediaMusicService Design Tokens - free-explore brand prefix: mm */
+:root {
+  /* Brand hue: deep teal-cyan, professional media tool */
+  --mm-brand-50: #effaf9;
+  --mm-brand-100: #d7f2f1;
+  --mm-brand-200: #b0e5e3;
+  --mm-brand-300: #7dd3d0;
+  --mm-brand-400: #44b8b5;
+  --mm-brand-500: #289c9a;
+  --mm-brand-600: #1f7f7e;
+  --mm-brand-700: #1c6665;
+  --mm-brand-800: #1a5252;
+  --mm-brand-900: #194545;
+
+  /* Neutral scale: cool slate */
+  --mm-gray-50: #f8fafc;
+  --mm-gray-100: #f1f5f9;
+  --mm-gray-200: #e2e8f0;
+  --mm-gray-300: #cbd5e1;
+  --mm-gray-400: #94a3b8;
+  --mm-gray-500: #64748b;
+  --mm-gray-600: #475569;
+  --mm-gray-700: #334155;
+  --mm-gray-800: #1e293b;
+  --mm-gray-900: #0f172a;
+
+  /* Semantic aliases required by apply-html-head-contract */
+  --mm-background: var(--mm-gray-50);
+  --mm-foreground: var(--mm-gray-900);
+  --mm-card: #ffffff;
+  --mm-card-foreground: var(--mm-gray-900);
+  --mm-popover: #ffffff;
+  --mm-popover-foreground: var(--mm-gray-900);
+  --mm-primary: var(--mm-brand-600);
+  --mm-primary-foreground: #ffffff;
+  --mm-muted: var(--mm-gray-100);
+  --mm-muted-foreground: var(--mm-gray-500);
+  --mm-border: var(--mm-gray-200);
+  --mm-input: var(--mm-gray-300);
+  --mm-ring: var(--mm-brand-500);
+
+  /* Radius */
+  --mm-radius-sm: 4px;
+  --mm-radius-md: 8px;
+  --mm-radius-lg: 16px;
+
+  /* Shadows */
+  --mm-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --mm-shadow-md: 0 8px 24px -8px rgba(15, 23, 42, 0.12);
+  --mm-shadow-lg: 0 24px 60px -20px rgba(15, 23, 42, 0.18);
+
+  /* State colors (semantic only) */
+  --state-success: #059669;
+  --state-warning: #d97706;
+  --state-error: #dc2626;
+  --state-info: #2563eb;
+
+  /* Typography */
+  --mm-font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --mm-font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--mm-background);
+    --color-foreground: var(--mm-foreground);
+    --color-card: var(--mm-card);
+    --color-card-foreground: var(--mm-card-foreground);
+    --color-popover: var(--mm-popover);
+    --color-popover-foreground: var(--mm-popover-foreground);
+    --color-primary: var(--mm-primary);
+    --color-primary-foreground: var(--mm-primary-foreground);
+    --color-muted: var(--mm-muted);
+    --color-muted-foreground: var(--mm-muted-foreground);
+    --color-border: var(--mm-border);
+    --color-input: var(--mm-input);
+    --color-ring: var(--mm-ring);
+    --radius-sm: var(--mm-radius-sm);
+    --radius-md: var(--mm-radius-md);
+    --radius-lg: var(--mm-radius-lg);
+  }
+  @layer base {
+    body { background: var(--mm-background); color: var(--mm-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--mm-background); }
+      .text-background { color: var(--mm-background); }
+      .border-background { border-color: var(--mm-background); }
+      .ring-background { --tw-ring-color: var(--mm-background); }
+      .bg-foreground { background-color: var(--mm-foreground); }
+      .text-foreground { color: var(--mm-foreground); }
+      .border-foreground { border-color: var(--mm-foreground); }
+      .ring-foreground { --tw-ring-color: var(--mm-foreground); }
+      .bg-card { background-color: var(--mm-card); }
+      .text-card { color: var(--mm-card); }
+      .border-card { border-color: var(--mm-card); }
+      .ring-card { --tw-ring-color: var(--mm-card); }
+      .bg-card-foreground { background-color: var(--mm-card-foreground); }
+      .text-card-foreground { color: var(--mm-card-foreground); }
+      .border-card-foreground { border-color: var(--mm-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--mm-card-foreground); }
+      .bg-popover { background-color: var(--mm-popover); }
+      .text-popover { color: var(--mm-popover); }
+      .border-popover { border-color: var(--mm-popover); }
+      .ring-popover { --tw-ring-color: var(--mm-popover); }
+      .bg-popover-foreground { background-color: var(--mm-popover-foreground); }
+      .text-popover-foreground { color: var(--mm-popover-foreground); }
+      .border-popover-foreground { border-color: var(--mm-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--mm-popover-foreground); }
+      .bg-primary { background-color: var(--mm-primary); }
+      .text-primary { color: var(--mm-primary); }
+      .border-primary { border-color: var(--mm-primary); }
+      .ring-primary { --tw-ring-color: var(--mm-primary); }
+      .bg-primary-foreground { background-color: var(--mm-primary-foreground); }
+      .text-primary-foreground { color: var(--mm-primary-foreground); }
+      .border-primary-foreground { border-color: var(--mm-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--mm-primary-foreground); }
+      .bg-muted { background-color: var(--mm-muted); }
+      .text-muted { color: var(--mm-muted); }
+      .border-muted { border-color: var(--mm-muted); }
+      .ring-muted { --tw-ring-color: var(--mm-muted); }
+      .bg-muted-foreground { background-color: var(--mm-muted-foreground); }
+      .text-muted-foreground { color: var(--mm-muted-foreground); }
+      .border-muted-foreground { border-color: var(--mm-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--mm-muted-foreground); }
+      .bg-border { background-color: var(--mm-border); }
+      .text-border { color: var(--mm-border); }
+      .border-border { border-color: var(--mm-border); }
+      .ring-border { --tw-ring-color: var(--mm-border); }
+      .bg-input { background-color: var(--mm-input); }
+      .text-input { color: var(--mm-input); }
+      .border-input { border-color: var(--mm-input); }
+      .ring-input { --tw-ring-color: var(--mm-input); }
+      .bg-ring { background-color: var(--mm-ring); }
+      .text-ring { color: var(--mm-ring); }
+      .border-ring { border-color: var(--mm-ring); }
+      .ring-ring { --tw-ring-color: var(--mm-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <style id="critical-layout">
+      body { background: var(--mm-background); color: var(--mm-foreground); }
+      .app-shell { min-height: 100vh; display: flex; flex-direction: column; }
+      .workspace { max-width: 1200px; width: 100%; margin: 0 auto; padding: 24px 32px 120px; }
+      .field-input {
+        width: 100%; height: 36px; padding: 0 12px;
+        background: var(--mm-card); border: 1px solid var(--mm-border);
+        border-radius: var(--mm-radius-md); font-size: 13px; color: var(--mm-foreground);
+        outline: none; transition: border-color 160ms cubic-bezier(.2,.8,.2,1), box-shadow 160ms cubic-bezier(.2,.8,.2,1);
+      }
+      .field-input:focus { border-color: var(--mm-ring); box-shadow: 0 0 0 3px rgba(40,156,154,.15); }
+      textarea.field-input { height: auto; padding: 8px 12px; resize: vertical; }
+      .section-card {
+        background: var(--mm-card); border: 1px solid var(--mm-border);
+        border-radius: var(--mm-radius-lg); box-shadow: var(--mm-shadow-sm);
+        transition: border-color 160ms cubic-bezier(.2,.8,.2,1), box-shadow 160ms cubic-bezier(.2,.8,.2,1);
+      }
+      .section-card:hover { border-color: var(--mm-brand-300); box-shadow: var(--mm-shadow-md); }
+      .chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 4px 12px; border-radius: 9999px; font-size: 12px;
+        border: 1px solid var(--mm-border); background: var(--mm-card);
+        color: var(--mm-muted-foreground); cursor: pointer; user-select: none;
+        transition: all 160ms cubic-bezier(.2,.8,.2,1);
+      }
+      .chip[data-checked="true"] {
+        background: var(--mm-brand-50); border-color: var(--mm-brand-500); color: var(--mm-brand-700);
+      }
+      .toggle { position: relative; width: 40px; height: 22px; border-radius: 9999px; background: var(--mm-gray-300); cursor: pointer; transition: background 160ms cubic-bezier(.2,.8,.2,1); flex: none; }
+      .toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 160ms cubic-bezier(.2,.8,.2,1); box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+      .toggle[aria-checked="true"] { background: var(--mm-primary); }
+      .toggle[aria-checked="true"]::after { transform: translateX(18px); }
+      .nav-link { display: inline-flex; align-items: center; gap: 6px; height: 64px; padding: 0 14px; font-size: 13px; text-decoration: none; }
+      .status-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+    </style>
+
+    <div class="app-shell">
+      <!-- 顶部导航 -->
+      <nav class="sticky top-0 z-40 bg-card/95 backdrop-blur border-b border-border">
+        <div class="max-w-[1400px] mx-auto px-6 flex items-center justify-between h-16">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
+              <i data-lucide="audio-lines" class="w-4 h-4 text-primary-foreground"></i>
+            </div>
+            <span class="font-semibold text-sm tracking-tight">MediaMusicService</span>
+            <span class="text-xs text-muted-foreground border border-border rounded-sm px-1.5 py-0.5 ml-1">Admin</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <a href="dashboard.html" class="nav-link text-muted-foreground hover:text-foreground" data-dom-id="nav-dashboard" data-nav-key="dashboard"><i data-lucide="layout-dashboard" class="w-4 h-4"></i>概览</a>
+            <a href="search.html" class="nav-link text-muted-foreground hover:text-foreground" data-dom-id="nav-search" data-nav-key="search"><i data-lucide="search" class="w-4 h-4"></i>搜索</a>
+            <a href="playlists.html" class="nav-link text-muted-foreground hover:text-foreground" data-dom-id="nav-playlists" data-nav-key="playlists"><i data-lucide="list-music" class="w-4 h-4"></i>歌单</a>
+            <a href="charts.html" class="nav-link text-muted-foreground hover:text-foreground" data-dom-id="nav-charts" data-nav-key="charts"><i data-lucide="bar-chart-3" class="w-4 h-4"></i>榜单</a>
+            <a href="albums.html" class="nav-link text-muted-foreground hover:text-foreground" data-dom-id="nav-albums" data-nav-key="albums"><i data-lucide="disc-3" class="w-4 h-4"></i>专辑</a>
+            <a href="tasks.html" class="nav-link text-muted-foreground hover:text-foreground" data-dom-id="nav-tasks" data-nav-key="tasks"><i data-lucide="list-checks" class="w-4 h-4"></i>任务</a>
+            <a href="library.html" class="nav-link text-muted-foreground hover:text-foreground" data-dom-id="nav-library" data-nav-key="library"><i data-lucide="library" class="w-4 h-4"></i>媒体库</a>
+            <a href="fnos.html" class="nav-link text-muted-foreground hover:text-foreground" data-dom-id="nav-fnos" data-nav-key="fnos"><i data-lucide="server" class="w-4 h-4"></i>飞牛</a>
+            <a href="settings.html" class="nav-link text-primary border-b-2 border-primary font-medium" data-dom-id="nav-settings" data-nav-key="settings"><i data-lucide="settings" class="w-4 h-4"></i>设置</a>
+          </div>
+        </div>
+      </nav>
+
+      <main class="workspace flex flex-col gap-6">
+        <!-- 页头 -->
+        <header class="flex items-start justify-between">
+          <div>
+            <h1 class="text-xl font-semibold tracking-tight">系统配置</h1>
+            <p class="text-sm text-muted-foreground mt-1">管理 MediaMusicService 的全部运行参数，配置对应 config.yaml。</p>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-muted-foreground bg-card border border-border rounded-md px-3 py-2" style="box-shadow: var(--mm-shadow-sm);">
+            <i data-lucide="file-cog" class="w-4 h-4"></i>
+            <span class="font-mono">/app/config/config.yaml</span>
+            <span class="text-border">|</span>
+            <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+            <span>最后修改 2026-10-08 09:42</span>
+          </div>
+        </header>
+
+        <!-- 警告横幅 -->
+        <div class="flex items-start gap-3 rounded-md border px-4 py-3 text-sm" style="background: rgba(217,119,6,.06); border-color: rgba(217,119,6,.35); color: #92400e;">
+          <i data-lucide="triangle-alert" class="w-4 h-4 mt-0.5 flex-none" style="color: var(--state-warning);"></i>
+          <p>配置修改后需要重启服务才能生效。Docker 部署时所有路径必须填容器内路径。</p>
+        </div>
+
+        <form id="config-form" class="flex flex-col gap-6">
+          <!-- 1. 服务设置 -->
+          <section class="section-card" id="server-config">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-border">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-md flex items-center justify-center" style="background: var(--mm-brand-50); color: var(--mm-brand-700);">
+                  <i data-lucide="server-cog" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h2 class="text-sm font-semibold">服务设置</h2>
+                  <p class="text-xs text-muted-foreground">HTTP 服务监听地址与访问密钥</p>
+                </div>
+              </div>
+              <span class="text-xs text-muted-foreground font-mono">server</span>
+            </div>
+            <div class="p-5 grid grid-cols-2 gap-4">
+              <label class="flex flex-col gap-1.5">
+                <span class="text-xs font-medium text-foreground">监听地址 <span class="text-muted-foreground font-normal">host</span></span>
+                <input class="field-input font-mono" type="text" value="0.0.0.0" />
+              </label>
+              <label class="flex flex-col gap-1.5">
+                <span class="text-xs font-medium text-foreground">端口 <span class="text-muted-foreground font-normal">port</span></span>
+                <input class="field-input font-mono" type="number" value="8848" />
+              </label>
+              <label class="flex flex-col gap-1.5 col-span-2">
+                <span class="text-xs font-medium text-foreground">API 密钥 <span class="text-muted-foreground font-normal">api_key</span></span>
+                <div class="relative">
+                  <input id="api-key-input" class="field-input font-mono pr-10" type="password" value="mms-9f2c7a1e4b8d" />
+                  <button type="button" id="toggle-api-key" class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" aria-label="显示或隐藏密钥">
+                    <i data-lucide="eye" class="w-4 h-4"></i>
+                  </button>
+                </div>
+                <span class="text-xs text-muted-foreground">外部调用 API 时需在请求头携带 X-API-Key。</span>
+              </label>
+            </div>
+          </section>
+
+          <!-- 2. 下载设置 -->
+          <section class="section-card" id="download-config">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-border">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-md flex items-center justify-center" style="background: var(--mm-brand-50); color: var(--mm-brand-700);">
+                  <i data-lucide="download" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h2 class="text-sm font-semibold">下载设置</h2>
+                  <p class="text-xs text-muted-foreground">下载目录、并发与默认音源</p>
+                </div>
+              </div>
+              <span class="text-xs text-muted-foreground font-mono">download_root / num_threads</span>
+            </div>
+            <div class="p-5 grid grid-cols-2 gap-4">
+              <label class="flex flex-col gap-1.5 col-span-2">
+                <span class="text-xs font-medium text-foreground">下载根目录 <span class="text-muted-foreground font-normal">download_root</span></span>
+                <div class="flex gap-2">
+                  <input class="field-input font-mono flex-1" type="text" value="/app/downloads" />
+                  <button type="button" class="field-input flex-none w-auto px-3 flex items-center gap-1.5 text-xs hover:bg-muted"><i data-lucide="folder-open" class="w-3.5 h-3.5"></i>浏览</button>
+                </div>
+              </label>
+              <label class="flex flex-col gap-1.5">
+                <span class="text-xs font-medium text-foreground">并发线程数 <span class="text-muted-foreground font-normal">num_threads</span></span>
+                <input class="field-input font-mono" type="number" value="4" min="1" max="16" />
+              </label>
+              <label class="flex flex-col gap-1.5">
+                <span class="text-xs font-medium text-foreground">单文件大小上限 MB <span class="text-muted-foreground font-normal">max_size_mb</span></span>
+                <input class="field-input font-mono" type="number" value="300" min="1" />
+              </label>
+              <div class="flex flex-col gap-1.5 col-span-2">
+                <span class="text-xs font-medium text-foreground">默认音源 <span class="text-muted-foreground font-normal">default_sources</span></span>
+                <div class="flex flex-wrap gap-2 pt-1">
+                  <button type="button" class="chip" data-checked="true"><i data-lucide="check" class="w-3 h-3"></i>QQ 音乐</button>
+                  <button type="button" class="chip" data-checked="true"><i data-lucide="check" class="w-3 h-3"></i>网易云音乐</button>
+                  <button type="button" class="chip" data-checked="false"><i data-lucide="check" class="w-3 h-3 opacity-0"></i>TIDAL</button>
+                  <button type="button" class="chip" data-checked="false"><i data-lucide="check" class="w-3 h-3 opacity-0"></i>Qobuz</button>
+                  <button type="button" class="chip" data-checked="true"><i data-lucide="check" class="w-3 h-3"></i>酷狗音乐</button>
+                  <button type="button" class="chip" data-checked="false"><i data-lucide="check" class="w-3 h-3 opacity-0"></i>Apple Music</button>
+                </div>
+                <span class="text-xs text-muted-foreground">搜索与下载按勾选顺序依次回退。</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- 3. 媒体库设置 -->
+          <section class="section-card" id="library-config">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-border">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-md flex items-center justify-center" style="background: var(--mm-brand-50); color: var(--mm-brand-700);">
+                  <i data-lucide="library-big" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h2 class="text-sm font-semibold">媒体库设置</h2>
+                  <p class="text-xs text-muted-foreground">整理入库目录与归档策略</p>
+                </div>
+              </div>
+              <span class="text-xs text-muted-foreground font-mono">library_root</span>
+            </div>
+            <div class="p-5 flex flex-col gap-4">
+              <div class="grid grid-cols-2 gap-4">
+                <label class="flex flex-col gap-1.5">
+                  <span class="text-xs font-medium text-foreground">主媒体库目录 <span class="text-muted-foreground font-normal">library_root</span></span>
+                  <input class="field-input font-mono" type="text" value="/app/library" />
+                </label>
+                <label class="flex flex-col gap-1.5">
+                  <span class="text-xs font-medium text-foreground">归档注释 <span class="text-muted-foreground font-normal">archive_comment</span></span>
+                  <input class="field-input" type="text" value="Archived by MediaMusicService" />
+                </label>
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <span class="text-xs font-medium text-foreground">附加媒体库 <span class="text-muted-foreground font-normal">extra_library_roots</span></span>
+                <div class="flex flex-col gap-2">
+                  <div class="grid grid-cols-[160px_1fr_36px] gap-2 items-center">
+                    <input class="field-input font-mono" type="text" value="nas_music" />
+                    <input class="field-input font-mono" type="text" value="/mnt/nas/music" />
+                    <button type="button" class="w-9 h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                  </div>
+                  <div class="grid grid-cols-[160px_1fr_36px] gap-2 items-center">
+                    <input class="field-input font-mono" type="text" value="usb_hdd" />
+                    <input class="field-input font-mono" type="text" value="/mnt/usb/hdd/music" />
+                    <button type="button" class="w-9 h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                  </div>
+                  <button type="button" class="self-start field-input w-auto px-3 flex items-center gap-1.5 text-xs hover:bg-muted"><i data-lucide="plus" class="w-3.5 h-3.5"></i>添加路径映射</button>
+                </div>
+              </div>
+              <div class="flex items-center justify-between rounded-md border border-border px-4 py-3 bg-muted/50">
+                <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                  <i data-lucide="broom" class="w-4 h-4"></i>
+                  <span>清理规则：下载完成后自动删除临时文件与空目录</span>
+                </div>
+                <button type="button" class="toggle" role="switch" aria-checked="true" aria-label="清理规则开关"></button>
+              </div>
+            </div>
+          </section>
+
+          <!-- 4. 源 Cookies -->
+          <section class="section-card" id="source-config">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-border">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-md flex items-center justify-center" style="background: var(--mm-brand-50); color: var(--mm-brand-700);">
+                  <i data-lucide="cookie" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h2 class="text-sm font-semibold">源 Cookies</h2>
+                  <p class="text-xs text-muted-foreground">各音源客户端的登录态 Cookie</p>
+                </div>
+              </div>
+              <span class="text-xs text-muted-foreground font-mono">sources.*.cookies</span>
+            </div>
+            <div class="p-5 flex flex-col gap-4">
+              <div class="flex flex-col gap-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-medium text-foreground">QQMusicClient</span>
+                  <span class="flex items-center gap-1.5 text-xs" style="color: var(--state-success);"><span class="status-dot" style="background: var(--state-success);"></span>已登录 · VIP</span>
+                </div>
+                <textarea class="field-input font-mono" rows="2">uin=123456789; qm_keyst=Q_H_L_63k3Nf...; euin=oK6k7e6k7enz7n**</textarea>
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-medium text-foreground">NeteaseMusicClient</span>
+                  <span class="flex items-center gap-1.5 text-xs" style="color: var(--state-success);"><span class="status-dot" style="background: var(--state-success);"></span>已登录</span>
+                </div>
+                <textarea class="field-input font-mono" rows="2">MUSIC_U=00c8f4b9a1d2e3...; __csrf=7f3a2b1c</textarea>
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-medium text-foreground">TIDALMusicClient</span>
+                  <span class="flex items-center gap-1.5 text-xs" style="color: var(--state-warning);"><span class="status-dot" style="background: var(--state-warning);"></span>Token 即将过期</span>
+                </div>
+                <textarea class="field-input font-mono" rows="2" placeholder="粘贴 TIDAL access_token / refresh_token"></textarea>
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-medium text-foreground">KuGouMusicClient</span>
+                  <span class="flex items-center gap-1.5 text-xs text-muted-foreground"><span class="status-dot" style="background: var(--mm-gray-300);"></span>未配置</span>
+                </div>
+                <textarea class="field-input font-mono" rows="2" placeholder="粘贴酷狗 Cookie"></textarea>
+              </div>
+            </div>
+          </section>
+
+          <!-- 5. 认证刷新 -->
+          <section class="section-card" id="auth-config">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-border">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-md flex items-center justify-center" style="background: var(--mm-brand-50); color: var(--mm-brand-700);">
+                  <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h2 class="text-sm font-semibold">认证刷新</h2>
+                  <p class="text-xs text-muted-foreground">定时刷新各源登录态，避免 Cookie 过期</p>
+                </div>
+              </div>
+              <span class="text-xs text-muted-foreground font-mono">auth_refresh</span>
+            </div>
+            <div class="p-5 grid grid-cols-2 gap-4">
+              <div class="flex items-center justify-between rounded-md border border-border px-4 py-3">
+                <div>
+                  <div class="text-xs font-medium">启用自动刷新</div>
+                  <div class="text-xs text-muted-foreground">auth_refresh.enabled</div>
+                </div>
+                <button type="button" class="toggle" role="switch" aria-checked="true" aria-label="启用认证自动刷新"></button>
+              </div>
+              <label class="flex flex-col gap-1.5">
+                <span class="text-xs font-medium text-foreground">刷新间隔（秒） <span class="text-muted-foreground font-normal">interval_s</span></span>
+                <input class="field-input font-mono" type="number" value="3600" min="300" />
+              </label>
+            </div>
+          </section>
+
+          <!-- 6. MCP 设置 -->
+          <section class="section-card" id="mcp-config">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-border">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-md flex items-center justify-center" style="background: var(--mm-brand-50); color: var(--mm-brand-700);">
+                  <i data-lucide="bot" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h2 class="text-sm font-semibold">MCP 设置</h2>
+                  <p class="text-xs text-muted-foreground">Model Context Protocol 服务接入</p>
+                </div>
+              </div>
+              <span class="text-xs text-muted-foreground font-mono">mcp</span>
+            </div>
+            <div class="p-5 grid grid-cols-2 gap-4">
+              <div class="flex flex-col gap-1.5">
+                <span class="text-xs font-medium text-foreground">传输方式 <span class="text-muted-foreground font-normal">transport</span></span>
+                <div class="flex gap-2 pt-1">
+                  <button type="button" class="chip" data-checked="false"><i data-lucide="terminal" class="w-3 h-3"></i>stdio</button>
+                  <button type="button" class="chip" data-checked="true"><i data-lucide="globe" class="w-3 h-3"></i>http</button>
+                </div>
+              </div>
+              <label class="flex flex-col gap-1.5">
+                <span class="text-xs font-medium text-foreground">服务地址 <span class="text-muted-foreground font-normal">service_url</span></span>
+                <input class="field-input font-mono" type="text" value="http://127.0.0.1:8848" />
+              </label>
+              <label class="flex flex-col gap-1.5">
+                <span class="text-xs font-medium text-foreground">监听地址 <span class="text-muted-foreground font-normal">host</span></span>
+                <input class="field-input font-mono" type="text" value="0.0.0.0" />
+              </label>
+              <label class="flex flex-col gap-1.5">
+                <span class="text-xs font-medium text-foreground">端口 <span class="text-muted-foreground font-normal">port</span></span>
+                <input class="field-input font-mono" type="number" value="8849" />
+              </label>
+            </div>
+          </section>
+
+          <!-- 7. 飞牛音乐 -->
+          <section class="section-card" id="fnos-config">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-border">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-md flex items-center justify-center" style="background: var(--mm-brand-50); color: var(--mm-brand-700);">
+                  <i data-lucide="hard-drive" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h2 class="text-sm font-semibold">飞牛音乐</h2>
+                  <p class="text-xs text-muted-foreground">fnOS 音乐应用同步与路径映射</p>
+                </div>
+              </div>
+              <span class="text-xs text-muted-foreground font-mono">fnos_music</span>
+            </div>
+            <div class="p-5 flex flex-col gap-4">
+              <div class="grid grid-cols-2 gap-4">
+                <label class="flex flex-col gap-1.5 col-span-2">
+                  <span class="text-xs font-medium text-foreground">服务地址 <span class="text-muted-foreground font-normal">base_url</span></span>
+                  <input class="field-input font-mono" type="text" value="http://192.168.1.10:5666" />
+                </label>
+                <label class="flex flex-col gap-1.5">
+                  <span class="text-xs font-medium text-foreground">用户名 <span class="text-muted-foreground font-normal">username</span></span>
+                  <input class="field-input" type="text" value="admin" />
+                </label>
+                <label class="flex flex-col gap-1.5">
+                  <span class="text-xs font-medium text-foreground">密码 <span class="text-muted-foreground font-normal">password</span></span>
+                  <input class="field-input" type="password" value="••••••••" />
+                </label>
+                <div class="flex items-center justify-between rounded-md border border-border px-4 py-3">
+                  <div>
+                    <div class="text-xs font-medium">校验 TLS 证书</div>
+                    <div class="text-xs text-muted-foreground">verify_tls</div>
+                  </div>
+                  <button type="button" class="toggle" role="switch" aria-checked="false" aria-label="TLS 证书校验开关"></button>
+                </div>
+                <label class="flex flex-col gap-1.5">
+                  <span class="text-xs font-medium text-foreground">扫描等待（秒） <span class="text-muted-foreground font-normal">scan_wait_s</span></span>
+                  <input class="field-input font-mono" type="number" value="60" min="0" />
+                </label>
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <span class="text-xs font-medium text-foreground">路径映射 <span class="text-muted-foreground font-normal">path_map（容器路径 → fnOS 路径）</span></span>
+                <div class="flex flex-col gap-2">
+                  <div class="grid grid-cols-[1fr_1fr_36px] gap-2 items-center">
+                    <input class="field-input font-mono" type="text" value="/app/library" />
+                    <input class="field-input font-mono" type="text" value="/vol1/1000/music" />
+                    <button type="button" class="w-9 h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                  </div>
+                  <button type="button" class="self-start field-input w-auto px-3 flex items-center gap-1.5 text-xs hover:bg-muted"><i data-lucide="plus" class="w-3.5 h-3.5"></i>添加映射</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 操作栏 -->
+          <div id="config-actions" class="sticky bottom-0 z-30 -mx-8 px-8 py-4 border-t border-border" style="background: var(--mm-card); backdrop-filter: blur(8px); box-shadow: 0 -4px 16px -8px rgba(15,23,42,.08);">
+            <div class="max-w-[1136px] mx-auto flex items-center justify-between">
+              <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                <i data-lucide="info" class="w-4 h-4"></i>
+                <span id="dirty-hint">当前配置与文件一致，无未保存修改。</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <button type="button" data-dom-id="test-connection" class="h-9 px-4 rounded-md border border-border bg-card text-sm font-medium hover:bg-muted transition-colors flex items-center gap-2">
+                  <i data-lucide="plug-zap" class="w-4 h-4"></i>测试连接
+                </button>
+                <button type="button" data-dom-id="reset-config" class="h-9 px-4 rounded-md border border-border bg-card text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-2">
+                  <i data-lucide="rotate-ccw" class="w-4 h-4"></i>重置
+                </button>
+                <button type="submit" data-dom-id="save-config" class="h-9 px-5 rounded-md bg-primary text-primary-foreground text-sm font-medium transition-all hover:opacity-90 active:scale-[.98] flex items-center gap-2" style="box-shadow: var(--mm-shadow-sm);">
+                  <i data-lucide="save" class="w-4 h-4"></i>保存配置
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </main>
+    </div>
+
+    <script>
+      lucide.createIcons();
+
+      // 微交互：api_key 显示/隐藏
+      const keyInput = document.getElementById('api-key-input');
+      const keyBtn = document.getElementById('toggle-api-key');
+      keyBtn.addEventListener('click', () => {
+        const showing = keyInput.type === 'text';
+        keyInput.type = showing ? 'password' : 'text';
+        keyBtn.innerHTML = '<i data-lucide="' + (showing ? 'eye' : 'eye-off') + '" class="w-4 h-4"></i>';
+        lucide.createIcons();
+      });
+
+      // 微交互：chip 多选切换
+      document.querySelectorAll('.chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          const checked = chip.dataset.checked === 'true';
+          chip.dataset.checked = checked ? 'false' : 'true';
+          const icon = chip.querySelector('svg');
+          if (icon) icon.style.opacity = checked ? '0' : '1';
+          markDirty();
+        });
+      });
+
+      // 微交互：开关切换
+      document.querySelectorAll('.toggle').forEach(t => {
+        t.addEventListener('click', () => {
+          t.setAttribute('aria-checked', t.getAttribute('aria-checked') === 'true' ? 'false' : 'true');
+          markDirty();
+        });
+      });
+
+      // 脏状态提示
+      const hint = document.getElementById('dirty-hint');
+      function markDirty() {
+        hint.textContent = '存在未保存的修改，保存后需重启服务生效。';
+        hint.parentElement.style.color = 'var(--state-warning)';
+      }
+      document.getElementById('config-form').addEventListener('input', markDirty);
+
+      // 操作反馈
+      document.querySelector('[data-dom-id="test-connection"]').addEventListener('click', function () {
+        const btn = this;
+        const old = btn.innerHTML;
+        btn.innerHTML = '<i data-lucide="loader-circle" class="w-4 h-4 animate-spin"></i>测试中';
+        lucide.createIcons();
+        setTimeout(() => {
+          btn.innerHTML = '<i data-lucide="circle-check" class="w-4 h-4" style="color: var(--state-success);"></i>连接正常';
+          lucide.createIcons();
+          setTimeout(() => { btn.innerHTML = old; lucide.createIcons(); }, 2000);
+        }, 900);
+      });
+    </script>
+</body>
+</html>

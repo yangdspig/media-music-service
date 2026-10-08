@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>专辑管理</title>
+    <style id="theme-vars">
+/* MediaMusicService Design Tokens - free-explore brand prefix: mm */
+:root {
+  /* Brand hue: deep teal-cyan, professional media tool */
+  --mm-brand-50: #effaf9;
+  --mm-brand-100: #d7f2f1;
+  --mm-brand-200: #b0e5e3;
+  --mm-brand-300: #7dd3d0;
+  --mm-brand-400: #44b8b5;
+  --mm-brand-500: #289c9a;
+  --mm-brand-600: #1f7f7e;
+  --mm-brand-700: #1c6665;
+  --mm-brand-800: #1a5252;
+  --mm-brand-900: #194545;
+
+  /* Neutral scale: cool slate */
+  --mm-gray-50: #f8fafc;
+  --mm-gray-100: #f1f5f9;
+  --mm-gray-200: #e2e8f0;
+  --mm-gray-300: #cbd5e1;
+  --mm-gray-400: #94a3b8;
+  --mm-gray-500: #64748b;
+  --mm-gray-600: #475569;
+  --mm-gray-700: #334155;
+  --mm-gray-800: #1e293b;
+  --mm-gray-900: #0f172a;
+
+  /* Semantic aliases required by apply-html-head-contract */
+  --mm-background: var(--mm-gray-50);
+  --mm-foreground: var(--mm-gray-900);
+  --mm-card: #ffffff;
+  --mm-card-foreground: var(--mm-gray-900);
+  --mm-popover: #ffffff;
+  --mm-popover-foreground: var(--mm-gray-900);
+  --mm-primary: var(--mm-brand-600);
+  --mm-primary-foreground: #ffffff;
+  --mm-muted: var(--mm-gray-100);
+  --mm-muted-foreground: var(--mm-gray-500);
+  --mm-border: var(--mm-gray-200);
+  --mm-input: var(--mm-gray-300);
+  --mm-ring: var(--mm-brand-500);
+
+  /* Radius */
+  --mm-radius-sm: 4px;
+  --mm-radius-md: 8px;
+  --mm-radius-lg: 16px;
+
+  /* Shadows */
+  --mm-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --mm-shadow-md: 0 8px 24px -8px rgba(15, 23, 42, 0.12);
+  --mm-shadow-lg: 0 24px 60px -20px rgba(15, 23, 42, 0.18);
+
+  /* State colors (semantic only) */
+  --state-success: #059669;
+  --state-warning: #d97706;
+  --state-error: #dc2626;
+  --state-info: #2563eb;
+
+  /* Typography */
+  --mm-font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --mm-font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--mm-background);
+    --color-foreground: var(--mm-foreground);
+    --color-card: var(--mm-card);
+    --color-card-foreground: var(--mm-card-foreground);
+    --color-popover: var(--mm-popover);
+    --color-popover-foreground: var(--mm-popover-foreground);
+    --color-primary: var(--mm-primary);
+    --color-primary-foreground: var(--mm-primary-foreground);
+    --color-muted: var(--mm-muted);
+    --color-muted-foreground: var(--mm-muted-foreground);
+    --color-border: var(--mm-border);
+    --color-input: var(--mm-input);
+    --color-ring: var(--mm-ring);
+    --radius-sm: var(--mm-radius-sm);
+    --radius-md: var(--mm-radius-md);
+    --radius-lg: var(--mm-radius-lg);
+  }
+  @layer base {
+    body { background: var(--mm-background); color: var(--mm-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--mm-background); }
+      .text-background { color: var(--mm-background); }
+      .border-background { border-color: var(--mm-background); }
+      .ring-background { --tw-ring-color: var(--mm-background); }
+      .bg-foreground { background-color: var(--mm-foreground); }
+      .text-foreground { color: var(--mm-foreground); }
+      .border-foreground { border-color: var(--mm-foreground); }
+      .ring-foreground { --tw-ring-color: var(--mm-foreground); }
+      .bg-card { background-color: var(--mm-card); }
+      .text-card { color: var(--mm-card); }
+      .border-card { border-color: var(--mm-card); }
+      .ring-card { --tw-ring-color: var(--mm-card); }
+      .bg-card-foreground { background-color: var(--mm-card-foreground); }
+      .text-card-foreground { color: var(--mm-card-foreground); }
+      .border-card-foreground { border-color: var(--mm-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--mm-card-foreground); }
+      .bg-popover { background-color: var(--mm-popover); }
+      .text-popover { color: var(--mm-popover); }
+      .border-popover { border-color: var(--mm-popover); }
+      .ring-popover { --tw-ring-color: var(--mm-popover); }
+      .bg-popover-foreground { background-color: var(--mm-popover-foreground); }
+      .text-popover-foreground { color: var(--mm-popover-foreground); }
+      .border-popover-foreground { border-color: var(--mm-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--mm-popover-foreground); }
+      .bg-primary { background-color: var(--mm-primary); }
+      .text-primary { color: var(--mm-primary); }
+      .border-primary { border-color: var(--mm-primary); }
+      .ring-primary { --tw-ring-color: var(--mm-primary); }
+      .bg-primary-foreground { background-color: var(--mm-primary-foreground); }
+      .text-primary-foreground { color: var(--mm-primary-foreground); }
+      .border-primary-foreground { border-color: var(--mm-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--mm-primary-foreground); }
+      .bg-muted { background-color: var(--mm-muted); }
+      .text-muted { color: var(--mm-muted); }
+      .border-muted { border-color: var(--mm-muted); }
+      .ring-muted { --tw-ring-color: var(--mm-muted); }
+      .bg-muted-foreground { background-color: var(--mm-muted-foreground); }
+      .text-muted-foreground { color: var(--mm-muted-foreground); }
+      .border-muted-foreground { border-color: var(--mm-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--mm-muted-foreground); }
+      .bg-border { background-color: var(--mm-border); }
+      .text-border { color: var(--mm-border); }
+      .border-border { border-color: var(--mm-border); }
+      .ring-border { --tw-ring-color: var(--mm-border); }
+      .bg-input { background-color: var(--mm-input); }
+      .text-input { color: var(--mm-input); }
+      .border-input { border-color: var(--mm-input); }
+      .ring-input { --tw-ring-color: var(--mm-input); }
+      .bg-ring { background-color: var(--mm-ring); }
+      .text-ring { color: var(--mm-ring); }
+      .border-ring { border-color: var(--mm-ring); }
+      .ring-ring { --tw-ring-color: var(--mm-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased bg-background text-foreground">
+    <style id="critical-layout">
+      /* critical-layout: ensures first-screen regions render correctly before CDN loads */
+      .app-shell-root { min-height: 100vh; display: flex; flex-direction: column; }
+      .app-shell-main { flex: 1; width: 100%; max-width: 1400px; margin: 0 auto; padding: 24px; }
+      .top-nav { position: sticky; top: 0; z-index: 40; height: 64px; background-color: rgba(255,255,255,0.95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--mm-border); }
+      .nav-link { display: inline-flex; align-items: center; height: 64px; padding: 0 12px; font-size: 14px; border-bottom: 2px solid transparent; transition: color 160ms cubic-bezier(.2,.8,.2,1), border-color 160ms cubic-bezier(.2,.8,.2,1); }
+      .nav-link:hover { color: var(--mm-foreground); }
+      .nav-link--active { color: var(--mm-primary); border-bottom-color: var(--mm-primary); font-weight: 500; }
+      .nav-link--inactive { color: var(--mm-muted-foreground); }
+      .album-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      @media (min-width: 1024px) { .album-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+      .btn-primary { background-color: var(--mm-primary); color: var(--mm-primary-foreground); transition: background-color 160ms cubic-bezier(.2,.8,.2,1); }
+      .btn-primary:hover { background-color: var(--mm-brand-700); }
+      .btn-outline { border: 1px solid var(--mm-border); background-color: var(--mm-card); color: var(--mm-foreground); transition: border-color 160ms cubic-bezier(.2,.8,.2,1), background-color 160ms cubic-bezier(.2,.8,.2,1); }
+      .btn-outline:hover { border-color: var(--mm-brand-400); background-color: var(--mm-brand-50); }
+      .album-card { transition: transform 160ms cubic-bezier(.2,.8,.2,1), box-shadow 160ms cubic-bezier(.2,.8,.2,1), border-color 160ms cubic-bezier(.2,.8,.2,1); cursor: pointer; }
+      .album-card:hover { transform: translateY(-2px); box-shadow: var(--mm-shadow-md); border-color: var(--mm-brand-400); }
+      .album-card:focus-visible { outline: 2px solid var(--mm-ring); outline-offset: 2px; }
+      .album-card.is-selected { border-color: var(--mm-primary); box-shadow: var(--mm-shadow-md); }
+      .meta-badge { padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 500; border: 1px solid var(--mm-border); background-color: var(--mm-muted); color: var(--mm-muted-foreground); white-space: nowrap; }
+      .meta-badge--itunes { background-color: var(--mm-brand-50); border-color: var(--mm-brand-200); color: var(--mm-brand-700); }
+      .meta-badge--netease { background-color: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+      .meta-badge--qq { background-color: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
+      .meta-badge--merged { background-color: var(--mm-brand-100); border-color: var(--mm-brand-300); color: var(--mm-brand-800); }
+      .cover-ph { width: 56px; height: 56px; border-radius: var(--mm-radius-md); background-color: var(--mm-brand-100); color: var(--mm-brand-700); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+      .cover-ph--lg { width: 96px; height: 96px; }
+      .match-tag { padding: 1px 8px; border-radius: 9999px; font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; }
+      .match-tag--ok { background-color: #ecfdf5; color: var(--state-success); }
+      .match-tag--unmatched { background-color: #fffbeb; color: var(--state-warning); }
+      .match-tag--failed { background-color: #fef2f2; color: var(--state-error); }
+      .match-dot { width: 6px; height: 6px; border-radius: 9999px; }
+      .match-tag--ok .match-dot { background-color: var(--state-success); }
+      .match-tag--unmatched .match-dot { background-color: var(--state-warning); }
+      .match-tag--failed .match-dot { background-color: var(--state-error); }
+      .input-base { height: 36px; padding: 0 12px; border-radius: var(--mm-radius-md); border: 1px solid var(--mm-input); background-color: var(--mm-card); font-size: 14px; color: var(--mm-foreground); transition: border-color 160ms cubic-bezier(.2,.8,.2,1), box-shadow 160ms cubic-bezier(.2,.8,.2,1); }
+      .input-base:focus-visible { outline: none; border-color: var(--mm-ring); box-shadow: 0 0 0 2px color-mix(in srgb, var(--mm-ring) 20%, transparent); }
+      .source-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 9999px; border: 1px solid var(--mm-border); background-color: var(--mm-card); font-size: 13px; cursor: pointer; transition: border-color 160ms cubic-bezier(.2,.8,.2,1), background-color 160ms cubic-bezier(.2,.8,.2,1); }
+      .source-chip:hover { border-color: var(--mm-brand-400); background-color: var(--mm-brand-50); }
+      .source-chip[data-checked="true"] { border-color: var(--mm-primary); background-color: var(--mm-brand-50); color: var(--mm-brand-700); font-weight: 500; }
+      .table-row-hover:hover { background-color: var(--mm-muted); }
+      .table-row-hover.is-active { background-color: var(--mm-brand-50); }
+      .score-bar { height: 8px; border-radius: 9999px; background-color: var(--mm-gray-200); overflow: hidden; }
+      .score-bar-fill { height: 100%; border-radius: 9999px; }
+      .checkbox-base { width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--mm-input); accent-color: var(--mm-primary); }
+    </style>
+    <div class="app-shell-root">
+      <nav class="top-nav" aria-label="主导航">
+        <div class="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-6">
+          <div class="flex items-center gap-6">
+            <a href="#" class="flex items-center gap-2 text-lg font-semibold text-foreground">
+              <i data-lucide="music-4" class="h-5 w-5 text-primary"></i>
+              <span>MediaMusicService</span>
+            </a>
+            <div class="hidden items-center gap-1 md:flex">
+              <a href="#" data-dom-id="nav-dashboard" data-nav-key="dashboard" class="nav-link nav-link--inactive">概览</a>
+              <a href="#" data-dom-id="nav-search" data-nav-key="search" class="nav-link nav-link--inactive">搜索</a>
+              <a href="#" data-dom-id="nav-playlists" data-nav-key="playlists" class="nav-link nav-link--inactive">歌单</a>
+              <a href="#" data-dom-id="nav-charts" data-nav-key="charts" class="nav-link nav-link--inactive">榜单</a>
+              <a href="#" data-dom-id="nav-albums" data-nav-key="albums" class="nav-link nav-link--active">专辑</a>
+              <a href="#" data-dom-id="nav-tasks" data-nav-key="tasks" class="nav-link nav-link--inactive">任务</a>
+              <a href="#" data-dom-id="nav-library" data-nav-key="library" class="nav-link nav-link--inactive">媒体库</a>
+              <a href="#" data-dom-id="nav-fnos" data-nav-key="fnos" class="nav-link nav-link--inactive">飞牛</a>
+              <a href="#" data-dom-id="nav-settings" data-nav-key="settings" class="nav-link nav-link--inactive">设置</a>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-sm text-muted-foreground">v2.4.1</span>
+            <button class="btn-outline flex h-9 w-9 items-center justify-center rounded-md" aria-label="通知">
+              <i data-lucide="bell" class="h-4 w-4"></i>
+            </button>
+          </div>
+        </div>
+      </nav>
+      <main class="app-shell-main">
+        <div class="mb-6 flex items-center justify-between">
+          <div>
+            <h1 class="text-2xl font-semibold text-foreground">专辑管理</h1>
+            <p class="mt-1 text-sm text-muted-foreground">按专辑维度检索元数据、整辑下载与归档入库</p>
+          </div>
+          <button class="btn-primary flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium">
+            <i data-lucide="refresh-cw" class="h-4 w-4"></i>
+            刷新列表
+          </button>
+        </div>
+
+        <!-- album-search -->
+        <section class="mb-6 rounded-lg border border-border bg-card p-5 shadow-sm" aria-label="专辑搜索">
+          <div class="mb-3 flex items-center gap-2">
+            <i data-lucide="disc-3" class="h-4 w-4 text-primary"></i>
+            <h2 class="text-base font-medium text-foreground">专辑搜索</h2>
+            <span class="text-xs text-muted-foreground">iTunes 优先，中文专辑自动回退网易/QQ 元数据源</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="relative">
+              <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"></i>
+              <input data-dom-id="album-search-input" type="text" placeholder="专辑名 / 关键词，如：范特西" class="input-base w-64 pl-9" />
+            </div>
+            <input type="text" placeholder="歌手（可选），如：周杰伦" class="input-base w-52" />
+            <select class="input-base w-32" aria-label="返回数量">
+              <option>前 10 条</option>
+              <option selected>前 20 条</option>
+              <option>前 50 条</option>
+            </select>
+            <button data-dom-id="album-search-submit" class="btn-primary flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium">
+              <i data-lucide="sparkles" class="h-4 w-4"></i>
+              搜索
+            </button>
+            <span class="ml-auto text-xs text-muted-foreground">共找到 6 张专辑 · 耗时 0.42s</span>
+          </div>
+        </section>
+
+        <div class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_560px]">
+          <div class="min-w-0">
+            <!-- album-list -->
+            <section aria-label="专辑搜索结果">
+              <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-base font-medium text-foreground">搜索结果</h2>
+                <span class="text-xs text-muted-foreground">点击卡片查看详情</span>
+              </div>
+              <div id="album-list" class="album-grid">
+
+                <article class="album-card is-selected rounded-lg border border-border bg-card p-4 shadow-sm" tabindex="0" aria-label="范特西">
+                  <div class="flex items-start gap-3">
+                    <div class="cover-ph"><i data-lucide="disc-3" class="h-6 w-6"></i></div>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center justify-between gap-2">
+                        <h3 class="truncate text-sm font-semibold text-foreground">范特西</h3>
+                        <span class="meta-badge meta-badge--merged">itunes+netease</span>
+                      </div>
+                      <p class="mt-0.5 truncate text-xs text-muted-foreground">周杰伦</p>
+                    </div>
+                  </div>
+                  <div class="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+                    <span class="inline-flex items-center gap-1"><i data-lucide="calendar" class="h-3.5 w-3.5"></i>2001-09-14</span>
+                    <span class="inline-flex items-center gap-1"><i data-lucide="list-music" class="h-3.5 w-3.5"></i>10 首</span>
+                    <span class="inline-flex items-center gap-1"><i data-lucide="tag" class="h-3.5 w-3.5"></i>流行</span>
+                  </div>
+                </article>
+
+                <article class="album-card rounded-lg border border-border bg-card p-4 shadow-sm" tabindex="0" aria-label="伟大的渺小">
+                  <div class="flex items-start gap-3">
+                    <div class="cover-ph"><i data-lucide="disc-3" class="h-6 w-6"></i></div>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center justify-between gap-2">
+                        <h3 class="truncate text-sm font-semibold text-foreground">伟大的渺小</h3>
+                        <span class="meta-badge meta-badge--itunes">itunes</span>
+                      </div>
+                      <p class="mt-0.5 truncate text-xs text-muted-foreground">林俊杰</p>
+                    </div>
+                  </div>
+                  <div class="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+                    <span class="inline-flex items-center gap-1"><i data-lucide="calendar" class="h-3.5 w-3.5"></i>2017-12-29</span>
+                    <span class="inline-flex items-center gap-1"><i data-lucide="list-music" class="h-3.5 w-3.5"></i>11 首</span>
+                    <span class="inline-flex items-center gap-1"><i data-lucide="tag" class="h-3.5 w-3.5"></i>流行</span>
+                  </div>
+                </article>
+
+                <article class="album-card rounded-lg border border-border bg-card p-4 shadow-sm" tabindex="0" aria-label="只爱陌生人">
+                  <div class="flex items-start gap-3">
+                    <div class="cover-ph"><i data-lucide="disc-3" class="h-6 w-6"></i></div>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center justify-between gap-2">
+                        <h3 class="truncate text-sm font-semibold text-foreground">只爱陌生人</h3>
+                        <span class="meta-badge meta-badge--netease">netease</span>
+                      </div>
+                      <p class="mt-0.5 truncate text-xs text-muted-foreground">王菲</p>
+                    </div>
+                  </div>
+                  <div class="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+                    <span class="inline-flex items-center gap-1"><i data-lucide="calendar" class="h-3.5 w-3.5"></i>1999-09-10</span>
+                    <span class="inline-flex items-center gap-1"><i data-lucide="list-music" class="h-3.5 w-3.5"></i>12 首</span>
+                    <span class="inline-flex items-center gap-1"><i data-lucide="tag" class="h-3.5 w-3.5"></i>流行</span>
+                  </div>
+                </article>
+
+                <article class="album-card rounded-lg border border-border bg-card p-4 shadow-sm" tabindex="0" aria-label="摩天动物园">
+                  <div class="flex items-start gap-3">
+                    <div class="cover-ph"><i data-lucide="disc-3" class="h-6 w-6"></i></div>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center justify-between gap-2">
+                        <h3 class="truncate text-sm font-semibold text-foreground">摩天动物园</h3>
+                        <span class="meta-badge meta-badge--qq">qq</span>
+                      </div>
+                      <p class="mt-0.5 truncate text-xs text-muted-foreground">邓紫棋</p>
+                    </div>
+                  </div>
+                  <div class="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+                    <span class="inline-flex items-center gap-1"><i data-lucide="calendar" class="h-3.5 w-3.5"></i>2019-12-27</span>
+                    <span class="inline-flex items-center gap-1"><i data-lucide="list-music" class="h-3.5 w-3.5"></i>13 首</span>
+                    <span class="inline-flex items-center gap-1"><i data-lucide="tag" class="h-3.5 w-3.5"></i>流行</span>
+                  </div>
+                </article>
+
+                <article class="album-card rounded-lg border border-border bg-card p-4 shadow-sm" tabindex="0" aria-label="U87">
+                  <div class="flex items-start gap-3">
+                    <div class="cover-ph"><i data-lucide="disc-3" class="h-6 w-6"></i></div>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center justify-between gap-2">
+                        <h3 class="truncate text-sm font-semibold text-foreground">U87</h3>
+                        <span class="meta-badge meta-badge--itunes">itunes</span>
+                      </div>
+                      <p class="mt-0.5 truncate text-xs text-muted-foreground">陈奕迅</p>
+                    </div>
+                  </div>
+                  <div class="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+                    <span class="inline-flex items-center gap-1"><i data-lucide="calendar" class="h-3.5 w-3.5"></i>2005-06-07</span>
+                    <span class="inline-flex items-center gap-1"><i data-lucide="list-music" class="h-3.5 w-3.5"></i>12 首</span>
+                    <span class="inline-flex items-center gap-1"><i data-lucide="tag" class="h-3.5 w-3.5"></i>粤语流行</span>
+                  </div>
+                </article>
+
+                <article class="album-card rounded-lg border border-border bg-card p-4 shadow-sm" tabindex="0" aria-label="逆光">
+                  <div class="flex items-start gap-3">
+                    <div class="cover-ph"><i data-lucide="disc-3" class="h-6 w-6"></i></div>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center justify-between gap-2">
+                        <h3 class="truncate text-sm font-semibold text-foreground">逆光</h3>
+                        <span class="meta-badge meta-badge--netease">netease</span>
+                      </div>
+                      <p class="mt-0.5 truncate text-xs text-muted-foreground">孙燕姿</p>
+                    </div>
+                  </div>
+                  <div class="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+                    <span class="inline-flex items-center gap-1"><i data-lucide="calendar" class="h-3.5 w-3.5"></i>2007-03-22</span>
+                    <span class="inline-flex items-center gap-1"><i data-lucide="list-music" class="h-3.5 w-3.5"></i>11 首</span>
+                    <span class="inline-flex items-center gap-1"><i data-lucide="tag" class="h-3.5 w-3.5"></i>流行</span>
+                  </div>
+                </article>
+
+              </div>
+            </section>
+
+            <!-- album-actions -->
+            <section class="mt-6 rounded-lg border border-border bg-card p-5 shadow-sm" aria-label="操作选项">
+              <div class="mb-4 flex items-center gap-2">
+                <i data-lucide="sliders-horizontal" class="h-4 w-4 text-primary"></i>
+                <h2 class="text-base font-medium text-foreground">操作选项</h2>
+              </div>
+              <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                <div>
+                  <h3 class="mb-3 text-sm font-medium text-foreground">下载选项</h3>
+                  <div class="mb-3">
+                    <label class="mb-1.5 block text-xs text-muted-foreground">下载源（多选）</label>
+                    <div class="flex flex-wrap gap-2">
+                      <button type="button" class="source-chip" data-checked="true"><i data-lucide="check" class="h-3.5 w-3.5"></i>网易</button>
+                      <button type="button" class="source-chip" data-checked="true"><i data-lucide="check" class="h-3.5 w-3.5"></i>QQ</button>
+                      <button type="button" class="source-chip" data-checked="false">酷狗</button>
+                      <button type="button" class="source-chip" data-checked="false">酷我</button>
+                      <button type="button" class="source-chip" data-checked="true"><i data-lucide="check" class="h-3.5 w-3.5"></i>咪咕</button>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap gap-3">
+                    <div>
+                      <label class="mb-1.5 block text-xs text-muted-foreground">子目录</label>
+                      <input type="text" value="周杰伦/范特西" class="input-base w-44" />
+                    </div>
+                    <div>
+                      <label class="mb-1.5 block text-xs text-muted-foreground">单首上限 (MB)</label>
+                      <input type="number" value="50" min="1" class="input-base w-28" />
+                    </div>
+                    <div>
+                      <label class="mb-1.5 block text-xs text-muted-foreground">目标媒体库</label>
+                      <select class="input-base w-36"><option selected>主媒体库</option><option>华语精选</option><option>待整理</option></select>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h3 class="mb-3 text-sm font-medium text-foreground">归档选项</h3>
+                  <div class="mb-3">
+                    <label class="mb-1.5 block text-xs text-muted-foreground">归档到媒体库</label>
+                    <select class="input-base w-44"><option selected>主媒体库</option><option>华语精选</option><option>待整理</option></select>
+                  </div>
+                  <label class="mb-2 flex items-center gap-2 text-sm text-foreground">
+                    <input type="checkbox" class="checkbox-base" />
+                    覆盖已存在文件
+                  </label>
+                  <label class="flex items-center gap-2 text-sm text-foreground">
+                    <input type="checkbox" class="checkbox-base" checked />
+                    标记为合辑（Compilation）
+                  </label>
+                </div>
+              </div>
+              <div class="mt-5 flex items-center gap-3 border-t border-border pt-4">
+                <button data-dom-id="download-album" class="btn-primary flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium">
+                  <i data-lucide="download" class="h-4 w-4"></i>
+                  下载专辑
+                </button>
+                <button data-dom-id="archive-album" class="btn-outline flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium">
+                  <i data-lucide="archive" class="h-4 w-4"></i>
+                  归档入库
+                </button>
+                <span class="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <i data-lucide="clock" class="h-3.5 w-3.5"></i>
+                  下载为异步任务，可在「任务」页查看进度
+                </span>
+              </div>
+            </section>
+          </div>
+
+          <!-- album-detail -->
+          <aside class="min-w-0" aria-label="专辑详情">
+            <section class="rounded-lg border border-border bg-card p-5 shadow-sm xl:sticky xl:top-20">
+              <div class="mb-4 flex items-start gap-4">
+                <div class="cover-ph cover-ph--lg"><i data-lucide="disc-3" class="h-10 w-10"></i></div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <h2 class="text-lg font-semibold text-foreground">范特西</h2>
+                    <span class="meta-badge meta-badge--merged">itunes+netease</span>
+                  </div>
+                  <p class="mt-0.5 text-sm text-muted-foreground">周杰伦 · 2001-09-14 · 流行 · 10 首</p>
+                  <p class="mt-1 text-xs text-muted-foreground">官方曲目已对齐 iTunes 元数据，中文曲名经网易源校正</p>
+                </div>
+              </div>
+
+              <div class="mb-4 rounded-md border border-border bg-muted/50 p-3">
+                <div class="mb-2 flex items-center justify-between">
+                  <span class="text-xs font-medium text-foreground">匹配清单摘要</span>
+                  <span class="text-xs text-muted-foreground">8 成功 · 1 待匹配 · 1 失败</span>
+                </div>
+                <div class="space-y-1.5">
+                  <div class="flex items-center gap-2">
+                    <span class="w-14 shrink-0 text-[11px] text-muted-foreground">≥0.9 高</span>
+                    <div class="score-bar flex-1"><div class="score-bar-fill" style="width: 62%; background-color: var(--state-success);"></div></div>
+                    <span class="w-6 text-right text-[11px] text-muted-foreground">6</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="w-14 shrink-0 text-[11px] text-muted-foreground">0.7–0.9</span>
+                    <div class="score-bar flex-1"><div class="score-bar-fill" style="width: 20%; background-color: var(--mm-brand-500);"></div></div>
+                    <span class="w-6 text-right text-[11px] text-muted-foreground">2</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="w-14 shrink-0 text-[11px] text-muted-foreground">&lt;0.7 低</span>
+                    <div class="score-bar flex-1"><div class="score-bar-fill" style="width: 10%; background-color: var(--state-warning);"></div></div>
+                    <span class="w-6 text-right text-[11px] text-muted-foreground">1</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="w-14 shrink-0 text-[11px] text-muted-foreground">失败</span>
+                    <div class="score-bar flex-1"><div class="score-bar-fill" style="width: 10%; background-color: var(--state-error);"></div></div>
+                    <span class="w-6 text-right text-[11px] text-muted-foreground">1</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="overflow-hidden rounded-md border border-border">
+                <table class="w-full text-sm">
+                  <thead>
+                    <tr class="border-b border-border bg-muted/60 text-left text-xs text-muted-foreground">
+                      <th class="px-3 py-2 font-medium">碟</th>
+                      <th class="px-3 py-2 font-medium">轨</th>
+                      <th class="px-3 py-2 font-medium">标题</th>
+                      <th class="px-3 py-2 font-medium">歌手</th>
+                      <th class="px-3 py-2 font-medium">时长</th>
+                      <th class="px-3 py-2 font-medium">匹配</th>
+                    </tr>
+                  </thead>
+                  <tbody class="text-foreground">
+                    <tr class="table-row-hover border-b border-border">
+                      <td class="px-3 py-2 text-xs text-muted-foreground">1</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">1</td>
+                      <td class="px-3 py-2">爱在西元前</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">周杰伦</td>
+                      <td class="px-3 py-2 font-mono text-xs text-muted-foreground">234</td>
+                      <td class="px-3 py-2"><span class="match-tag match-tag--ok"><span class="match-dot"></span>0.97</span></td>
+                    </tr>
+                    <tr class="table-row-hover border-b border-border">
+                      <td class="px-3 py-2 text-xs text-muted-foreground">1</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">2</td>
+                      <td class="px-3 py-2">爸我回来了</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">周杰伦</td>
+                      <td class="px-3 py-2 font-mono text-xs text-muted-foreground">224</td>
+                      <td class="px-3 py-2"><span class="match-tag match-tag--ok"><span class="match-dot"></span>0.95</span></td>
+                    </tr>
+                    <tr class="table-row-hover border-b border-border">
+                      <td class="px-3 py-2 text-xs text-muted-foreground">1</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">3</td>
+                      <td class="px-3 py-2">简单爱</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">周杰伦</td>
+                      <td class="px-3 py-2 font-mono text-xs text-muted-foreground">271</td>
+                      <td class="px-3 py-2"><span class="match-tag match-tag--ok"><span class="match-dot"></span>0.98</span></td>
+                    </tr>
+                    <tr class="table-row-hover border-b border-border">
+                      <td class="px-3 py-2 text-xs text-muted-foreground">1</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">4</td>
+                      <td class="px-3 py-2">忍者</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">周杰伦</td>
+                      <td class="px-3 py-2 font-mono text-xs text-muted-foreground">161</td>
+                      <td class="px-3 py-2"><span class="match-tag match-tag--ok"><span class="match-dot"></span>0.92</span></td>
+                    </tr>
+                    <tr class="table-row-hover border-b border-border">
+                      <td class="px-3 py-2 text-xs text-muted-foreground">1</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">5</td>
+                      <td class="px-3 py-2">开不了口</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">周杰伦</td>
+                      <td class="px-3 py-2 font-mono text-xs text-muted-foreground">285</td>
+                      <td class="px-3 py-2"><span class="match-tag match-tag--ok"><span class="match-dot"></span>0.96</span></td>
+                    </tr>
+                    <tr class="table-row-hover border-b border-border">
+                      <td class="px-3 py-2 text-xs text-muted-foreground">1</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">6</td>
+                      <td class="px-3 py-2">上海一九四三</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">周杰伦</td>
+                      <td class="px-3 py-2 font-mono text-xs text-muted-foreground">195</td>
+                      <td class="px-3 py-2"><span class="match-tag match-tag--ok"><span class="match-dot"></span>0.88</span></td>
+                    </tr>
+                    <tr class="table-row-hover border-b border-border">
+                      <td class="px-3 py-2 text-xs text-muted-foreground">1</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">7</td>
+                      <td class="px-3 py-2">对不起</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">周杰伦</td>
+                      <td class="px-3 py-2 font-mono text-xs text-muted-foreground">228</td>
+                      <td class="px-3 py-2"><span class="match-tag match-tag--ok"><span class="match-dot"></span>0.81</span></td>
+                    </tr>
+                    <tr class="table-row-hover border-b border-border">
+                      <td class="px-3 py-2 text-xs text-muted-foreground">1</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">8</td>
+                      <td class="px-3 py-2">威廉古堡</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">周杰伦</td>
+                      <td class="px-3 py-2 font-mono text-xs text-muted-foreground">236</td>
+                      <td class="px-3 py-2"><span class="match-tag match-tag--ok"><span class="match-dot"></span>0.93</span></td>
+                    </tr>
+                    <tr class="table-row-hover is-active border-b border-border">
+                      <td class="px-3 py-2 text-xs text-muted-foreground">1</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">9</td>
+                      <td class="px-3 py-2">双截棍</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">周杰伦</td>
+                      <td class="px-3 py-2 font-mono text-xs text-muted-foreground">201</td>
+                      <td class="px-3 py-2"><span class="match-tag match-tag--unmatched"><span class="match-dot"></span>待匹配</span></td>
+                    </tr>
+                    <tr class="table-row-hover">
+                      <td class="px-3 py-2 text-xs text-muted-foreground">1</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">10</td>
+                      <td class="px-3 py-2">安静</td>
+                      <td class="px-3 py-2 text-xs text-muted-foreground">周杰伦</td>
+                      <td class="px-3 py-2 font-mono text-xs text-muted-foreground">331</td>
+                      <td class="px-3 py-2"><span class="match-tag match-tag--failed"><span class="match-dot"></span>失败</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <i data-lucide="info" class="h-3.5 w-3.5"></i>
+                时长单位为秒；未匹配曲目将在下载时按所选源顺序重试
+              </p>
+            </section>
+          </aside>
+        </div>
+      </main>
+    </div>
+    <script>lucide.createIcons();</script>
+</body>
+</html>
