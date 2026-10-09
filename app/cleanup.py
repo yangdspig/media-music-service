@@ -106,15 +106,29 @@ def _sweep_once() -> None:
 
 def _sweep_loop() -> None:
     while True:
-        time.sleep(settings.cleanup.interval_s)
+        if _WAKE.wait(settings.cleanup.interval_s):
+            _WAKE.clear()
+            continue
         try:
-            _sweep_once()
+            if settings.cleanup.periodic:
+                _sweep_once()
         except Exception:
             logger.exception("下载目录定期清理异常")
 
 
+_THREAD_LOCK = threading.Lock()
+_SWEEP_THREAD: threading.Thread | None = None
+_WAKE = threading.Event()
+
+
 def start_periodic_sweep() -> None:
     """服务启动时调用：按配置开启定期清理后台线程。"""
-    if not settings.cleanup.periodic:
-        return
-    threading.Thread(target=_sweep_loop, daemon=True, name="download-dir-sweeper").start()
+    global _SWEEP_THREAD
+    with _THREAD_LOCK:
+        if _SWEEP_THREAD and _SWEEP_THREAD.is_alive():
+            _WAKE.set()
+            return
+        if not settings.cleanup.periodic:
+            return
+        _SWEEP_THREAD = threading.Thread(target=_sweep_loop, daemon=True, name="download-dir-sweeper")
+        _SWEEP_THREAD.start()

@@ -108,8 +108,8 @@
         <h2 class="text-lg font-medium text-foreground">最近任务</h2>
         <RouterLink to="/tasks" class="text-sm text-primary hover:underline">查看全部</RouterLink>
       </div>
-      <div v-if="tasksLoading && !tasks.length" class="py-8 text-center text-sm text-muted-foreground">加载中...</div>
-      <div v-else-if="!tasks.length" class="py-8 text-center text-sm text-muted-foreground">暂无任务，去搜索页提交第一个下载吧</div>
+      <div v-if="tasksLoading && !recentTasks.length" class="py-8 text-center text-sm text-muted-foreground">加载中...</div>
+      <div v-else-if="!recentTasks.length" class="py-8 text-center text-sm text-muted-foreground">暂无任务，去搜索页提交第一个下载吧</div>
       <div v-else class="overflow-x-auto">
         <table class="w-full text-left text-sm">
           <thead>
@@ -123,7 +123,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="task in tasks" :key="task.task_id" class="table-row-hover border-b border-border last:border-b-0">
+            <tr v-for="task in recentTasks" :key="task.task_id" class="table-row-hover border-b border-border last:border-b-0">
               <td class="py-3 pr-4 font-mono text-xs">{{ task.task_id }}</td>
               <td class="py-3 pr-4">{{ isAlbumTask(task) ? '专辑下载' : '单曲下载' }}</td>
               <td class="py-3 pr-4">{{ taskDisplayName(task) }}</td>
@@ -188,6 +188,7 @@ const toast = useToastStore()
 
 const sources = ref([])
 const tasks = ref([])
+const recentTasks = ref([])
 const systemStatus = ref(undefined) // undefined=未加载 null=接口未就绪
 const loading = ref(false)
 const sourcesLoading = ref(false)
@@ -238,8 +239,18 @@ async function loadSources() {
 async function loadTasks() {
   tasksLoading.value = true
   try {
-    const { data } = await client.get('/downloads', { params: { limit: 8 } })
-    tasks.value = data
+    const responses = await Promise.allSettled([
+      client.get('/downloads', { params: { limit: 8 } }),
+      client.get('/history', { params: { limit: 8, order_by: 'completed_at' } }),
+    ])
+    if (responses[0].status === 'fulfilled') tasks.value = responses[0].value.data
+    else toast.show(errorMessage(responses[0].reason, '获取任务列表失败'), 'error')
+    if (responses[1].status === 'fulfilled') {
+      const liveTasks = new Map(tasks.value.map((task) => [task.task_id, task]))
+      recentTasks.value = responses[1].value.data.map((task) => ({ ...liveTasks.get(task.task_id), ...task }))
+    } else {
+      toast.show(errorMessage(responses[1].reason, '获取最近任务失败'), 'error')
+    }
   } catch (e) {
     toast.show(errorMessage(e, '获取任务列表失败'), 'error')
   } finally {

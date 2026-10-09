@@ -105,7 +105,9 @@ export function taskDisplayName(task) {
   return task?.message || '—'
 }
 
-/** 判断任务是否专辑任务（有 manifest 产出即为专辑任务） */
+/** 历史记录没有 manifest_path，按专辑结果的曲目序号或终态消息识别。 */
 export function isAlbumTask(task) {
   return Boolean(task?.manifest_path)
+    || Boolean(task?.results?.some((result) => result.disc != null && result.track != null))
+    || Boolean(task?.message?.startsWith('专辑《'))
 }

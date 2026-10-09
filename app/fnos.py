@@ -179,11 +179,40 @@ class FnosClient:
 
     # —— 歌单原语 ——
 
-    def list_playlists(self) -> list[dict]:
+    def list_playlists(self, *, include_counts: bool = False) -> list[dict]:
         data = self.request("GET", "/playlist/list")
-        return [{"guid": p.get("guid"), "name": p.get("name"),
-                 "track_count": p.get("trackCount")}
-                for p in (data or {}).get("list") or []]
+        playlists = [_trim_playlist(p) for p in (data or {}).get("list") or []]
+        if include_counts:
+            # 飞牛部分版本的目录不返回 trackCount；不能用目录页长或默认值代替。
+            for playlist in playlists:
+                playlist["track_count"] = None
+                if not playlist["guid"]:
+                    continue
+                try:
+                    playlist["track_count"] = self.playlist_track_count(playlist["guid"])
+                except Exception:
+                    logger.warning("读取飞牛歌单曲目数量失败 guid=%s", playlist["guid"])
+        return playlists
+
+    @staticmethod
+    def _total(data: dict) -> int | None:
+        total = data.get("total")
+        if isinstance(total, bool) or total is None:
+            return None
+        try:
+            count = int(total)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        return count if count >= 0 and str(total) == str(count) else None
+
+    def playlist_track_count(self, playlist_guid: str) -> int:
+        """只取一条曲目，使用详情信封 total；缺字段时再分页核对。"""
+        data = self.request("GET", "/track/playlist-detail/list",
+                            params={"playlistGUID": playlist_guid, "page": 1, "size": 1}) or {}
+        total = self._total(data)
+        if total is not None and total >= len(data.get("list") or []):
+            return total
+        return len(self.playlist_tracks(playlist_guid))
 
     def create_playlist(self, name: str) -> str:
         data = self.request("POST", "/playlist/create", json={"name": name})
@@ -196,13 +225,17 @@ class FnosClient:
         """歌单内全部曲目（完整对象，分页拉全，追加前去重依据）。"""
         out: list[dict] = []
         page, size = 1, 300
+        previous_items = None
         while True:
             data = self.request("GET", "/track/playlist-detail/list",
                                 params={"playlistGUID": playlist_guid, "page": page, "size": size})
             items = (data or {}).get("list") or []
+            if items and items == previous_items:
+                raise FnosApiError(None, "歌单曲目分页未推进，无法确认完整数量")
+            previous_items = items
             out.extend(items)
-            total = (data or {}).get("total") or 0
-            if not items or len(out) >= total:
+            total = self._total(data or {})
+            if not items or (total is not None and len(out) >= total):
                 return out
             page += 1
 
@@ -366,7 +399,7 @@ def reset_client() -> None:
 # ---- 模块门面（端点与下载钩子调用；测试 monkeypatch 入口） ----
 
 def list_playlists() -> list[dict]:
-    return get_client().list_playlists()
+    return get_client().list_playlists(include_counts=True)
 
 
 def playlist_detail(name: str) -> dict:

@@ -2,13 +2,13 @@
   <div class="min-h-screen flex flex-col">
     <!-- ===== 顶栏导航 ===== -->
     <nav class="sticky top-0 z-40 bg-card/95 backdrop-blur border-b border-border" aria-label="主导航">
-      <div class="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-4 px-6">
-        <div class="flex items-center gap-6 min-w-0">
+      <div class="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-2 px-4 sm:px-6">
+        <div class="flex items-center gap-4 min-w-0">
           <RouterLink to="/" class="flex items-center gap-2 shrink-0">
             <span class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-primary text-primary-foreground">
               <Music4 class="w-4 h-4" />
             </span>
-            <span class="font-semibold text-foreground" style="font-size:15px;">MediaMusicService</span>
+            <span class="font-semibold text-foreground text-sm sm:text-[15px]">MediaMusicService</span>
           </RouterLink>
           <!-- 桌面导航（<960px 收进抽屉） -->
           <div class="hidden min-[960px]:flex items-center gap-1 h-16 no-scrollbar overflow-x-auto">
@@ -33,7 +33,7 @@
             <Moon v-else class="w-4 h-4" />
           </button>
           <!-- 汉堡按钮（<960px 显示） -->
-          <button class="btn-outline flex h-9 w-9 items-center justify-center rounded-md min-[960px]:hidden" aria-label="打开导航菜单" @click="drawerOpen = true">
+          <button ref="menuButton" class="btn-outline flex h-9 w-9 items-center justify-center rounded-md min-[960px]:hidden" aria-label="打开导航菜单" :aria-expanded="drawerOpen" aria-controls="mobile-navigation" @click="drawerOpen = true">
             <Menu class="w-4 h-4" />
           </button>
         </div>
@@ -45,7 +45,7 @@
       <div v-if="drawerOpen" class="fixed inset-0 z-50 bg-black/40 min-[960px]:hidden" @click="drawerOpen = false"></div>
     </Transition>
     <Transition name="drawer">
-      <aside v-if="drawerOpen" class="fixed inset-y-0 left-0 z-[60] w-64 bg-card border-r border-border flex flex-col min-[960px]:hidden" aria-label="移动端导航">
+      <aside v-if="drawerOpen" id="mobile-navigation" ref="drawerPanel" class="fixed inset-y-0 left-0 z-[60] w-64 max-w-[90vw] bg-card border-r border-border flex flex-col min-[960px]:hidden" role="dialog" aria-modal="true" aria-label="移动端导航" tabindex="-1">
         <div class="flex items-center justify-between h-16 px-4 border-b border-border">
           <span class="flex items-center gap-2">
             <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-primary text-primary-foreground">
@@ -73,14 +73,17 @@
       </aside>
     </Transition>
 
-    <main class="flex-1 w-full max-w-[1440px] mx-auto px-6 py-6">
+    <main class="flex-1 w-full min-w-0 max-w-[1440px] mx-auto px-4 sm:px-6 py-6 pb-24 min-[960px]:pb-6">
       <slot />
     </main>
+    <nav class="fixed bottom-0 inset-x-0 z-40 bg-card border-t border-border flex justify-around min-[960px]:hidden pb-[env(safe-area-inset-bottom)]" aria-label="常用导航">
+      <RouterLink v-for="item in navItems.filter(item => ['dashboard', 'search', 'albums', 'tasks', 'settings'].includes(item.key))" :key="item.key" :to="item.to" class="flex flex-1 flex-col items-center gap-1 py-3 text-[11px]" :class="isActive(item) ? 'text-primary' : 'text-muted-foreground'" :aria-current="isActive(item) ? 'page' : undefined"><component :is="item.icon" class="w-4 h-4" />{{ item.label }}</RouterLink>
+    </nav>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   Music4, LayoutDashboard, Search, ListMusic, BarChart3, Disc3,
@@ -91,6 +94,32 @@ import { useThemeStore } from '../stores/theme'
 const theme = useThemeStore()
 const route = useRoute()
 const drawerOpen = ref(false)
+const drawerPanel = ref(null), menuButton = ref(null)
+let previousOverflow = null
+watch(drawerOpen, async (open) => {
+  if (open) {
+    previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    await nextTick()
+    if (drawerOpen.value) drawerPanel.value?.focus()
+  } else {
+    if (previousOverflow !== null) document.body.style.overflow = previousOverflow
+    previousOverflow = null
+    menuButton.value?.focus()
+  }
+})
+function drawerKeydown(event) {
+  if (!drawerOpen.value) return
+  if (event.key === 'Escape') { event.preventDefault(); drawerOpen.value = false }
+  if (event.key !== 'Tab') return
+  const elements = [...(drawerPanel.value?.querySelectorAll('button, a[href]') || [])].filter(el => !el.disabled && el.getClientRects().length)
+  const first = elements[0], last = elements.at(-1)
+  if (event.shiftKey && [first, drawerPanel.value].includes(document.activeElement)) { event.preventDefault(); last?.focus() }
+  else if (!event.shiftKey && [last, drawerPanel.value].includes(document.activeElement)) { event.preventDefault(); first?.focus() }
+}
+function resize() { if (window.innerWidth >= 960) drawerOpen.value = false }
+onMounted(() => { document.addEventListener('keydown', drawerKeydown); window.addEventListener('resize', resize) })
+onBeforeUnmount(() => { if (previousOverflow !== null) document.body.style.overflow = previousOverflow; document.removeEventListener('keydown', drawerKeydown); window.removeEventListener('resize', resize) })
 
 const navItems = [
   { key: 'dashboard', label: '概览', to: '/', icon: LayoutDashboard },
@@ -105,6 +134,6 @@ const navItems = [
 ]
 
 function isActive(item) {
-  return route.name === item.key
+  return item.to === '/' ? route.path === '/' : route.path === item.to || route.path.startsWith(`${item.to}/`)
 }
 </script>

@@ -48,13 +48,14 @@ num_threads: 5
 # 可选 API Key；留空或删除本行则不启用鉴权（纯内网自用推荐）
 # api_key: "change-me"
 
-# 默认搜索源（musicdl 官方默认五源）
+# 默认搜索源（与 Web 设置、搜索页统一）
 default_sources:
-  - MiguMusicClient
-  - NeteaseMusicClient
   - QQMusicClient
-  - KuwoMusicClient
+  - KugouMusicClient
+  - NeteaseMusicClient
   - QianqianMusicClient
+  - MiguMusicClient
+  - KuwoMusicClient
 
 # 按需配置各源 cookies；不配置的源如果必须登录态会被标记为不可用
 # 示例：

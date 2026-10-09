@@ -1,6 +1,6 @@
 # MediaMusicService Web UI 原型设计文稿
 
-- 文档状态：**原型待确认**（确认后按 P1→P3 分期动工）
+- 文档状态：**设计已确认，P1 已交付，P2 已实现，P3 待实施**
 - 创建日期：2026-10-08
 - 技术栈：**Vue 3 + Vite + vue-router + Pinia + Tailwind CSS 4 + axios + lucide-vue-next**（2026-10-08 定稿：为像素级贴合用户设计稿，放弃 Vuetify 组件体系，设计稿的 Tailwind class 可直接迁移）
 - 前置方案：独立 Web 前端可行性与开发方案（2026-10-08 已审核）
@@ -38,6 +38,8 @@
 **设计稿响应式情况（2026-10-08 实测截图验证：390px 手机 / 820px 平板 / 1440px PC）**：设计稿内置 Tailwind `sm/md/lg` 断点，平板/手机下统计卡与源网格自动降列、顶栏导航自动收缩，**三端可用**。两个实测遗留问题实施时修正：① 手机端数据表格被挤压换行（专辑名列逐字竖排），表格在 <960px 一律降级为卡片列表（沿用 §2.3 移动策略）；② 手机端顶栏导航项挤成两行竖排文字，改为汉堡抽屉 + 底部高频 Tab。
 
 ## 1. 设计原则
+
+**实施补充（P2）**：为显示真实库结构与专辑匹配评分，增加两条只读 API：`GET /api/v1/library/entries`（命名库内相对路径、一层分页、不跟随符号链接）与 `GET /api/v1/downloads/{task_id}/manifest`（只读取当前任务登记的清单）。本地复用的曲目无评分，摘要单列“复用 / 无评分”，避免计为低分匹配。专辑下载与归档分两步，合集/覆盖/目标库在归档对话框选择；替换曲目端点无 dry_run，使用提交前确认，其余三项维护均预览后执行。PC 使用顶栏九项导航，960px 以下采用抽屉、底部常用导航与卡片列表。
 
 1. **移动优先，一套代码**：不写独立移动站。PC 用侧边抽屉导航 + 数据表格；手机用底部 Tab + 卡片列表。断点按 Vuetify 默认（<960px 视为手机布局）。
 2. **操作如实反映后端能力**：同步阻塞的歌单解析给长 loading；运行中任务的"取消"置灰并附原因；需重启生效的配置项打标签，不假装热更新了一切。
@@ -247,13 +249,15 @@
 
 ```
 POST /api/v1/auth/qr/{source}          创建扫码会话 → {key, image_url 或 url}
-GET  /api/v1/auth/qr/{source}?key=…    轮询状态 → {status, cookies?}
+GET  /api/v1/auth/qr/{source}?key=…    轮询状态 → {status, message, saved, remaining_s}
+DELETE /api/v1/auth/qr/{source}?key=…  取消登录会话
     status: waiting | scanned | success | expired | failed
 ```
 
 - success 时 cookies 直接写入 `settings.sources[source]`（热应用）+ 回写 config.yaml（复用 webconfig 的 ruamel 回写），前端输入框同步回填掩码。
 - QQ 成功额外触发 qqauth 种子重置，保活链路无缝接管。
 - 会话态存内存（key → 状态/过期时间），不落库。
+- P3 实施（2026-10-09）：`source=qq|netease`，会话有效期 180 秒、最多保留 16 个；后端保存成功后才返回 success，凭证不返回浏览器。前端读取脱敏配置更新输入框，并保留其他草稿。关闭弹窗会取消会话；保存失败时提示并保留凭证仅在该会话内重试。
 
 **前端交互**（状态机弹窗，对齐对方已验证的流程）：
 

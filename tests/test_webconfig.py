@@ -154,7 +154,10 @@ def test_put_fnos_music_merges_and_resets_client(cfg_file, client, monkeypatch):
     assert settings.fnos_music.password == "pw-原值"  # 掩码未覆盖原值
     data = yaml.safe_load(cfg_file.read_text(encoding="utf-8"))
     assert data["fnos_music"]["base_url"] == "https://new"
-    assert "password" not in data["fnos_music"]  # 掩码字段不写回
+    assert data["fnos_music"]["password"] == "pw-原值"  # 保存完整配置，沿用原凭证
+    assert MASK not in cfg_file.read_text(encoding="utf-8")
+    saved = FnosMusicConfig.model_validate(data["fnos_music"])
+    assert saved.base_url == "https://new" and saved.password == "pw-原值"
 
 
 def test_put_invalid_returns_400(cfg_file, client):

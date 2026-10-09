@@ -6,21 +6,22 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import Body, Depends, FastAPI, Header, HTTPException
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import settings
-from .schemas import AlbumDownloadRequest, AlbumInfo, AlbumSummary, ArchiveRequest, ArchiveResult, BackfillLyricsRequest, ChartSummary, CleanupLibraryRequest, DownloadRequest, DownloadTask, FnosPlaylistAppendRequest, FnosPlaylistRequest, MigrateSinglesRequest, ReplaceTrackRequest, SearchResponse, SourceInfo, TaskStatus, Track, TrackArchiveRequest
+from .schemas import AlbumDownloadRequest, AlbumInfo, AlbumSummary, ArchiveRequest, ArchiveResult, BackfillLyricsRequest, ChartParseTask, ChartSummary, CleanupLibraryRequest, DownloadRequest, DownloadTask, FnosPlaylistAppendRequest, FnosPlaylistRequest, MigrateSinglesRequest, ReplaceTrackRequest, SearchResponse, SourceInfo, TaskStatus, Track, TrackArchiveRequest
 from . import album as album_svc
 from . import archive as archive_svc
 from . import download as dl
 from . import fnos as fnos_svc
-from . import backfill, charts as charts_svc, libraries, libops, meta, registry, storage, webconfig
+from . import backfill, chartparse, charts as charts_svc, libraries, libops, meta, registry, storage, webbrowse, webconfig
 from .playlist import parse_playlist
 from .search import search
+from . import qrauth
 
 app = FastAPI(title="MediaMusicService", version="0.1.0")
 
@@ -99,6 +100,44 @@ def api_chart_tracks(source: str, chart_id: str, limit: int | None = None) -> li
         raise HTTPException(status_code=502, detail=f"榜单曲目获取失败（{source}/{chart_id}）：{e}")
 
 
+@app.post("/api/v1/charts/{source}/{chart_id}/parse", response_model=ChartParseTask,
+          status_code=202, dependencies=[Depends(auth)])
+def api_chart_parse(source: str, chart_id: str,
+                    limit: int | None = Query(default=None, ge=1)) -> ChartParseTask:
+    try:
+        return chartparse.submit(source, chart_id, limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except chartparse.ParseBusyError as e:
+        raise HTTPException(status_code=429, detail=str(e))
+
+
+@app.get("/api/v1/chart-parses/{task_id}", response_model=ChartParseTask, dependencies=[Depends(auth)])
+def api_chart_parse_progress(task_id: str) -> ChartParseTask:
+    try:
+        return chartparse.get(task_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.get("/api/v1/chart-parses/{task_id}/tracks", response_model=list[Track], dependencies=[Depends(auth)])
+def api_chart_parse_tracks(task_id: str) -> list[Track]:
+    try:
+        return chartparse.get_tracks(task_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@app.delete("/api/v1/chart-parses/{task_id}", response_model=ChartParseTask, dependencies=[Depends(auth)])
+def api_chart_parse_cancel(task_id: str) -> ChartParseTask:
+    try:
+        return chartparse.cancel(task_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 def _get_album_or_404(collection_id: str) -> AlbumInfo:
     try:
         return meta.get_album(collection_id)
@@ -111,6 +150,20 @@ def _get_album_or_404(collection_id: str) -> AlbumInfo:
 @app.get("/api/v1/libraries", dependencies=[Depends(auth)])
 def api_libraries() -> list[dict]:
     return libraries.list_libraries()
+
+
+@app.get("/api/v1/library/entries", dependencies=[Depends(auth)])
+def api_library_entries(library: str | None = None, path: str = "",
+                        offset: int = Query(default=0, ge=0),
+                        limit: int = Query(default=100, ge=1, le=500)) -> dict:
+    try:
+        return webbrowse.list_entries(library, path, offset, limit)
+    except (ValueError, RuntimeError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except OSError as e:
+        raise HTTPException(status_code=400, detail=f"无法读取媒体库目录: {e}")
 
 
 # 注意：/albums/search 必须声明在 /albums/{collection_id} 之前，否则会被路径参数吃掉
@@ -223,6 +276,16 @@ def api_task(task_id: str) -> DownloadTask:
     return t
 
 
+@app.get("/api/v1/downloads/{task_id}/manifest", dependencies=[Depends(auth)])
+def api_task_manifest(task_id: str) -> dict:
+    try:
+        return webbrowse.get_manifest(task_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except (ValueError, OSError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.post("/api/v1/downloads/{task_id}/cancel", dependencies=[Depends(auth)])
 def api_cancel(task_id: str) -> dict:
     return {"canceled": dl.cancel(task_id)}
@@ -234,8 +297,9 @@ def api_list(limit: int = 20) -> list[dict]:
 
 
 @app.get("/api/v1/history", dependencies=[Depends(auth)])
-def api_history(limit: int = 50) -> list[dict]:
-    return storage.list_history(limit)
+def api_history(limit: int = 50,
+                order_by: Literal["created_at", "completed_at"] = "created_at") -> list[dict]:
+    return storage.list_history(limit, order_by=order_by)
 
 
 @app.post("/api/v1/auth/qq/refresh", dependencies=[Depends(auth)])
@@ -257,6 +321,26 @@ def api_get_config() -> dict:
 def api_put_config(body: dict[str, Any] = Body(...)) -> dict:
     """部分更新配置：掩码值跳过，回写 config.yaml（保注释），可变字段热应用。"""
     return webconfig.apply_update(body)
+
+
+@app.get("/api/v1/config/editor", dependencies=[Depends(auth)])
+def api_config_editor() -> dict:
+    return webconfig.get_editor()
+
+
+@app.post("/api/v1/auth/qr/{source}", dependencies=[Depends(auth)], status_code=201)
+def api_qr_create(source: str) -> dict:
+    return qrauth.create(source)
+
+
+@app.get("/api/v1/auth/qr/{source}", dependencies=[Depends(auth)])
+def api_qr_poll(source: str, key: str = Query(min_length=20, max_length=128)) -> dict:
+    return qrauth.poll(source, key)
+
+
+@app.delete("/api/v1/auth/qr/{source}", dependencies=[Depends(auth)])
+def api_qr_cancel(source: str, key: str = Query(min_length=20, max_length=128)) -> dict:
+    return qrauth.cancel(source, key)
 
 
 @app.get("/api/v1/system/status", dependencies=[Depends(auth)])
@@ -346,10 +430,15 @@ def _fnos_task_paths(task_id: str) -> list[str]:
     task = dl.get(task_id)
     if not task:
         raise LookupError(f"任务 {task_id} 不在内存中（服务重启后请改用 paths 入参）")
+    if task.status not in {TaskStatus.SUCCESS, TaskStatus.FAILED} or task.manifest_path or any("disc" in r or "track" in r for r in task.results):
+        raise ValueError("请选择已完成的单曲任务")
     if not task.library:
         raise ValueError(f"任务 {task_id} 下载时未指定 library，无入库曲目，请改用 paths 入参")
     from .archive import archive_tracks, archived_container_paths
-    return archived_container_paths(archive_tracks(task_id, library=task.library))
+    paths = archived_container_paths(archive_tracks(task_id, library=task.library))
+    if not paths:
+        raise ValueError("该任务没有成功入库的曲目，请检查归档结果或使用文件路径")
+    return paths
 
 
 @app.get("/api/v1/fnos/playlists", dependencies=[Depends(auth)])
@@ -360,7 +449,7 @@ def api_fnos_playlists() -> list[dict]:
         raise _fnos_http(e)
 
 
-@app.get("/api/v1/fnos/playlists/{name}/tracks", dependencies=[Depends(auth)])
+@app.get("/api/v1/fnos/playlists/{name:path}/tracks", dependencies=[Depends(auth)])
 def api_fnos_playlist_tracks(name: str) -> dict:
     try:
         return fnos_svc.playlist_detail(name)
@@ -381,12 +470,19 @@ def api_fnos_sync_playlist(req: FnosPlaylistRequest) -> dict:
         raise _fnos_http(e)
 
 
-@app.post("/api/v1/fnos/playlists/{name}/tracks", dependencies=[Depends(auth)])
+@app.post("/api/v1/fnos/playlists/{name:path}/tracks", dependencies=[Depends(auth)])
 def api_fnos_append_tracks(name: str, req: FnosPlaylistAppendRequest) -> dict:
-    if not req.paths and not req.guids:
-        raise HTTPException(status_code=400, detail="paths 与 guids 至少传其一")
+    if not req.paths and not req.guids and not req.task_id:
+        raise HTTPException(status_code=400, detail="paths、guids、task_id 至少传其一")
     try:
-        return fnos_svc.append_tracks(name, container_paths=req.paths, guids=req.guids)
+        paths = list(req.paths or [])
+        if req.task_id:
+            paths.extend(_fnos_task_paths(req.task_id))
+            if not paths and not req.guids:
+                raise ValueError("该任务没有成功入库的曲目")
+        return fnos_svc.append_tracks(name, container_paths=paths or None, guids=req.guids)
+    except (ValueError, LookupError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise _fnos_http(e)
 

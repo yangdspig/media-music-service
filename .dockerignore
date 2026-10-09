@@ -17,3 +17,14 @@ web/node_modules/
 web/dist/
 *.md
 !README.md
+# 部署配置与凭证只在运行时挂载
+config.yaml
+config.yaml.*
+.env
+.env.*
+.agents/
+.codex/
+.kimi/
+artifacts/
+tests/
+docs/

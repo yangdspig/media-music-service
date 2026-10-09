@@ -167,7 +167,7 @@
 | 参数 | 必填 | 默认 | 说明 |
 |---|---|---|---|
 | `keyword` | 是 | — | 搜索词（歌名/歌手/专辑） |
-| `sources` | 否 | 默认五源 | 逗号分隔源名，如 `NeteaseMusicClient,QQMusicClient` |
+| `sources` | 否 | 配置默认来源（初始六源） | 逗号分隔源名，如 `NeteaseMusicClient,QQMusicClient` |
 | `limit` | 否 | 20 | 返回条数上限 |
 
 **响应 200**：`SearchResponse`（含 `keyword`/`total`/`tracks`/`failed_sources`）
@@ -221,6 +221,44 @@
 **错误**：source 非法 → 400；上游接口失败/限流 → 502
 
 **典型流程**：`GET /api/v1/charts` → `GET /api/v1/charts/qq/4?limit=50` → `POST /api/v1/downloads`（tracks 只传 id 列表，subdir 如 `榜单-巅峰榜流行指数-2026-10-04`）
+
+---
+
+### 榜单异步解析与进度
+
+Web 榜单页使用以下接口获取逐曲进度；原同步榜单接口与 MCP 调用仍可使用。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/charts/{source}/{chart_id}/parse?limit=20` | 创建解析任务，立即返回 202 和进度对象；`limit` 可省略，传入时必须大于 0 |
+| GET | `/api/v1/chart-parses/{task_id}` | 读取进度对象，建议每 1–2 秒轮询 |
+| GET | `/api/v1/chart-parses/{task_id}/tracks` | 成功完成后读取 `Track[]`，并续期下载缓存；尚未成功时返回 409 |
+| DELETE | `/api/v1/chart-parses/{task_id}` | 请求停止；当前曲目请求结束后取消，已结束任务保持原状态 |
+
+所有接口使用同一 API Key 鉴权。解析任务保存在内存中，同时最多运行 4 个，超过返回 429；结束结果最多保留 32 个且最长 1 小时，服务重启后失效，任务不存在或过期返回 404。榜单 `source` 为 `qq` / `netease`，`chart_id` 必须为数字。
+
+QQ 最多解析前 100 首；网易云异步入口先按 `limit` 截取待解析曲目，再逐曲解析，不再先解析整个榜单。省略 `limit` 时，网易云解析整榜。进度的 `total` 表示本次待处理曲目数，获取目录前为 `null`，不代表榜单名义总数。
+
+进度对象示例：
+
+```json
+{
+  "task_id": "…", "source": "qq", "chart_id": "4", "limit": 20,
+  "status": "running", "stage": "parsing",
+  "total": 20, "processed": 8, "available": 6, "skipped": 2,
+  "current": "当前歌曲名", "message": "正在解析第 9/20 首曲目", "error": null,
+  "created_at": 1791446400, "updated_at": 1791446445,
+  "finished_at": null, "elapsed_s": 48
+}
+```
+
+- `status`：`pending` / `running` / `canceling` / `success` / `failed` / `canceled`。
+- `stage`：`fetching`（获取目录）/ `parsing`（逐曲解析）/ `completed`（全部处理结束）。失败或取消时保留最后处理阶段。
+- `processed`：已处理数量，等于 `available + skipped`；`available` 为已得到下载信息的曲目数；`skipped` 包括无下载地址和单曲解析异常。
+- `current`：当前曲目名称，目录缺少名称时显示曲目标识；任务结束后为 `null`。
+- 时间为 Unix 秒；`updated_at` 只在实际进展或状态变化时更新，`elapsed_s` 在查询时计算，结束后固定。`error` 为整次解析失败的原因。
+
+Web 页面显示真实进度条、当前曲目、数量和耗时；等待平台响应超过 30 秒会提示当前步骤的等待时间。临时断网会自动重试进度查询；切换榜单、刷新目录或离开页面会请求停止当前解析。
 
 ---
 
@@ -279,9 +317,76 @@
 
 ### GET /api/v1/history
 
-历史任务记录（SQLite 持久化）。参数：`limit`（默认 50）。
+历史任务记录（SQLite 持久化）。参数：`limit`（默认 50），`order_by`（`created_at` 默认按创建时间倒序；`completed_at` 按完成时间倒序，未完成任务排在最后）。排序先于条数限制；时间相同按创建时间、任务 ID 倒序稳定排序。
+
+记录含 `created_at`、`updated_at` 和 `completed_at`（Unix 秒）；成功、失败、取消记录的 `completed_at` 为终态最后更新时间，未完成记录为 null。概览“最近任务”使用 `order_by=completed_at&limit=8`。
+
+下载任务的 `results[].size_bytes` 为实际下载文件的字节数（专辑复用曲目亦记录），无法定位文件时为 null。历史旧记录会从同任务、同来源、同文件名的文件记录补齐缺失大小，无法补齐仍为 null；Web 显示 `—`，不将未知大小计作零。
 
 ---
+
+### GET /api/v1/config
+
+返回当前运行的配置；非空的 API Key、飞牛密码及来源 cookies 替换为 `••••••••`。需要鉴权。该接口保留运行态语义；配置编辑器请使用以下端点。
+
+Web 搜索使用这里的 `default_sources` 初始化勾选，配置改变后重新同步；不按来源注册顺序或可用来源的数量推断默认值。初始六源为 `QQMusicClient`、`KugouMusicClient`、`NeteaseMusicClient`、`QianqianMusicClient`、`MiguMusicClient`、`KuwoMusicClient`；已保存的自定义配置优先。不可用来源仍展示，实际搜索时过滤并提示。
+
+### GET /api/v1/config/editor
+
+分别返回已保存及运行配置，均脱敏；不创建目录或应用配置。
+
+```json
+{
+  "config": {"num_threads": 9, "api_key": "••••••••"},
+  "runtime": {"num_threads": 5, "api_key": "••••••••"},
+  "modes": {"num_threads": "restart", "api_key": "hot"},
+  "pending_restart": ["num_threads"],
+  "environment_overrides": []
+}
+```
+
+示例省略其余配置字段。相对路径按照配置文件所在目录归一化后比较。`environment_overrides` 列出被非空 `MUSIC_SERVICE_API_KEY` / `MUSIC_SERVICE_DOWNLOAD_ROOT` / `MUSIC_SERVICE_LIBRARY_ROOT` 覆盖的字段，Web 不允许修改这些字段。
+
+### PUT /api/v1/config
+
+请求体为部分更新对象。只发送发生变化的字段；敏感字段的掩码表示保留原值，cookies/API Key 的 `null` 表示清空；`fnos_music: null` 关闭飞牛连接。新增飞牛连接需要完整地址、账号、密码。
+
+- 即时应用：API Key、默认来源、来源 cookies/开关/extra、清理策略、QQ 保活策略、下载 HTTP 读取超时 `download_timeout_s`、单曲体积上限、归档备注、飞牛连接。
+- 重启应用：监听地址/端口、下载/数据库/媒体库路径、命名库根、线程数、MCP 配置。核心服务和 MCP 适配器单独读取配置，修改 MCP 本身或其 API Key 后需重启适配器。
+- `extra_library_roots`、`fnos_music.path_map`、`sources.*.extra` 和字典形式的来源 cookies 作为完整映射替换；传 `{}` 可清空。其余嵌套配置按字段合并，替换 cookie 不会残留旧账号的凭证键。
+- 保存先校验完整配置，再回写 YAML，随后应用运行态；保留 YAML 注释。Docker 单文件挂载无法替换文件时使用原位写入。
+
+**响应 200**：`{ok: true, fields: {字段: hot|restart|unchanged}, config: 脱敏运行配置, editor: 配置编辑器快照}`。校验失败 400，文件写入失败 500；校验响应不包含提交的凭证明文。修改 API Key 的成功响应可用旧 Key 收到，后续请求必须使用新 Key。
+
+### POST /api/v1/auth/qr/{source}
+
+创建扫码会话，`source` 为 `qq` / `netease`；均需与其他配置接口相同的鉴权。返回 **201**：
+
+```json
+{"key": "opaque-session-key", "source": "qq", "status": "waiting",
+ "message": "等待扫码", "expires_at": 1791500000, "remaining_s": 179,
+ "saved": false, "image_url": "data:image/png;base64,…"}
+```
+
+QQ 使用 QQ App，网易使用网易云音乐 App 扫码。二维码在本服务返回为图片数据 URL；网易 SVG 在本地生成。会话保留在内存，有效期 180 秒、最多保留 16 个，重启后失效。获取失败 502；会话满 429；不支持的来源 400。
+
+### GET /api/v1/auth/qr/{source}?key=…
+
+轮询登录状态，建议前端每 2.2 秒一次，等上次请求结束后再轮询。返回同一会话的 `status` / `message` / `expires_at` / `remaining_s` / `saved`（不重复返回图片）。
+
+| status | 说明 |
+|---|---|
+| waiting | 等待扫码；暂时网络故障会提示重试 |
+| scanned | 已扫码，等待手机确认；确认后文件保存失败也留在此状态并提示重试 |
+| success | 登录确认并成功写入配置，`saved=true` |
+| expired | 过期或已取消，需要重新生成二维码 |
+| failed | 平台拒绝/响应无效，需要重新扫码 |
+
+成功时，服务端保存该来源的 `search_cookies` / `download_cookies` / `parse_cookies` 并热应用，保留原启用开关；QQ 同时重置保活种子并沿用设备上下文。**不返回 cookies、平台签名或 access token**。保存失败时仅在当前会话内保留凭证并重试，取消/过期后丢弃。未知会话 404。
+
+### DELETE /api/v1/auth/qr/{source}?key=…
+
+取消会话并停止后续凭证保存；成功保存的凭证不撤回。在途平台请求结束后响应。关闭或刷新二维码时由前端调用。未知会话 404。
 
 ### POST /api/v1/auth/qq/refresh
 
@@ -296,6 +401,18 @@
 - `failed`：网络或未知错误，自动模式下周期间隔重试
 
 ---
+
+### GET /api/v1/library/entries
+
+浏览已配置命名库中的一层目录，复用 `X-API-Key` 鉴权。例如：`?library=default&path=艺人/专辑&offset=0&limit=100`。
+
+`path` 为相对路径，默认库根；`offset` ≥0，`limit` 1–500。返回 `library/root/path/total/offset/has_more` 与 `entries`，每项含 `name/path/type/audio/size_bytes`，目录在前；目录大小为 null。未知库或目录不存在为 404，绝对路径、`..` 和符号链接目录为 400，符号链接条目不列出。不提供文件内容下载。
+
+### GET /api/v1/downloads/{task_id}/manifest
+
+返回当前内存专辑任务的 `manifest.json`（`album/tracks/summary`；逐曲 `match.score`、`status`、`error`），复用 `X-API-Key` 鉴权。
+
+不接受客户端文件路径，只读取任务登记的清单，并核对清单任务 ID。任务不存在、清单尚未生成或已被清理为 404；路径或内容无效为 400。单曲任务没有该清单，服务重启后此入口失效；已有落盘清单仍可通过原专辑归档接口的 `manifest_path` 使用。
 
 ### GET /api/v1/albums/search
 
@@ -450,7 +567,7 @@
 | `artist` | 是 | — | 艺人名（对应库内一级目录） |
 | `album` | 是 | — | 专辑名（对应库内二级目录） |
 | `track` | 是 | — | 曲目序号（如 `3`）或曲名；多 Disc 专辑可用 `"D-NN"` 形式消歧（如 `"2-03"` 指 CD2 的第 3 首，无该 CD 子目录时退回主目录匹配） |
-| `sources` | 否 | 默认五源 | 参与搜索的源名列表 |
+| `sources` | 否 | 配置默认来源（初始六源） | 参与搜索的源名列表 |
 | `force` | 否 | false | 新候选音质不高于现有版本也强制替换 |
 | `max_size_mb` | 否 | 配置文件 | 单文件体积上限（MB）；>0 优先于配置，0/空不限 |
 
@@ -555,7 +672,7 @@
 | `library` | 否 | 默认库 | 库名（见 `/api/v1/libraries`） |
 | `artist` | 否 | — | 限定单个艺人；留空扫描整个库 |
 | `album` | 否 | — | 限定单个专辑（需配合 `artist`） |
-| `sources` | 否 | 默认五源 | 参与搜索的源名列表 |
+| `sources` | 否 | 配置默认来源（初始六源） | 参与搜索的源名列表 |
 | `limit` | 否 | 50 | 单次处理曲目数上限；超出时 `has_more=true`，分批调用 |
 | `dry_run` | 否 | **true** | 只扫描与匹配并报告，不写文件（**默认安全，建议先跑一遍看匹配质量**）；`false` 才实际写 `.lrc` |
 
@@ -592,6 +709,8 @@
 ```json
 [{"guid": "…", "name": "我的收藏", "track_count": 12}]
 ```
+
+`track_count` 取自每个歌单的 `/track/playlist-detail/list` 详情总数（只请求 1 条曲目）；详情缺少总数时分页计数。目录没有 `trackCount` 时不会用列表长度或 1 作为默认值。单个歌单数量读取失败时返回 null，其余歌单正常返回；创建、定位歌单等内部操作不额外读取所有歌单数量。
 
 **错误**：未配置 `fnos_music` → 400；飞牛侧失败（含认证失败自动重登无效）→ 502
 
@@ -647,11 +766,12 @@
 | 字段 | 必填 | 说明 |
 |---|---|---|
 | `paths` | 否 | 容器内库文件绝对路径清单（经 `path_map` 解析为飞牛 guid） |
-| `guids` | 否 | 飞牛曲目 guid 清单（免路径解析直达；可由 `/api/v1/fnos/search/tracks` 获得）。`paths`/`guids` **至少传其一** |
+| `guids` | 否 | 飞牛曲目 guid 清单（免路径解析直达；可由 `/api/v1/fnos/search/tracks` 获得） |
+| `task_id` | 否 | 当前服务内已完成、有成功入库曲目的单曲任务 ID；需下载时指定 `library`。可与 paths/guids 叠加 |
 
 **响应 200**：同建/补端点结构。
 
-**错误**：`paths`/`guids` 均缺 → 400；歌单不存在 → 404
+**错误**：`paths`/`guids`/`task_id` 均缺、任务仍在运行、专辑任务或无入库曲目 → 400；歌单不存在 → 404。歌单名称以 URL 编码传递，支持名称中的斜杠。
 
 ---
 

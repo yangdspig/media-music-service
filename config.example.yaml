@@ -1,0 +1,38 @@
+# 镜像默认配置。实际部署请将自己的 config.yaml 挂载到 /app/config.yaml。
+# 文件路径均为容器内路径；账号、cookies 和 API Key 不写入镜像。
+server:
+  host: "0.0.0.0"
+  port: 8765
+download_root: "/app/downloads"
+db_path: "/app/data/music_service.db"
+library_root: "/library"
+extra_library_roots:
+  singles: "/singles"
+num_threads: 5
+download_timeout_s: 300
+api_key: null
+max_size_mb: null
+archive_comment: "yangds整理"
+default_sources:
+  - QQMusicClient
+  - KugouMusicClient
+  - NeteaseMusicClient
+  - QianqianMusicClient
+  - MiguMusicClient
+  - KuwoMusicClient
+sources: {}
+cleanup:
+  after_archive: true
+  periodic: true
+  interval_s: 21600
+  max_size_gb: 10
+  keep_hours: 24
+auth_refresh:
+  enabled: true
+  interval_s: 3600
+fnos_music: null
+mcp:
+  transport: "stdio"
+  host: "0.0.0.0"
+  port: 8766
+  service_url: "http://127.0.0.1:8765"

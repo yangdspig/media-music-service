@@ -9,7 +9,10 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
+import os
+import tempfile
 import threading
 import time
 from dataclasses import asdict, dataclass
@@ -30,6 +33,11 @@ _ENDPOINT = "https://u.y.qq.com/cgi-bin/musicu.fcg"
 _CHECK_URL = "https://c6.y.qq.com/rsc/fcgi-bin/fcg_get_profile_homepage.fcg"
 _APP_VERSION = "14.9.0.8"
 _APP_CV = 14090008
+_THREAD_LOCK = threading.Lock()
+_KEEPALIVE_THREAD: threading.Thread | None = None
+_WAKE = threading.Event()
+_LEGACY_SEED_INVALIDATED = False
+_STATE_LOCK = threading.Lock()
 
 
 class QQAuthRefreshError(Exception):
@@ -125,17 +133,34 @@ def _load_state() -> dict | None:
 
 
 def _save_state(cred: QQCredential, config_createtime: str, expired: bool,
-                device: dict | None = None) -> None:
+                device: dict | None = None, seed: dict | None = None) -> None:
     payload = {"credential": asdict(cred), "refreshed_at": int(time.time()),
                "config_createtime": config_createtime, "expired": expired}
     # 设备上下文持久化：未显式传入时沿用旧状态的（避免每次刷新注册新设备 → 20279 设备数超限）
     old = _load_state() or {}
+    current = seed if seed is not None else _config_cookies()
+    if current is not None:
+        payload["config_fingerprint"] = _seed_fingerprint(current)
     device = device or old.get("device")
     if device:
         payload["device"] = device
     p = _state_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    with _STATE_LOCK:
+        # 保活请求在途时可能重新扫码；旧响应不可覆盖刚保存的新种子。
+        latest = _config_cookies()
+        if current is not None and (latest is None or _seed_fingerprint(current) != _seed_fingerprint(latest)):
+            return
+        fd, tmp = tempfile.mkstemp(prefix=p.name + ".", dir=p.parent)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(json.dumps(payload, ensure_ascii=False))
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, p)
+        finally:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
 
 
 def _config_cookies() -> dict | None:
@@ -148,7 +173,28 @@ def _config_cookies() -> dict | None:
 
 def _state_matches_config(state: dict, config_cookies: dict) -> bool:
     """状态文件是否仍对应当前 config 种子（用户重新粘贴 → createtime 变化 → 失配）。"""
-    return state.get("config_createtime") == str(_int(config_cookies.get("psrf_musickey_createtime")))
+    if state.get("config_createtime") != str(_int(config_cookies.get("psrf_musickey_createtime"))):
+        return False
+    if state.get("config_fingerprint"):
+        return state["config_fingerprint"] == _seed_fingerprint(config_cookies)
+    if _LEGACY_SEED_INVALIDATED:
+        return False
+    return True
+
+
+def _seed_fingerprint(cookies: dict) -> str:
+    return hashlib.sha256(json.dumps(cookies, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def reset_seed() -> None:
+    """更新 cookies 后替换保活种子，同时保留设备上下文。"""
+    global _LEGACY_SEED_INVALIDATED
+    _LEGACY_SEED_INVALIDATED = True
+    cookies = _config_cookies()
+    if cookies is None:
+        _state_path().unlink(missing_ok=True)
+        return
+    _save_state(parse_credential(cookies), str(_int(cookies.get("psrf_musickey_createtime"))), False)
 
 
 def effective_cookies() -> dict | None:
@@ -312,7 +358,7 @@ def keepalive_once(force: bool = False) -> dict:
     try:
         new_cred = refresh(cred, ctx)
     except QQAuthExpiredError as e:
-        _save_state(cred, config_createtime, expired=True)
+        _save_state(cred, config_createtime, expired=True, seed=config)
         logger.error("QQ 凭证彻底失效（code=%s），需重新粘贴 cookies", e.code)
         return {"status": "expired", "code": e.code}
     except Exception as e:
@@ -321,7 +367,7 @@ def keepalive_once(force: bool = False) -> dict:
     if check_expired(new_cred) is not False:
         logger.error("QQ 凭证刷新后复核不通过，保留旧凭证")
         return {"status": "failed", "error": "刷新后复核不通过"}
-    _save_state(new_cred, config_createtime, expired=False, device=_serialize_device(*ctx))
+    _save_state(new_cred, config_createtime, expired=False, device=_serialize_device(*ctx), seed=config)
     logger.info("QQ 凭证刷新成功，musickey 有效期 %ds", new_cred.key_expires_in)
     return {"status": "refreshed", "key_expires_in": new_cred.key_expires_in}
 
@@ -330,15 +376,24 @@ def keepalive_once(force: bool = False) -> dict:
 
 def _keepalive_loop() -> None:
     while True:
-        time.sleep(settings.auth_refresh.interval_s)
+        if _WAKE.wait(settings.auth_refresh.interval_s):
+            _WAKE.clear()
+            continue
         try:
-            keepalive_once()
+            if settings.auth_refresh.enabled:
+                keepalive_once()
         except Exception:
             logger.exception("QQ 凭证保活周期任务异常")
 
 
 def start_keepalive() -> None:
     """服务启动时调用：按配置开启 QQ 凭证保活后台线程。"""
-    if not settings.auth_refresh.enabled:
-        return
-    threading.Thread(target=_keepalive_loop, daemon=True, name="qq-auth-keepalive").start()
+    global _KEEPALIVE_THREAD
+    with _THREAD_LOCK:
+        if _KEEPALIVE_THREAD and _KEEPALIVE_THREAD.is_alive():
+            _WAKE.set()
+            return
+        if not settings.auth_refresh.enabled:
+            return
+        _KEEPALIVE_THREAD = threading.Thread(target=_keepalive_loop, daemon=True, name="qq-auth-keepalive")
+        _KEEPALIVE_THREAD.start()

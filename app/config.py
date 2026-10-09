@@ -80,15 +80,15 @@ class Settings(BaseModel):
     download_root: str = "./downloads"
     db_path: str = "./data/music_service.db"
     num_threads: int = 5
-    download_timeout_s: int = 300  # 单源下载超时保护，防止 musicdl 内部无限等待
+    download_timeout_s: int = 300  # 音频下载 HTTP 读取超时；并非整首曲目的总时限
     api_key: str | None = None  # 为空则不启用鉴权
     library_root: str | None = None  # 媒体库根目录（archive_album 归档目标）；为空则归档不可用
     extra_library_roots: dict[str, str] = {}  # 命名附加库根（如 {"singles": "/singles"}），归档可按库名选择目标（白名单，调用方不传裸路径）
     max_size_mb: float | None = None  # 单文件体积上限（MB）：超出则专辑匹配跳过该候选、单曲下载拒绝；0/空不限；接口传参优先
     archive_comment: str = "yangds整理"  # 归档时统一写入的 COMMENT tag
     default_sources: list[str] = [
-        "MiguMusicClient", "NeteaseMusicClient", "QQMusicClient",
-        "KuwoMusicClient", "QianqianMusicClient",
+        "QQMusicClient", "KugouMusicClient", "NeteaseMusicClient",
+        "QianqianMusicClient", "MiguMusicClient", "KuwoMusicClient",
     ]
     sources: dict[str, SourceConfig] = {}
     mcp: MCPConfig = MCPConfig()  # MCP 适配器配置（仅 mcp_adapter.py 读取，核心服务不使用）

@@ -333,7 +333,8 @@ def _run_album(task: DownloadTask, album: AlbumInfo, sources: list[str] | None,
                                     "quality_tier": libops.file_quality_tier(reused)})
                 task.completed += 1
                 task.results.append({"disc": expected.disc, "track": expected.track,
-                                     "title": expected.title, "file": fname, "source": "singles"})
+                                     "title": expected.title, "file": fname, "source": "singles",
+                                     "size_bytes": entry["size_bytes"]})
                 entries.append(entry)
                 dl.save_task(task)
                 continue
@@ -381,8 +382,9 @@ def _run_album(task: DownloadTask, album: AlbumInfo, sources: list[str] | None,
                              size_bytes=fpath.stat().st_size if fpath.exists() else None)
                 task.completed += 1
                 task.results.append({"disc": expected.disc, "track": expected.track,
-                                     "title": expected.title, "file": found, "source": source})
-                storage.record_file(task.task_id, chosen.model_dump(), save_path=str(fpath))
+                                     "title": expected.title, "file": found, "source": source,
+                                     "size_bytes": entry["size_bytes"]})
+                storage.record_file(task.task_id, {**chosen.model_dump(), "size_bytes": entry["size_bytes"]}, save_path=str(fpath))
             else:
                 entry.update(status="failed", error="下载后未找到落盘文件")
         dl.save_task(task)

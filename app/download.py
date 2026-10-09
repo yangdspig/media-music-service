@@ -53,6 +53,7 @@ def download_songs(source: str, song_dicts: list[dict], save_dir: str) -> int:
     if not song_infos:
         raise RuntimeError("SongInfo 重建失败")
     client = build_client([source])
+    client.requests_overrides.setdefault(source, {})["timeout"] = (10, settings.download_timeout_s)
     client.download(song_infos=song_infos)
     return len(song_infos)
 
@@ -176,13 +177,19 @@ def _run(task: DownloadTask, tracks: list[Track]) -> None:
             # 逐曲定位实际落盘文件（musicdl 单曲失败不抛异常，找不到时 file=None，归档跳过）
             for t in grp_tracks:
                 fname = _find_downloaded_file(save_dir, "", str(t.raw.get("identifier", "")), before)
+                size_bytes = None
+                if fname:
+                    try:
+                        size_bytes = (Path(save_dir) / fname).stat().st_size
+                    except OSError:
+                        pass
                 task.results.append({
                     "source": source, "title": t.title, "artists": t.artists,
                     "album": t.album, "ext": t.ext, "cover_url": t.cover_url,
                     "artist_img_url": t.artist_img_url,
-                    "file": fname, "save_dir": save_dir,
+                    "file": fname, "save_dir": save_dir, "size_bytes": size_bytes,
                 })
-                storage.record_file(task.task_id, t.model_dump(),
+                storage.record_file(task.task_id, {**t.model_dump(), "size_bytes": size_bytes},
                                     save_path=str(Path(save_dir) / fname) if fname else save_dir)
         except Exception as e:  # 单源失败不拖垮整体
             # 完整堆栈进日志；errors 里带异常类型，避免 musicdl 抛出空消息异常时只剩 "None"

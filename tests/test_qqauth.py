@@ -92,13 +92,27 @@ def test_effective_cookies_state_wins(state_dir, monkeypatch):
     assert out is not None and out["qqmusic_key"] == "Q_H_L_new"
 
 
-def test_state_reset_when_user_repastes(state_dir, monkeypatch):
+@pytest.mark.parametrize("expired", [False, True])
+def test_state_reset_when_user_repastes(state_dir, monkeypatch, expired):
     """用户重新粘贴 cookies（createtime 变化）→ 状态文件作废，回退 config。"""
     _seed_config(monkeypatch)
     qqauth._save_state(qqauth.QQCredential(musickey="Q_H_L_new"),
-                       config_createtime="1111111111", expired=True)  # 陈旧种子
+                       config_createtime="1111111111", expired=expired)  # 陈旧种子
     assert qqauth.effective_cookies() is None
     assert qqauth.state_is_expired() is False  # 新 cookies 不受旧 expired 标记影响
+
+
+def test_state_reset_when_cookie_changes_without_new_createtime(state_dir, monkeypatch):
+    """缺少新创建时间的扫码凭证也不能被旧保活状态覆盖。"""
+    _seed_config(monkeypatch)
+    qqauth._save_state(qqauth.QQCredential(musickey="Q_H_L_refreshed"),
+                       config_createtime="1788258930", expired=True)
+    cookies = {**SAMPLE_COOKIES, "qqmusic_key": "Q_H_L_replaced"}
+    monkeypatch.setattr(settings, "sources", {
+        "QQMusicClient": SourceConfig(search_cookies=cookies),
+    })
+    assert qqauth.effective_cookies() is None
+    assert qqauth.state_is_expired() is False
 
 
 def test_state_is_expired(state_dir, monkeypatch):

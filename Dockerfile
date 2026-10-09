@@ -4,7 +4,8 @@
 # 基础镜像：python:3.11-slim（Debian），与 musicdl 官方推荐版本一致
 
 # ---- 前端构建（Vue 3 + Vite，产物由 FastAPI StaticFiles 托管在 /） ----
-FROM node:20-alpine AS web-builder
+ARG WEB_BUILD_IMAGE=node:20-alpine
+FROM ${WEB_BUILD_IMAGE} AS web-builder
 
 WORKDIR /build
 COPY web/package.json web/package-lock.json ./
@@ -43,12 +44,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # ---- Python 依赖（单独一层，利用构建缓存）----
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY constraints.txt .
+RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt
 
 # ---- 应用代码 ----
 COPY app ./app
 COPY mcp_adapter.py ./
-COPY config.yaml ./
+# 默认配置不含部署凭证；现有 NAS 继续挂载自己的 config.yaml
+COPY config.example.yaml ./config.yaml
 # 前端构建产物（web-builder 阶段；app/main.py 的 SPA 托管从 web/dist 读取）
 COPY --from=web-builder /build/dist ./web/dist
 

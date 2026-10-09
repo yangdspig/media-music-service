@@ -75,7 +75,7 @@
    - 设计文档：[docs/superpowers/specs/2026-09-23-charts-catalog-design.md](docs/superpowers/specs/2026-09-23-charts-catalog-design.md)（接口已 2026-09-23 实测可用）
    - 第一期：新增 `app/charts.py` + `GET /api/v1/charts`（榜单目录）+ `GET /api/v1/charts/{source}/{chart_id}`（榜单曲目，落缓存可直接提交下载）+ MCP `list_charts`/`get_chart_tracks`；网易榜单本质是歌单（`/api/toplist` 的 id 即 playlist id，详情复用 parse_playlist）；QQ 走 `fcg_myqq_toplist.fcg`（目录）+ `fcg_v8_toplist_cp.fcg`（详情，song_begin/song_num 可分页），逐曲解析复用 musicdl QQMusicClient 的 `_parsewithofficialapiv1` + thirdpart 回退模式；下载管线零改动（全量=整表提交，挑选=子集提交）（已实现并 E2E 验证通过：QQ fcg_myqq_toplist/fcg_v8_toplist_cp 逐曲解析复用 QQMusicClient parseplaylist 模式，网易榜单 id 即 playlist id 复用 parse_playlist；REST 两端点 + MCP 两工具）
    - 第二期（另行立项）：歌单关键词搜索 `GET /api/v1/playlists/search`（网易 `/api/search/get` type=1000，QQ `client_search_cp` 歌单类型）
-   - 第三期（候选）：榜单/歌单解析异步化，与下方"歌单批量下载"条目是同一个问题，届时合并解决
+   - 榜单 Web 异步解析已实现（2026-10-08）：后台任务 + 逐曲进度轮询（已处理/总数、可下载/跳过、当前曲目、耗时、停止），网易云按指定数量先截取目录；原同步 REST/MCP 保留。歌单解析异步化仍待后续实现。
 
 2j. **飞牛音乐歌单同步** ✅ 第一期已完成（2026-10-04）
    - 背景：下载入库的歌曲在飞牛音乐里只是散落在曲库中，缺歌单组织维度；典型场景：榜单批量下载后新建榜单歌单管理；以及把已有歌曲加入既有歌单的原子管理
@@ -85,9 +85,12 @@
 
 2k. **独立 Web UI（进行中，2026-10-08 立项）**
    - 背景：补齐浏览器操作入口，配置修改与全部业务功能前端化，PC/手机双端响应式
-   - 方案：可行性与方案已审核（[2026-10-08-web-ui-feasibility.md](docs/superpowers/specs/2026-10-08-web-ui-feasibility.md)，方案 A：Vue 3 + Vuetify 3 SPA + FastAPI StaticFiles 同源托管）；后端仅新增 config 读写 + system/status 端点（配置热更新已核可实现：全局 settings 各模块调用时现读）
+   - 方案：可行性与方案已审核（[2026-10-08-web-ui-feasibility.md](docs/superpowers/specs/2026-10-08-web-ui-feasibility.md)）；实施采用 Vue 3 + Tailwind CSS 4 + Pinia + axios + Lucide，按用户设计稿迁移，FastAPI StaticFiles 同源托管
    - 原型：设计文稿 [2026-10-08-web-ui-design.md](docs/superpowers/specs/2026-10-08-web-ui-design.md)（9 页 + 扫码登录；视觉基线以用户提供的设计稿为准：`docs/superpowers/specs/2026-10-08-web-ui-draft/pages/` 九页 HTML，深青 teal + 顶栏导航 + Tailwind tokens）；可交互 HTML 原型 `docs/superpowers/specs/2026-10-08-web-ui-prototype.html`（单文件双击即开，早期 Vue+Vuetify 验证稿）
    - 分期：P1 后端补能 + 骨架 + 仪表盘/搜索/任务中心 → P2 榜单/专辑/歌单/媒体库 → P3 设置 + 飞牛 + 移动端打磨
+   - P1 已完成：config/system 端点、SPA 托管、登录与三页核心闭环（`88a5b15`）。P2 已实现：四页真实 API 交互、专辑匹配分数/未匹配原因、归档结果、命名库目录浏览与四种运维操作（清理/迁移/回填先预览后确认）；补充两个只读端点 `library/entries` 与 `downloads/{task_id}/manifest`；修复未鉴权登录循环及已完成任务无法归档的问题
+   - P3 已实现（2026-10-09）：系统配置页（保存与运行态分开、即时/重启标注、脱敏凭证、未保存提醒、QQ 手动保活、MCP 只读）；飞牛歌单列表/详情/四组搜索/创建/追加及数量结果；QQ/网易云扫码会话与凭证保存；移动端导航焦点约束及保存栏避让底部导航。后端新增 `config/editor` 与扫码三端点，兼容 Docker 单文件配置挂载，修复路径映射无法清空、周期任务重复启动/关闭无效、旧 QQ 保活响应覆盖新凭证的问题
+   - P3 交付状态：前端构建与 Python 语法检查通过；QQ/网易真实手机扫码、凭证下载与飞牛实际写入尚未验收，NAS 容器未自动更新。实施记录见 [2026-10-09-web-ui-p3.md](docs/superpowers/plans/2026-10-09-web-ui-p3.md)。镜像瘦身与 MoviePilot 插件仍独立暂缓
    - 借鉴调研：[2026-10-08-go-music-dl-comparison.md](docs/superpowers/specs/2026-10-08-go-music-dl-comparison.md)（含扫码登录设计、镜像瘦身方案）
 
 2l. **镜像瘦身（待启动，2026-10-08 提案）**

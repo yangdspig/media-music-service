@@ -5,7 +5,7 @@ Track 是对 musicdl SongInfo 的标准化封装，服务对外只暴露这个�
 """
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 
 
@@ -54,6 +54,27 @@ class ChartSummary(BaseModel):
     extra: dict[str, Any] = Field(default_factory=dict, description="源特有附加信息（试听数/更新频率/前三首预览等）")
 
 
+class ChartParseTask(BaseModel):
+    """榜单解析进度；曲目结果通过独立接口读取，避免轮询传输 raw。"""
+    task_id: str
+    source: str
+    chart_id: str
+    limit: Optional[int] = None
+    status: Literal["pending", "running", "canceling", "success", "failed", "canceled"] = "pending"
+    stage: Literal["fetching", "parsing", "completed"] = "fetching"
+    total: Optional[int] = None
+    processed: int = 0
+    available: int = 0
+    skipped: int = 0
+    current: Optional[str] = None
+    message: str = "正在准备解析"
+    error: Optional[str] = None
+    created_at: float
+    updated_at: float
+    finished_at: Optional[float] = None
+    elapsed_s: float = 0
+
+
 class DownloadTrackInput(Track):
     """下载提交项：仅 id 必填（服务端按搜索/歌单缓存补全 raw 与其余字段）；
     也兼容完整 Track（含 raw）直传——raw 非空时优先使用传入值，不查缓存。"""
@@ -98,7 +119,7 @@ class AlbumInfo(AlbumSummary):
 
 
 class AlbumDownloadRequest(BaseModel):
-    sources: Optional[list[str]] = Field(default=None, description="参与匹配下载的源，留空用默认五源")
+    sources: Optional[list[str]] = Field(default=None, description="参与匹配下载的源，留空用配置的 default_sources（初始六源）")
     subdir: Optional[str] = Field(default=None, description="下载根目录下的子目录，默认'{艺人} - {专辑}'")
     album_title: Optional[str] = Field(default=None, description="显示用专辑名覆盖（应对 iTunes 罗马音专辑名，写入 manifest 供归档使用）")
     artist: Optional[str] = Field(default=None, description="显示用艺人名覆盖")
@@ -166,7 +187,7 @@ class ReplaceTrackRequest(BaseModel):
     artist: str = Field(description="艺人名（对应库内一级目录）")
     album: str = Field(description="专辑名（对应库内二级目录）")
     track: Any = Field(description="曲目序号（如 3）或曲名")
-    sources: Optional[list[str]] = Field(default=None, description="参与搜索的源，留空用默认五源")
+    sources: Optional[list[str]] = Field(default=None, description="参与搜索的源，留空用配置的 default_sources（初始六源）")
     force: bool = Field(default=False, description="新候选音质不高于现有版本也强制替换")
     max_size_mb: Optional[float] = Field(default=None, description="单文件体积上限（MB），>0 优先于配置，0/空不限")
 
@@ -176,7 +197,7 @@ class BackfillLyricsRequest(BaseModel):
     library: Optional[str] = Field(default=None, description="库名（见 GET /api/v1/libraries）；留空用默认库")
     artist: Optional[str] = Field(default=None, description="限定单个艺人；留空扫描整个库")
     album: Optional[str] = Field(default=None, description="限定单个专辑（需配合 artist）；留空不限")
-    sources: Optional[list[str]] = Field(default=None, description="参与搜索的源，留空用默认五源")
+    sources: Optional[list[str]] = Field(default=None, description="参与搜索的源，留空用配置的 default_sources（初始六源）")
     limit: int = Field(default=50, description="单次处理的曲目数上限（网络密集型，分批调用）")
     dry_run: bool = Field(default=True, description="只扫描与匹配并报告，不写文件；False 才实际写 .lrc")
 
@@ -217,3 +238,4 @@ class FnosPlaylistAppendRequest(BaseModel):
     """严格追加到既有飞牛歌单：paths/guids 至少其一；歌单不存在返回 404。"""
     paths: Optional[list[str]] = Field(default=None, description="容器内库文件绝对路径清单")
     guids: Optional[list[str]] = Field(default=None, description="飞牛曲目 guid 清单（免路径解析直达）")
+    task_id: Optional[str] = Field(default=None, description="已完成且指定了 library 的单曲下载任务 ID")

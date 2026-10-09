@@ -72,6 +72,7 @@ async function verify(key) {
   try {
     // 用 /sources 校验 key 是否有效；未启用鉴权的服务任何 key 都会放行
     await client.get('/sources')
+    if (!key) auth.allowAnonymous()
     toast.show('登录成功', 'success')
     router.push(redirectTarget())
   } catch (e) {
@@ -95,8 +96,7 @@ function submit() {
 }
 
 function enterWithoutKey() {
-  // 服务未启用鉴权时不带 key 直接进入；若服务实际开了鉴权，后续 401 会被拦截回来
-  auth.clear()
-  router.push(redirectTarget())
+  // 先用真实 API 验证匿名访问，再授予当前标签页通行状态。
+  verify('')
 }
 </script>

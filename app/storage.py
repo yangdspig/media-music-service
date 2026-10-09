@@ -78,13 +78,39 @@ def list_task_dirs() -> list[tuple[str, float]]:
     return [(r["save_dir"], r["ts"]) for r in rows]
 
 
-def list_history(limit: int = 50) -> list[dict]:
+def list_history(limit: int = 50, order_by: str = "created_at") -> list[dict]:
+    # 终态记录最后一次更新时间即任务完成时间；未完成任务排在已完成任务之后。
+    orders = {
+        "created_at": "created_at DESC, task_id DESC",
+        "completed_at": "CASE WHEN status IN ('success', 'failed', 'canceled') "
+                        "THEN updated_at END DESC, created_at DESC, task_id DESC",
+    }
+    if order_by not in orders:
+        raise ValueError(f"不支持的任务排序字段: {order_by}")
     with _conn() as c:
-        rows = c.execute("SELECT * FROM tasks ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+        rows = c.execute(f"SELECT * FROM tasks ORDER BY {orders[order_by]} LIMIT ?", (limit,)).fetchall()
+        # 旧版 results 未记录大小；使用同任务的文件记录补齐，无需改写历史。
+        task_ids = [r["task_id"] for r in rows]
+        files = c.execute(
+            f"SELECT task_id,source,title,save_path,size_bytes FROM files "
+            f"WHERE task_id IN ({','.join('?' for _ in task_ids)}) ORDER BY id DESC",
+            task_ids,
+        ).fetchall() if task_ids else []
+    file_sizes: dict[tuple, int] = {}
+    for file in files:
+        if file["size_bytes"] is not None and file["save_path"]:
+            key = (file["task_id"], file["source"], Path(file["save_path"]).name)
+            file_sizes.setdefault(key, file["size_bytes"])
     out = []
     for r in rows:
         d = dict(r)
         d["results"] = json.loads(d.get("results") or "[]")
+        for result in d["results"]:
+            if result.get("size_bytes") is None:
+                name = result.get("file") or result.get("save_path")
+                key = (d["task_id"], result.get("source"), Path(name).name) if name else None
+                result["size_bytes"] = file_sizes.get(key)
         d["errors"] = json.loads(d.get("errors") or "[]")
+        d["completed_at"] = d["updated_at"] if d["status"] in ("success", "failed", "canceled") else None
         out.append(d)
     return out
