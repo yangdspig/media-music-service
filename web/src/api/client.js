@@ -4,7 +4,7 @@ import { useToastStore } from '../stores/toast'
 import router from '../router'
 
 const client = axios.create({
-  baseURL: '/api/v1',
+  baseURL: new URL('api/v1', document.baseURI).pathname,
   timeout: 120000,
 })
 

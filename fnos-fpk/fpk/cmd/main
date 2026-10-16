@@ -1,0 +1,79 @@
+#!/bin/bash
+set -u
+
+: "${TRIM_APPDEST:?missing TRIM_APPDEST}"
+: "${TRIM_PKGVAR:?missing TRIM_PKGVAR}"
+PROXY="$TRIM_APPDEST/proxy.py"
+PIDFILE="$TRIM_PKGVAR/proxy.pid"
+SOCKET="$TRIM_APPDEST/app.sock"
+
+if [ -x /var/apps/python312/target/bin/python3 ]; then
+  PY=/var/apps/python312/target/bin/python3
+else
+  PY="$(command -v python3 || true)"
+fi
+
+error() {
+  if [ -n "${TRIM_TEMP_LOGFILE:-}" ]; then
+    printf '%s\n' "$1" > "$TRIM_TEMP_LOGFILE"
+  else
+    printf '%s\n' "$1" >&2
+  fi
+}
+
+alive() {
+  [ -f "$PIDFILE" ] || return 1
+  PID="$(cat "$PIDFILE")"
+  [[ "$PID" =~ ^[0-9]+$ ]] || return 1
+  kill -0 "$PID" 2>/dev/null || return 1
+  # A stale PID file must never stop an unrelated process after PID reuse.
+  [ -r "/proc/$PID/cmdline" ] || return 1
+  [[ "$(tr '\0' ' ' < "/proc/$PID/cmdline")" == *"$PROXY"* ]]
+}
+
+case "${1:-}" in
+  start)
+    if [ ! -x "$PY" ]; then
+      error "未找到 python3，请先在飞牛应用中心安装 python312 运行时。"
+      exit 1
+    fi
+    mkdir -p "$TRIM_PKGVAR" || exit 1
+    if ! alive; then
+      nohup "$PY" "$PROXY" >> "$TRIM_PKGVAR/proxy.log" 2>&1 &
+      printf '%s\n' "$!" > "$PIDFILE"
+    fi
+    for ((attempt = 0; attempt < 50; attempt++)); do
+      if alive && [ -S "$SOCKET" ]; then
+        exit 0
+      fi
+      alive || break
+      sleep 0.1
+    done
+    if alive; then kill "$PID" 2>/dev/null; fi
+    rm -f "$PIDFILE"
+    error "音乐助手代理启动失败，请查看 $TRIM_PKGVAR/proxy.log。"
+    exit 1
+    ;;
+  stop)
+    if alive; then
+      kill "$PID" 2>/dev/null
+      for ((attempt = 0; attempt < 50; attempt++)); do
+        alive || break
+        sleep 0.1
+      done
+      if alive; then
+        error "音乐助手代理尚未退出，请查看 $TRIM_PKGVAR/proxy.log。"
+        exit 1
+      fi
+    fi
+    rm -f "$PIDFILE" "$SOCKET"
+    exit 0
+    ;;
+  status)
+    if alive && [ -S "$SOCKET" ]; then exit 0; fi
+    exit 3
+    ;;
+  *)
+    exit 1
+    ;;
+esac

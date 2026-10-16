@@ -92,6 +92,37 @@ docker compose -p media-music-service -f docker-compose.yml -f docker-compose.we
 
 部署完成访问 `http://192.168.254.111:8765/`。此版本新增榜单单首/多选/全部顺序试听与播放控制、12px 绿/红源状态圆点、手机源列表默认折叠，以及底部榜单入口；保留已有的搜索/榜单结果与选择状态、大小排序、统一六源等功能。试听使用原始音频，不做转码，音源地址或浏览器格式支持会影响实际可播性。无需新增配置字段；挂载配置中已有的 `default_sources` 优先于镜像初始六源。如果仍是旧五源或自定义来源，在设置 → 下载与归档 → 使用常用六源后保存即可同步搜索页，无需重启。
 
+### 飞牛桌面应用
+
+配套 FPK 显示为“音乐助手”，使用蓝色音符图标，通过飞牛统一网关在桌面窗口中访问现有服务。**先升级镜像，再安装 FPK**；完整构建和排查说明见 [fnos-fpk/README.md](fnos-fpk/README.md)。
+
+本次对应产物：
+
+- `artifacts/MUSICASSISTANT.fpk` 及 `.sha256`：飞牛应用中心手动安装包。
+- `artifacts/media-music-service-fnos-20261016-linux-amd64.tar.gz` 及 `.sha256`：包含网关路径适配的服务镜像。
+
+将这四个文件拷贝到现有 NAS 部署目录，例如 `/vol1/1000/media-music-service`。在**现有部署目录**加载新镜像，沿用当前网络和挂载：
+
+```bash
+cd /vol1/1000/media-music-service
+sha256sum -c MUSICASSISTANT.fpk.sha256
+sha256sum -c media-music-service-fnos-20261016-linux-amd64.tar.gz.sha256
+docker image load -i media-music-service-fnos-20261016-linux-amd64.tar.gz
+cat > docker-compose.fnos.yml <<'YAML'
+services:
+  music-service:
+    image: media-music-service:fnos-20261016
+YAML
+docker compose -p media-music-service -f docker-compose.yml -f docker-compose.fnos.yml up -d --no-deps --no-build --pull never music-service
+curl --fail http://127.0.0.1:8765/app/MUSICASSISTANT/api/v1/health
+```
+
+已有部署如使用其他 Compose 项目名、文件名或额外覆盖文件，请保留原参数，将新的镜像覆盖文件放在最后。不要在源码目录用默认挂载代替正在使用的部署配置。NAS 须能通过本机 `127.0.0.1:8765` 访问后端。
+
+健康接口返回 JSON 且 `ok` 为 `true` 后，在飞牛应用中心手动安装 `MUSICASSISTANT.fpk`。设备须有系统 Python 3 或应用中心 `python312` 运行时。点击桌面“音乐助手”即可打开，启用 API Key 时继续使用原密钥。
+
+FPK 不包含音乐后端或配置凭证，仅管理入口代理。停止或卸载它不会删除音乐、配置及数据库，也不会停止现有 Docker 服务。原有 `http://<NAS>:8765/` 访问方式继续可用。日志位于 `/var/apps/MUSICASSISTANT/var/proxy.log`；页面显示 502 时先检查音乐容器，带前缀接口返回 HTML 时检查是否仍运行旧镜像。
+
 ### 更新应用代码
 
 Dockerfile 将应用代码和前端产物复制进镜像；Compose 挂载的是配置与数据。修改 `app/` 或 `web/` 后，需要构建新镜像并重建容器。`docker compose restart` 适用于读取更新后的挂载配置，不会加载工作区里修改过的应用代码。

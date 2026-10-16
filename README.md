@@ -91,6 +91,8 @@ venv\Scripts\python.exe mcp_adapter.py
 
 前后端可一起打包进 Docker 镜像，由 8765 端口提供网页和 API。执行 `bash scripts/package-image.sh <镜像标签>` 可构建并导出 `artifacts/` 下的镜像归档及校验文件，在 NAS 上使用 `docker image load` 加载即可；镜像使用无凭证默认配置，继续挂载部署目录中的 `config.yaml`。详见 [Docker 部署指南](DEPLOY.md)。
 
+飞牛桌面入口见 [音乐助手 FPK](fnos-fpk/README.md)：升级配套服务镜像后，手动安装 `artifacts/MUSICASSISTANT.fpk`，即可点击蓝色音符图标在飞牛窗口中打开网页，支持 HTTPS 桌面。入口沿用现有 8765 服务，卸载不影响 Docker 服务及音乐数据。
+
 - [设计方案](docs/design.md)：背景目标、总体架构、关键取舍、里程碑、范围外事项
 - [开发规划](ROADMAP.md)：里程碑状态与 M4 待办方向
 - [贡献指南](CONTRIBUTING.md)：核心原则、开发环境、自测要求

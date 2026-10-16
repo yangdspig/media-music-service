@@ -1,0 +1,13 @@
+appname="MUSICASSISTANT"
+version="1.0.0"
+display_name="音乐助手"
+desc="MediaMusicService 音乐助手桌面入口，支持音乐搜索下载、榜单试听、专辑归档与飞牛歌单。通过飞牛统一网关打开本机 8765 端口的现有 Web 服务，支持 HTTPS 桌面访问。"
+maintainer="yangds"
+source="thirdparty"
+platform="all"
+ctl_stop=true
+checkport=false
+service_port=8765
+desktop_uidir=ui
+desktop_applaunchname=MUSICASSISTANT.main
+disable_authorization_path=true

@@ -1,0 +1,14 @@
+{
+  ".url": {
+    "MUSICASSISTANT.main": {
+      "title": "音乐助手",
+      "icon": "images/icon_{0}.png",
+      "type": "iframe",
+      "protocol": "",
+      "gatewayPrefix": "/app/MUSICASSISTANT",
+      "gatewaySocket": "app.sock",
+      "url": "/app/MUSICASSISTANT/",
+      "allUsers": true
+    }
+  }
+}

@@ -9,8 +9,6 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.staticfiles import StaticFiles
-from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import settings
 from .schemas import AlbumDownloadRequest, AlbumInfo, AlbumSummary, ArchiveRequest, ArchiveResult, BackfillLyricsRequest, ChartParseTask, ChartSummary, CleanupLibraryRequest, DownloadRequest, DownloadTask, FnosPlaylistAppendRequest, FnosPlaylistRequest, MigrateSinglesRequest, ReplaceTrackRequest, SearchResponse, SourceInfo, TaskStatus, Track, TrackArchiveRequest
@@ -22,8 +20,10 @@ from . import backfill, chartparse, charts as charts_svc, libraries, libops, met
 from .playlist import parse_playlist
 from .search import search
 from . import qrauth
+from .webapp import FnosGatewayMiddleware, SPAStaticFiles
 
 app = FastAPI(title="MediaMusicService", version="0.1.0")
+app.add_middleware(FnosGatewayMiddleware)
 
 
 @app.on_event("startup")
@@ -66,8 +66,10 @@ def api_search(keyword: str, sources: str | None = None, limit: int = 20) -> Sea
 
 
 @app.post("/api/v1/tracks/{track_id}/preview", dependencies=[Depends(auth)])
-def api_track_preview(track_id: str) -> dict:
-    return preview.issue(track_id)
+def api_track_preview(track_id: str, request: Request) -> dict:
+    result = preview.issue(track_id)
+    result["url"] = request.scope.get("root_path", "").rstrip("/") + result["url"]
+    return result
 
 
 @app.get("/api/v1/preview/{token}")
@@ -517,20 +519,7 @@ def api_fnos_search_tracks(q: str = "", limit: int = 50) -> dict:
         raise _fnos_http(e)
 
 
-# ---- SPA 静态托管：web/dist 存在时挂在 /（API 路由已先注册，/api/* 不受影响） ----
-
-class _SPAStaticFiles(StaticFiles):
-    """history 路由回退：静态文件未命中时回落 index.html。"""
-
-    async def get_response(self, path: str, scope):
-        try:
-            return await super().get_response(path, scope)
-        except StarletteHTTPException as e:
-            if e.status_code == 404:
-                return await super().get_response("index.html", scope)
-            raise
-
-
+# ---- SPA 静态托管：API 路由先注册；同一构建兼容根路径与飞牛网关。 ----
 _WEB_DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
 if (_WEB_DIST / "index.html").is_file():
-    app.mount("/", _SPAStaticFiles(directory=str(_WEB_DIST), html=True), name="web")
+    app.mount("/", SPAStaticFiles(directory=str(_WEB_DIST), html=True), name="web")
