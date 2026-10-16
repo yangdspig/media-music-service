@@ -32,7 +32,8 @@
           </div>
         </section>
         <p class="mm-notice">按所选数量逐首解析下载信息，切换页面后继续解析并保留结果；QQ 每次最多解析前 100 首，无下载地址或解析失败的曲目计入跳过。</p>
-        <TrackList v-model="selected" :tracks="tracks" :loading="parsing" :title="current.name" :loading-text="parseTask?.status === 'success' ? '解析完成，正在加载曲目结果…' : parseTask?.message || '正在创建解析任务…'" :empty-text="parseTask?.status === 'failed' ? '解析失败，请重试' : parseTask?.status === 'canceled' ? '解析已停止' : '没有可下载曲目'" :note="`曲目来自本次解析；无下载地址的曲目可能被过滤。`" @download="downloadTracks = $event" />
+        <TrackPreviewPlayer :key="`${source}:${current.id}:${parseTask?.task_id || ''}`" ref="previewPlayer" @track-change="activeTrackId = $event" />
+        <TrackList v-model="selected" :tracks="tracks" :loading="parsing" :title="current.name" previewable :active-track-id="activeTrackId" :loading-text="parseTask?.status === 'success' ? '解析完成，正在加载曲目结果…' : parseTask?.message || '正在创建解析任务…'" :empty-text="parseTask?.status === 'failed' ? '解析失败，请重试' : parseTask?.status === 'canceled' ? '解析已停止' : '没有可下载曲目'" :note="`点击歌名试听单首，勾选后可试听已选或试听全部；无下载地址的曲目可能被过滤。`" @preview="previewPlayer?.playTracks($event)" @download="downloadTracks = $event" />
       </template>
     </div>
     <TrackDownloadDialog v-if="downloadTracks" :tracks="downloadTracks" @close="downloadTracks = null" />
@@ -45,6 +46,7 @@ import { BarChart3, Download, RefreshCw } from 'lucide-vue-next'
 import AppShell from '../components/AppShell.vue'
 import TrackList from '../components/TrackList.vue'
 import TrackDownloadDialog from '../components/TrackDownloadDialog.vue'
+import TrackPreviewPlayer from '../components/TrackPreviewPlayer.vue'
 import { useChartsStore, CHART_PLATFORMS, ACTIVE_PARSE_STATUSES } from '../stores/charts'
 const chartsStore = useChartsStore()
 const { source, charts, loading, current, parsing, tracks, selected, limit, brokenCovers, parseTask, progressError, stopping, elapsed, stalledSeconds, progressPercent } = storeToRefs(chartsStore)
@@ -52,5 +54,6 @@ const { chartSummary, loadCharts, changeSource, selectChart, stopParse } = chart
 const platforms = CHART_PLATFORMS, activeStatuses = ACTIVE_PARSE_STATUSES
 const gradients = ['linear-gradient(135deg,#289c9a,#194545)', 'linear-gradient(135deg,#6366f1,#3730a3)', 'linear-gradient(135deg,#fb923c,#c2410c)', 'linear-gradient(135deg,#ec4899,#9d174d)']
 const downloadTracks = ref(null)
+const previewPlayer = ref(null), activeTrackId = ref(null)
 onMounted(chartsStore.ensureLoaded)
 </script>

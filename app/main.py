@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -18,7 +18,7 @@ from . import album as album_svc
 from . import archive as archive_svc
 from . import download as dl
 from . import fnos as fnos_svc
-from . import backfill, chartparse, charts as charts_svc, libraries, libops, meta, registry, storage, webbrowse, webconfig
+from . import backfill, chartparse, charts as charts_svc, libraries, libops, meta, preview, registry, storage, webbrowse, webconfig
 from .playlist import parse_playlist
 from .search import search
 from . import qrauth
@@ -63,6 +63,16 @@ def api_search(keyword: str, sources: str | None = None, limit: int = 20) -> Sea
     src_list = [s.strip() for s in sources.split(",")] if sources else None
     tracks, failed = search(keyword=keyword, sources=src_list, limit=limit)
     return SearchResponse(keyword=keyword, total=len(tracks), tracks=tracks, failed_sources=failed)
+
+
+@app.post("/api/v1/tracks/{track_id}/preview", dependencies=[Depends(auth)])
+def api_track_preview(track_id: str) -> dict:
+    return preview.issue(track_id)
+
+
+@app.get("/api/v1/preview/{token}")
+async def api_preview_stream(token: str, request: Request, range: str | None = Header(default=None)):
+    return await preview.stream(token, range, request)
 
 
 @app.get("/api/v1/playlist", response_model=list[Track], dependencies=[Depends(auth)])

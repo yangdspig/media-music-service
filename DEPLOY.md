@@ -64,33 +64,33 @@ docker compose --profile mcp up -d
 在源码目录执行（同时构建前后端，输出镜像归档及 SHA-256）：
 
 ```bash
-bash scripts/package-image.sh media-music-service:web-p3-20261009-r2
+bash scripts/package-image.sh media-music-service:web-preview-20261016
 ```
 
 如需复用本机已有的 Node 构建镜像：
 
 ```bash
-WEB_BUILD_IMAGE=node:22-slim bash scripts/package-image.sh media-music-service:web-p3-20261009-r2
+WEB_BUILD_IMAGE=node:22-slim bash scripts/package-image.sh media-music-service:web-preview-20261016
 ```
 
-归档输出到 `artifacts/media-music-service-web-p3-20261009-r2-linux-amd64.tar.gz`（架构后缀取自实际镜像）。把归档和 `.sha256` 拷到 NAS；部署目录为 `/vol1/1000/media-music-service` 的现有安装可执行：
+归档输出到 `artifacts/media-music-service-web-preview-20261016-linux-amd64.tar.gz`（架构后缀取自实际镜像）。把归档和 `.sha256` 拷到 NAS；部署目录为 `/vol1/1000/media-music-service` 的现有安装可执行：
 
 ```bash
 cd /vol1/1000/media-music-service
-sha256sum -c media-music-service-web-p3-20261009-r2-linux-amd64.tar.gz.sha256
-docker image load -i media-music-service-web-p3-20261009-r2-linux-amd64.tar.gz
-cat > docker-compose.web-p3.yml <<'YAML'
+sha256sum -c media-music-service-web-preview-20261016-linux-amd64.tar.gz.sha256
+docker image load -i media-music-service-web-preview-20261016-linux-amd64.tar.gz
+cat > docker-compose.web-preview.yml <<'YAML'
 services:
   music-service:
-    image: media-music-service:web-p3-20261009-r2
+    image: media-music-service:web-preview-20261016
 YAML
-docker compose -p media-music-service -f docker-compose.yml -f docker-compose.web-p3.yml up -d --no-deps --no-build --pull never music-service
-docker compose -p media-music-service -f docker-compose.yml -f docker-compose.web-p3.yml logs --tail=50 music-service
+docker compose -p media-music-service -f docker-compose.yml -f docker-compose.web-preview.yml up -d --no-deps --no-build --pull never music-service
+docker compose -p media-music-service -f docker-compose.yml -f docker-compose.web-preview.yml logs --tail=50 music-service
 ```
 
 覆盖文件仅指定新镜像，沿用原 Compose 的网络、端口、配置和媒体库挂载。后续 `up` 使用相同两个 `-f`；或者把原文件中 `music-service.image` 改为该版本后恢复单文件命令。若需同步升级 MCP，再给覆盖文件的 `mcp-adapter` 指定同一镜像。
 
-部署完成访问 `http://192.168.254.111:8765/`。此版本包含搜索/榜单结果保留、大小排序及字段、统一六源、网易默认榜单和飞牛数量修复。无需新增配置字段；挂载配置中已有的 `default_sources` 优先于镜像初始六源。如果仍是旧五源或自定义来源，在设置 → 下载与归档 → 使用常用六源后保存即可同步搜索页，无需重启。
+部署完成访问 `http://192.168.254.111:8765/`。此版本新增榜单单首/多选/全部顺序试听与播放控制、12px 绿/红源状态圆点、手机源列表默认折叠，以及底部榜单入口；保留已有的搜索/榜单结果与选择状态、大小排序、统一六源等功能。试听使用原始音频，不做转码，音源地址或浏览器格式支持会影响实际可播性。无需新增配置字段；挂载配置中已有的 `default_sources` 优先于镜像初始六源。如果仍是旧五源或自定义来源，在设置 → 下载与归档 → 使用常用六源后保存即可同步搜索页，无需重启。
 
 ### 更新应用代码
 

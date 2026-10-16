@@ -28,6 +28,8 @@ venv/bin/pip install -r requirements.txt                      # Linux/macOS
 
 ## 提交改动前请自测
 
+- 后端回归：`python -m pytest -q`；前端播放控制器与生产构建：在 `web/` 运行 `npm test` 和 `npm run build`
+- 改动榜单试听：检查单首、多选、全部播放，以及暂停恢复、停止归零、切歌、进度定位和切换页面后的清理；手机与桌面分别验证源列表折叠和导航
 - 改动搜索/下载相关：`curl 'http://127.0.0.1:8765/api/v1/search?keyword=周杰伦&limit=1'` 有结果，且能提交一次下载并落盘成功
 - 改动 MCP 适配器：用 MCP 客户端（或 fastmcp Client）跑通"搜歌 → 下载 → 查状态"链路
 - 升级 musicdl 后：回归 M1 主链路（搜索 + 下载 + 歌词/标签）

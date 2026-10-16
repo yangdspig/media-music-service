@@ -27,6 +27,7 @@
         </div>
 
         <!-- 数据源多选 -->
+        <MobileDisclosure id="search-source-options" label="数据源" :summary="sourceSelectionSummary">
         <div class="flex items-center gap-2 flex-wrap">
           <span class="text-xs text-muted-foreground mr-1">数据源：</span>
           <button
@@ -42,6 +43,7 @@
             {{ sourceDisplayName(src.name) }}<span v-if="!src.available"> · 不可用</span>
           </button>
         </div>
+        </MobileDisclosure>
       </section>
 
       <p v-if="sourcesLoading" class="text-xs text-muted-foreground" role="status">正在同步默认搜索来源…</p>
@@ -212,6 +214,7 @@ import { storeToRefs } from 'pinia'
 import { useSearchStore } from '../stores/search'
 import { Search, RefreshCw, Download, AlertTriangle, X, Loader2 } from 'lucide-vue-next'
 import AppShell from '../components/AppShell.vue'
+import MobileDisclosure from '../components/MobileDisclosure.vue'
 import client, { errorMessage } from '../api/client'
 import { useToastStore } from '../stores/toast'
 import { formatDuration, formatSize, qualityInfo, sourceDisplayName } from '../utils/format'
@@ -223,6 +226,10 @@ const route = useRoute()
 const searchStore = useSearchStore()
 const { keyword, limit, searchSources, selectedSources, tracks, sortedTracks, sortOrder, failedSources, searched, searching, selected, sourcesLoading, sourcesReady } = storeToRefs(searchStore)
 const { loadSources, doSearch } = searchStore
+const sourceSelectionSummary = computed(() => {
+  const names = [...selectedSources.value].map(sourceDisplayName)
+  return names.length ? `已选 ${names.length} 个 · ${names.slice(0, 2).join('、')}${names.length > 2 ? ' 等' : ''}` : '未选择数据源'
+})
 watch(() => route.query.keyword, (value) => {
   if (typeof value === 'string' && value !== searchStore.prefilledKeyword) {
     keyword.value = value

@@ -77,7 +77,7 @@
       <slot />
     </main>
     <nav class="fixed bottom-0 inset-x-0 z-40 bg-card border-t border-border flex justify-around min-[960px]:hidden pb-[env(safe-area-inset-bottom)]" aria-label="常用导航">
-      <RouterLink v-for="item in navItems.filter(item => ['dashboard', 'search', 'albums', 'tasks', 'settings'].includes(item.key))" :key="item.key" :to="item.to" class="flex flex-1 flex-col items-center gap-1 py-3 text-[11px]" :class="isActive(item) ? 'text-primary' : 'text-muted-foreground'" :aria-current="isActive(item) ? 'page' : undefined"><component :is="item.icon" class="w-4 h-4" />{{ item.label }}</RouterLink>
+      <RouterLink v-for="item in navItems.filter(item => ['dashboard', 'search', 'charts', 'tasks', 'settings'].includes(item.key))" :key="item.key" :to="item.to" class="flex flex-1 flex-col items-center gap-1 py-3 text-[11px]" :class="isActive(item) ? 'text-primary' : 'text-muted-foreground'" :aria-current="isActive(item) ? 'page' : undefined"><component :is="item.icon" class="w-4 h-4" />{{ item.label }}</RouterLink>
     </nav>
   </div>
 </template>

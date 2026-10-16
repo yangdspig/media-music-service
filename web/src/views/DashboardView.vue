@@ -86,20 +86,23 @@
       </div>
       <div v-if="sourcesLoading && !sources.length" class="py-8 text-center text-sm text-muted-foreground">加载中...</div>
       <div v-else-if="!sources.length" class="py-8 text-center text-sm text-muted-foreground">未能获取源列表</div>
-      <div v-else class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+      <MobileDisclosure v-else id="dashboard-source-details" label="查看源状态" :summary="`共 ${sources.length} 个源 · ${availableCount} 个可用 · ${sources.length - availableCount} 个异常`">
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         <div
           v-for="src in sources"
           :key="src.name"
           class="source-chip flex items-center gap-2 rounded-md border border-border px-3 py-2"
-          :title="src.available ? src.name : (src.note || '不可用')"
+          :title="src.available ? `${src.name} · 正常` : `${src.name} · ${src.note || '不可用'}`"
         >
-          <span class="status-dot" :class="src.available ? 'status-dot--on' : 'status-dot--off'"></span>
+          <span class="status-dot" :class="src.available ? 'status-dot--on' : 'status-dot--off'" aria-hidden="true"></span>
+          <span class="sr-only">{{ src.available ? '正常：' : '异常：' }}</span>
           <span class="truncate text-sm" :class="{ 'text-muted-foreground': !src.available }">{{ sourceDisplayName(src.name) }}</span>
         </div>
       </div>
-      <p v-if="sources.length" class="mt-4 text-xs text-muted-foreground">
+      <p class="mt-4 text-xs text-muted-foreground">
         共 {{ sources.length }} 个源，{{ availableCount }} 个可用，{{ sources.length - availableCount }} 个不可用。不可用源已自动降级或移除。
       </p>
+      </MobileDisclosure>
     </section>
 
     <!-- ===== 最近任务 ===== -->
@@ -180,6 +183,7 @@ import {
   Search, ListMusic, BarChart3, Settings,
 } from 'lucide-vue-next'
 import AppShell from '../components/AppShell.vue'
+import MobileDisclosure from '../components/MobileDisclosure.vue'
 import client, { errorMessage } from '../api/client'
 import { useToastStore } from '../stores/toast'
 import { sourceDisplayName, taskDisplayName, isAlbumTask, TASK_STATUS_TEXT } from '../utils/format'
